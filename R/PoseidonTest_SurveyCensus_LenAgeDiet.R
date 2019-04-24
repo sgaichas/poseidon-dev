@@ -91,6 +91,9 @@ ageclcomp + facet_wrap(~species, ncol=5) #, scales="free")
 # setting the effN higher than actual numbers results in sampling all
 effNall <- data.frame(species=groups2, effN=rep(1e+15, length(groups2)))
 # rmultinom broke with that sample size
+#comptestall <- sample_fish(survey_testNall, effNall)
+#names(comptestall) <- c("species","agecl","polygon", "layer","time","numAtAgesamp")
+
 # this one is high but not equal to total for numerous groups
 effNhigh <- data.frame(species=groups2, effN=rep(1e+8, length(groups2)))
 
