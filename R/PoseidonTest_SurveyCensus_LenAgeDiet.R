@@ -6,7 +6,7 @@
 #   weight samples from sample_weights (TO BE WRITTEN)
 #   diet samples from sample_diet
 #
-# S. Gaichas Feb 2017, revied Apr 2019
+# S. Gaichas Feb 2017, revised Apr 2019
 
 library(tidyr)
 library(dplyr)
@@ -18,13 +18,17 @@ library(here)
 # for reference, this is the call to run_truth for NEUS1.0 in trunk
 # this model produces required files, but is untuned
 
+#define directories using here
+d.name <- here("atlantisoutput", "NEUStest20160303")
+
 #define group names
 #groups2 <- load_fgs(dir = "test20160303", "NeusGroups.csv")
-groups2 <- load_fgs(here("test20160303", "NeusGroups.csv")) #doesnt work bc outside proj dir
+groups2 <- load_fgs(d.name, "NeusGroups.csv") 
 groups2 <- groups2[groups2$IsTurnedOn > 0, "Name"]
 
+#this takes a long time
 run_truth(scenario = "neusDynEffort_Test1_",
-          dir = "test20160303",
+          dir = d.name,
           file_fgs = "NeusGroups.csv",
           file_bgm = "neus30_2006.bgm",
           select_groups = groups2,
@@ -32,7 +36,7 @@ run_truth(scenario = "neusDynEffort_Test1_",
           file_biolprm = "at_biol_neus_v15_DE.prm",
           file_runprm = "at_run_neus_v15_DE.xml")
 
-load("test20160303/outputneusDynEffort_Test1_run_truth.Rdata")
+load(file.path(d.name, "outputneusDynEffort_Test1_run_truth.Rdata"))
 
 # this is the create survey call using the loaded run_truth output "result"
 
