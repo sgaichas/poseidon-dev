@@ -64,12 +64,21 @@ survey_testNall <- create_survey(dat = result$nums,
                                  selex = selex1)
 
 # what is true composition? need annual by species, use code from sample_fish
-dat<-survey_testNall
-dat2 <- aggregate(dat$atoutput,list(dat$species,dat$agecl,dat$time),sum)
-names(dat2) <- c("species","agecl","time","numAtAge")
+# do tidyly
+dat2 <- survey_testNall %>%
+  group_by(species, agecl, time) %>%
+  summarize(numAtAge = sum(atoutput))
 
-totN <- aggregate(dat2$numAtAge,list(dat2$species,dat2$time),sum )
-names(totN) <- c("species","time","totN")
+#dat<-survey_testNall
+#dat2 <- aggregate(dat$atoutput,list(dat$species,dat$agecl,dat$time),sum)
+#names(dat2) <- c("species","agecl","time","numAtAge")
+
+totN <- dat2 %>%
+  group_by(species, time) %>%
+  summarize(totN = sum(numAtAge))
+
+#totN <- aggregate(dat2$numAtAge,list(dat2$species,dat2$time),sum )
+#names(totN) <- c("species","time","totN")
 
 dat2totN <- merge(dat2, totN)
 
