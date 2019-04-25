@@ -128,7 +128,7 @@ if(initNEUS) NEUSresults <- results
 if(initNOBA) NOBAresults <- results
 ```
 
-Now the R object `results` with the comprehensive results from the Atlantis model has been read in. 
+Now the R object `results` with the comprehensive results from the Atlantis model has been read in. It is also saved as an .RData file titled "output[scenario.name]run_truth.RData" in the directory with the model output, so that later steps can use `load()' instead of taking the time to rerun `atlantisom::run_truth()'. 
 
 
 
