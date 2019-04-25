@@ -1,0 +1,147 @@
+---
+title: "Testing atlantisom: true biomass output from Atlantis"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "April 25, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This page documents initial testing of the atlantisom package in development at https://github.com/r4atlantis/atlantisom using three different [Atlantis](https://research.csiro.au/atlantis/) output datasets. Development of atlantisom began at the [2015 Atlantis Summit](https://research.csiro.au/atlantis/atlantis-summit/) in Honolulu, Hawaii, USA. 
+
+The purpose of atlantisom is to use existing Atlantis model output to generate input datasets for a variety of models, so that the performance of these models can be evaluated against known (simulated) ecosystem dynamics. Atlantis models can be run using different climate forcing, fishing, and other scenarios. Users of atlantisom will be able to specify fishery independent and fishery dependent sampling in space and time, as well as species-specific catchability, selectivty, and other observation processes for any Atlantis scenario. Internally consistent multispecies and ecosystem datasets with known observation error characteristics will be the atlantisom outputs, for use in individual model performance testing, comparing performance of alternative models, and performance testing of model ensembles against "true" Atlantis outputs.
+
+Initial testing was conducted by S. Gaichas using R scripts in the R folder of this repository that are titled "PoseidonTest_[whatwastested].R". Initial tests are expanded and documented in more detail in these pages. C. Stawitz improved and streamlined the setup and intialization sections. 
+
+## Setup
+
+First, you will want to load packages and initialize the correct file and working directory names. 
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+```
+
+If you want to load the local of the atlantisom R package, use devtools. The R package here [@`citation(here)'] is helpful for installing from your local atlantisom directory, as it avoids hardcoding the specific location. The code below is not running from our local atlantisom directory and is not evaluated:
+
+```{r eval=FALSE, message=FALSE, warning=FALSE}
+require(devtools)
+package.dir <- here()
+devtools::load_all(package.dir)
+library(atlantisom)
+```
+
+Or you can install directly from the Github repository.
+
+```{r eval=FALSE, message=FALSE, warning=FALSE}
+devtools::install_github("r4atlantis\atlantisom")
+```
+
+## Initializing input files and directories
+
+You will first need to tell `atlantisom` to know where to look for the output and input files from your atlantis model run. Here, we will give the directory where the Atlantis inputs and outputs are stored `d.name`, the location of the functional groups file `functional.group.file` (.csv), the biomass pools file `biomass.pools.file` (.nc), the box locations file `box.file` (.bgm), an `initial.conditions.file` (.nc), the biology .prm file `biol.prm.file` (.prm), and the run .prm file `run.prm.file` (.prm). You will also need to specify a scenario name, which will be used to define the output files (i.e. output is stored in a number of netCDF files of the format: output<scenario><value>.nc). All of these files should be stored in `d.name`.
+
+In general, Atlantis model output files that are sufficiently detailed to mimic fishery sampling in space and time are too large to store on GitHub, so are not included as examples with the atlantisom code. 
+
+In this example, we have a local folder "atlantisoutput" with three subdirectories:
+  * "CalCurrentSummitScenario1": California Current Atlantis model output
+  * "NEUStest20160303": older (broken) Northeast US Atlantis model output
+  * "NOBACERESGlobalSustainability": Norwegian-Barents Sea Atlantis model output
+  
+Our directory structure is set up to take advantage of `here()' to allow setup on a different computer.
+
+```{r initialize}
+
+initCCA <- TRUE
+initNEUS <- FALSE
+initNOBA <- FALSE
+
+if(initCCA){
+  d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
+  functional.groups.file <- "CalCurrentV3Groups.csv"
+  biomass.pools.file <- "DIVCalCurrentV3_BIOL.nc"
+  biol.prm.file <- "CalCurrentV3_Biol.prm"
+  box.file <- "CalCurrentV3_utm.bgm"
+  initial.conditions.file <- "DIVCalCurrentV3_BIOL.nc"
+  run.prm.file <- "CalCurrentV3_run.xml"
+  scenario.name <- "CCV3"
+}
+
+if(initNEUS){
+  d.name <- here("atlantisoutput","NEUStest20160303")
+  functional.groups.file <- "NeusGroups.csv" 
+  biomass.pools.file <- ""
+  biol.prm.file <- "at_biol_neus_v15_DE.prm"
+  box.file <- "neus30_2006.bgm"
+  initial.conditions.file <- "inneus_2012.nc"
+  run.prm.file <- "at_run_neus_v15_DE.xml"
+  scenario.name <- "neusDynEffort_Test1_"
+}
+
+if(initNOBA){
+  d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
+  functional.groups.file <- "nordic_groups_v04.csv" 
+  biomass.pools.file <- "nordic_biol_v23.nc"
+  biol.prm.file <- "nordic_biol_incl_harv_v_007_3.prm"
+  box.file <- "Nordic02.bgm"
+  initial.conditions.file <- ".nc"
+  run.prm.file <- "nordic_run_v01.prm"
+  scenario.name <- "nordic_runresults_01"
+}
+
+```
+
+## Getting the "true" operating model values
+
+There are a number of functions in the package that begin with the prefix `load` that load various files. See documentation if you'd only like to load one file. The `atlantisom::run_truth()` function uses the above file definitions and calls a number of the `load` functions to read in all of the atlantis output. Note: this call reads in a number of large .nc files, so it will take a few minutes to return.
+
+```{r get_truth, message=FALSE}
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+#Store all loaded results into an R object
+results <- run_truth(scenario = scenario.name,
+          dir = d.name,
+          file_fgs = functional.groups.file,
+          file_bgm = box.file,
+          select_groups = funct.group.names,
+          file_init = initial.conditions.file,
+          file_biolprm = biol.prm.file,
+          file_runprm = run.prm.file
+)
+
+if(initCCA) CCAresults <- results
+if(initNEUS) NEUSresults <- results
+if(initNOBA) NOBAresults <- results
+```
+
+Now the R object `results` with the comprehensive results from the Atlantis model has been read in. 
+
+
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
