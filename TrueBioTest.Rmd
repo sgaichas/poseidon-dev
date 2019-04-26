@@ -93,8 +93,8 @@ if(initNOBA){
   biomass.pools.file <- "nordic_biol_v23.nc"
   biol.prm.file <- "nordic_biol_incl_harv_v_007_3.prm"
   box.file <- "Nordic02.bgm"
-  initial.conditions.file <- ".nc"
-  run.prm.file <- "nordic_run_v01.prm"
+  initial.conditions.file <- "nordic_biol_v23.nc"
+  run.prm.file <- "nordic_run_v01.xml"
   scenario.name <- "nordic_runresults_01"
 }
 
@@ -104,7 +104,7 @@ if(initNOBA){
 
 There are a number of functions in the package that begin with the prefix `load` that load various files. See documentation if you'd only like to load one file. The `atlantisom::run_truth()` function uses the above file definitions and calls a number of the `load` functions to read in all of the atlantis output. Note: this call reads in a number of large .nc files, so it will take a few minutes to return.
 
-```{r get_truth, message=FALSE, warning=FALSE, eval=FALSE}
+```{r get_names, message=FALSE, warning=FALSE}
 #Load functional groups
 funct.groups <- load_fgs(dir=d.name,
                          file_fgs = functional.groups.file)
@@ -114,6 +114,9 @@ funct.group.names <- funct.groups %>%
   select(Name) %>%
   .$Name
 
+```
+
+```{r get_truth, message=FALSE, warning=FALSE, eval = FALSE}
 #Store all loaded results into an R object
 results <- run_truth(scenario = scenario.name,
           dir = d.name,
@@ -128,6 +131,7 @@ results <- run_truth(scenario = scenario.name,
 if(initCCA) CCAresults <- results
 if(initNEUS) NEUSresults <- results
 if(initNOBA) NOBAresults <- results
+
 ```
 
 Now the R object `results` with the comprehensive results from the Atlantis model has been read in. It is also saved as an .RData file titled "output[scenario.name]run_truth.RData" in the directory with the model output, so that later analyses can use `load()' instead of taking the time to rerun `atlantisom::run_truth()'. 
@@ -152,27 +156,27 @@ selex1 <- data.frame(species=rep(funct.group.names, each=10),
                      selex=rep(1.0,length(funct.group.names)*10))
 
 # should return all model areas; need to generalize
-if(initCCA)
+if(initCCA) boxall <- c(0:29) #placeholder, correct for CCA
 if(initNEUS) boxall <- c(0:29)
-if(initNOBA)
+if(initNOBA) boxall <- c(0:29) #placeholder, correct for NOBA
 
 # should return all model output timesteps; need to generalize
-if(initCCA)
+if(initCCA) timeall <- c(0:251) #placeholder, correct for CCA
 if(initNEUS) timeall <- c(0:251)
-if(initNOBA)
+if(initNOBA) timeall <- c(0:251) #placeholder, correct for NOBA
   
 # define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
 # for ecosystem indicator work test all species
 # to keep plots simpler, currently hardcoded for vertebrate groups
-if(initCCA)
+if(initCCA) survspp <- funct.group.names[1:21] #placeholder, correct for CCA
 if(initNEUS) survspp <- funct.group.names[1:21]
-if(initNOBA)
+if(initNOBA) survspp <- funct.group.names[1:21] #placeholder, correct for NOBA
   
 ```
 
 Because the results of `run_truth' provide both biomass at age and numbers at age, we can use `create_survey' on both with some modifications.
 
-```{r surveyBbased}
+```{r surveyBbased, eval = FALSE}
 
 # this uses result$biomass_ages to sample biomass directly
 
@@ -189,7 +193,7 @@ survey_testBall <- create_survey(dat = datB,
 
 ```
 
-```{r surveyNbased}
+```{r surveyNbased , eval = FALSE}
 
 # this uses result$nums so will need a weight at age to get biomass
 
