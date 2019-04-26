@@ -19,7 +19,15 @@ Initial testing was conducted by S. Gaichas using R scripts in the R folder of t
 
 ## Setup
 
-First, you will want to install atlantisom if you haven't already.
+First, you will want to set up libraries and install atlantisom if you haven't already.
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+```
 
 If you want to load the local of the atlantisom R package, use devtools. The R package here [@`citation(here)'] is helpful for installing from your local atlantisom directory, as it avoids hardcoding the specific location. The code below is not running from our local atlantisom directory and is not evaluated:
 
@@ -35,14 +43,9 @@ Or you can install directly from the Github repository.
 devtools::install_github("r4atlantis\atlantisom")
 ```
 
-Next, load packages. 
+Next, load the package. 
 
 ```{r message=FALSE, warning=FALSE}
-library(tidyr)
-require(dplyr)
-library(ggplot2)
-library(data.table)
-library(here)
 library(atlantisom)
 ```
 
