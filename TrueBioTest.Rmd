@@ -120,7 +120,7 @@ funct.group.names <- funct.groups %>%
 
 ```
 
-```{r get_truth, message=FALSE, warning=FALSE}
+```{r get_truth, message=FALSE, warning=FALSE, eval=FALSE}
 #Store all loaded results into an R object
 results <- run_truth(scenario = scenario.name,
           dir = d.name,
@@ -148,33 +148,40 @@ To create a survey, the user specifies the timing of the survey, which species a
 
 The following settings should achieve a survey that samples all Atlantis model output timesteps, all species, and all model polygons, with perfect efficiency and full selectivity for all ages: 
 
-```{r census-spec, message=FALSE, warning=FALSE, eval=FALSE}
+```{r census-spec, message=FALSE, warning=FALSE}
 
 # should return a perfectly scaled survey 
 effic1 <- data.frame(species=funct.group.names,
                      efficiency=rep(1.0,length(funct.group.names)))
 
 # should return all lengths fully sampled (Atlantis output is 10 age groups per spp)
+# BUT CHECK if newer Atlantis models can do age-specific outputs
 selex1 <- data.frame(species=rep(funct.group.names, each=10),
                      agecl=rep(c(1:10),length(funct.group.names)),
                      selex=rep(1.0,length(funct.group.names)*10))
 
-# should return all model areas; need to generalize
-if(initCCA) boxall <- c(0:29) #placeholder, correct for CCA
-if(initNEUS) boxall <- c(0:29)
-if(initNOBA) boxall <- c(0:29) #placeholder, correct for NOBA
+# should return all model areas
+boxpars <- load_box(d.name, box.file)
+boxall <- c(0:(boxpars$nbox - 1))
+
+# these are model specific, generalized above
+# if(initCCA) boxall <- c(0:88) 
+# if(initNEUS) boxall <- c(0:29)
+# if(initNOBA) boxall <- c(0:59) 
 
 # should return all model output timesteps; need to generalize
-if(initCCA) timeall <- c(0:251) #placeholder, correct for CCA
+if(initCCA) timeall <- c(0:100) 
 if(initNEUS) timeall <- c(0:251)
-if(initNOBA) timeall <- c(0:251) #placeholder, correct for NOBA
+if(initNOBA) timeall <- c(0:560) 
   
 # define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
-# for ecosystem indicator work test all species
-# to keep plots simpler, currently hardcoded for vertebrate groups
-if(initCCA) survspp <- funct.group.names[1:21] #placeholder, correct for CCA
+# for ecosystem indicator work test all species, e.g.
+survspp <- funct.group.names 
+
+# to keep plots simpler, currently hardcoded for vertebrate/fished invert groups
+if(initCCA) survspp <- funct.group.names[c(1:44, 59:61, 65:68)] 
 if(initNEUS) survspp <- funct.group.names[1:21]
-if(initNOBA) survspp <- funct.group.names[1:21] #placeholder, correct for NOBA
+if(initNOBA) survspp <- funct.group.names[1:36]
   
 ```
 
