@@ -1,7 +1,7 @@
 ---
 title: "Testing atlantisom: true biomass output from Atlantis"
 author: "Sarah Gaichas and Christine Stawitz"
-date: "April 25, 2019"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
 
@@ -142,7 +142,7 @@ if(initNOBA) NOBAresults <- results
 
 Now the R object `results` with the comprehensive results from the Atlantis model has been read in. It is also saved as an .RData file titled "output[scenario.name]run_truth.RData" in the directory with the model output, so that later analyses can use 'load()' instead of taking the time to rerun `atlantisom::run_truth()'. 
 
-Note: on Sarah's laptop, CCA took ~40 minutes to return from `run_truth` and NOBA took an hour and 26 minutes to return. Therefore, reading the RData file in as below is advised after the first run to make the plots comparing systems later in this document.
+Note: on Sarah's laptop, CCA took ~40 minutes to return from `run_truth` and NOBA took an hour and 26 minutes to return. Therefore, reading the .RData file in as below is advised after the first run to make the plots comparing systems later in this document.
 
 ```{r load_Rdata, message=FALSE, warning=FALSE}
 
@@ -217,7 +217,7 @@ if(initNOBA) survspp <- funct.group.names[1:36]
 
 Because the results of `run_truth` provide both biomass at age and numbers at age, we can use `create_survey` on both with some modifications. The following uses the biomass output of `run_truth` to create the survey, so the call to `sample_survey_biomass` will require a weight at age argument that is filled with 1's because no conversion from numbers to weight is necessary. Because we are making a census for testing, the survey cv argument is set to 0. 
 
-```{r surveyBbased, eval = FALSE}
+```{r surveyBbased}
 
 # this uses result$biomass_ages to sample biomass directly
 
