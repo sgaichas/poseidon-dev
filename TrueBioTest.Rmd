@@ -252,7 +252,7 @@ if(initNOBA) NOBAsurveyB_frombio <- surveyB_frombio
 
 Comparing our (census) survey based on true biomass from above with the Atlantis output file "[modelscenario]BiomIndx.txt" should give us a perfect match. Note that the our (census) survey may have more sampling in time than the Atlantis output file.
 
-```{r matchB, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; first 9 species."}
+```{r matchB, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; first 9 species.", message=FALSE, warning=FALSE}
 # plot some comparisons with Atlantis output
 
 # read Atlantis output files
@@ -307,9 +307,15 @@ compareB +
 
 ```
 
-```{r matchBp3, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; last 9 species. Depending on the model, we may not show all species in this example."}
+```{r matchBp3, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; next 9 species."}
 compareB + 
   facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free") 
+
+```
+
+```{r matchBp4, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; last 9 species. Depending on the model, we may not show all species in this example."}
+compareB + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
 
 ```
 
@@ -400,10 +406,17 @@ compareB_N +
 
 ```
 
-```{r matchBfromN3, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; last 9 species.Depending on the model, we may not show all species in this example."}
+```{r matchBfromN3, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; next 9 species."}
 
 compareB_N + 
   facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free") 
+
+```
+
+```{r matchBfromN4, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; last 9 species.Depending on the model, we may not show all species in this example."}
+
+compareB_N + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
 
 ```
 
