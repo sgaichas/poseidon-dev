@@ -284,14 +284,14 @@ atBtxt2tidy <- atBtxt2 %>%
   #select(Time, FPL:DIN) %>%
   rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
   gather(species, biomass, -Time) %>%
-  filter(species == levels(surveyB_frombio$species))
+  filter(species %in% levels(surveyB_frombio$species))
 
 #all species comparison, time intervals hardcoded for NEUS and NOBA
 compareB <-ggplot() +
   geom_line(data=surveyB_frombio, aes(x=time/5,y=atoutput, color="survey census B"), 
-            alpha = 3/10) +
+            alpha = 10/10) +
   geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
-             alpha = 3/10) + 
+             alpha = 1/10) + 
   theme_tufte() +
   theme(legend.position = "top") +
   labs(colour=scenario.name)
