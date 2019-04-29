@@ -185,7 +185,7 @@ if(initNOBA) survspp <- funct.group.names[1:36]
   
 ```
 
-Because the results of `run_truth` provide both biomass at age and numbers at age, we can use `create_survey` on both with some modifications.
+Because the results of `run_truth` provide both biomass at age and numbers at age, we can use `create_survey` on both with some modifications. The following uses the biomass output of `run_truth` to create the survey, so the call to `sample_survey_biomass` will require a weight at age argument that is filled with 1's because no conversion from numbers to weight is necessary. Because we are making a census for testing, the survey cv argument is set to 0. 
 
 ```{r surveyBbased, eval = FALSE}
 
@@ -202,7 +202,25 @@ survey_testBall <- create_survey(dat = datB,
                                  effic = effic1,
                                  selex = selex1)
 
+# make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+# call sample_survey_biomass with a bunch of 1s for weight at age
+# in the code it multiplies atoutput by wtatage so this allows us to use
+# biomass directly
+wtage <- data.frame(species=rep(survspp, each=10),
+                    agecl=rep(c(1:10),length(survspp)),
+                    wtAtAge=rep(1.0,length(survspp)*10))
+
+surveyB_frombio <- sample_survey_biomass(survey_testBall, surv_cv, wtage)
+
+if(initCCA) CCAsurveyB_frombio <- surveyB_frombio
+if(initNEUS) NEUSsurveyB_frombio <- surveyB_frombio
+if(initNOBA) NOBAsurveyB_frombio <- surveyB_frombio
+
 ```
+
+
 
 ```{r surveyNbased , eval = FALSE}
 
