@@ -250,6 +250,9 @@ wtage <- data.frame(species=rep(survspp, each=10),
 
 surveyB_frombio <- sample_survey_biomass(survey_testBall, surv_cv, wtage)
 
+#save for later use, takes a long time to generate
+saveRDS(surveyB_frombio, file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+
 if(initCCA) CCAsurveyB_frombio <- surveyB_frombio
 if(initNEUS) NEUSsurveyB_frombio <- surveyB_frombio
 if(initNOBA) NOBAsurveyB_frombio <- surveyB_frombio
@@ -377,6 +380,8 @@ wtage <- calcwtage %>%
   select(species, agecl, wtAtAge)
 
 surveyB_fromN <- sample_survey_biomass(survey_testNall, surv_cv, wtage)
+#save for later use, takes a long time to generate
+saveRDS(surveyB_fromN, file.path(d.name, paste0(scenario.name, "surveyBfromNcensus.rds")))
 
 if(initCCA) CCAsurveyB_fromN <- surveyB_fromN
 if(initNEUS) NEUSsurveyB_froN <- surveyB_fromN
