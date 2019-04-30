@@ -1,5 +1,5 @@
 ---
-title: "Testing atlantisom: true biomass output from Atlantis"
+title: "Testing atlantisom: example bottom trawl survey index"
 author: "Sarah Gaichas and Christine Stawitz"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
@@ -25,7 +25,7 @@ Initial testing was conducted by S. Gaichas using R scripts in the R folder of t
 
 ## Setup
 
-First, you will want to set up libraries and install atlantisom if you haven't already. This document assumes atlantisom is already installed. Some code blocks are hidden here. For complete setup and initialization, please see https://sgaichas.github.io/poseidon-dev/TrueBioTest.html. 
+First, you will want to set up libraries and install atlantisom if you haven't already. This document assumes atlantisom is already installed. For complete setup and initialization, please see [TrueBioTest](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html). 
 
 This document is written in in R Markdown [@R-rmarkdown], and we use several packages to produce the outputs [@R-tidyr; @R-dplyr; @R-ggplot2; @R-here; @R-ggforce; @R-ggthemes]. 
 
@@ -43,7 +43,7 @@ library(atlantisom)
 
 ## Initialize input files and directories, read in "truth"
 
-Abbreviated here; please see https://sgaichas.github.io/poseidon-dev/TrueBioTest.html. This document assumes that `atlantisom::run_truth` has already completed and stored an .RData file in the atlantis output model directory.
+Abbreviated here; for a full explanation please see [TrueBioTest](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html). This document assumes that `atlantisom::run_truth` has already completed and stored an .RData file in the atlantis output model directory.
 
 ```{r initialize}
 
@@ -294,7 +294,7 @@ if(initNOBA) survspp <- funct.group.names[1:36]
 
 Here we use `create_survey` on the biomass output of `run_truth` to create the survey, so the call to `sample_survey_biomass` will require a weight at age argument that is filled with 1's because no conversion from numbers to weight is necessary. 
 
-```{r surveyBbased}
+```{r stdsurveyBbased}
 
 # this uses result$biomass_ages to sample biomass directly
 
@@ -302,15 +302,12 @@ if(initCCA) datB <- CCAresults$biomass_ages
 if(initNEUS) datB <- NEUSresults$biomass_ages
 if(initNOBA) datB <- NOBAresults$biomass_ages
 
-survey_testBall <- create_survey(dat = datB,
-                                 time = timeall,
+survey_testBstd <- create_survey(dat = datB,
+                                 time = annualmidyear,
                                  species = survspp,
-                                 boxes = boxall,
-                                 effic = effic1,
-                                 selex = selex1)
-
-# make up a constant 0 cv for testing
-surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+                                 boxes = boxsurv,
+                                 effic = efficmix,
+                                 selex = selexmix)
 
 # call sample_survey_biomass with a bunch of 1s for weight at age
 # in the code it multiplies atoutput by wtatage so this allows us to use
@@ -319,11 +316,11 @@ wtage <- data.frame(species=rep(survspp, each=10),
                     agecl=rep(c(1:10),length(survspp)),
                     wtAtAge=rep(1.0,length(survspp)*10))
 
-surveyB_frombio <- sample_survey_biomass(survey_testBall, surv_cv, wtage)
+stdsurveyB_frombio <- sample_survey_biomass(survey_testBstd, surv_cv_mix, wtage)
 
-if(initCCA) CCAsurveyB_frombio <- surveyB_frombio
-if(initNEUS) NEUSsurveyB_frombio <- surveyB_frombio
-if(initNOBA) NOBAsurveyB_frombio <- surveyB_frombio
+if(initCCA) CCAstdsurveyB_frombio <- stdsurveyB_frombio
+if(initNEUS) NEUSstdsurveyB_frombio <- stdsurveyB_frombio
+if(initNOBA) NOBAstdsurveyB_frombio <- stdsurveyB_frombio
 
 ```
 
@@ -369,6 +366,11 @@ compareB <-ggplot() +
             alpha = 10/10) +
   geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
              alpha = 1/10) + 
+  #geom_line(data=surveyB_frombio_eff, aes(x=time/5,y=atoutput, color="stdeffB")) +
+  #geom_line(data=surveyB_frombio_effsel, aes(x=time/5,y=atoutput, color="stdeffselB")) +
+  geom_point(data=surveyB_frombio_effselcv, aes(x=time/5,y=atoutput, color="stdeffcvselB"),
+              alpha = 1/2) +
+
   theme_tufte() +
   theme(legend.position = "top") +
   labs(colour=scenario.name)
@@ -396,109 +398,6 @@ compareB +
 
 ```
 
-After comparing the survey census based on the biomass output of `run_truth`, we now look at a biomass index that is estimated based on numbers in the survey census and an average weight at age. This is more complex, but may be closer to the way some assessments handle survey observations. 
-
-```{r surveyNbased, fig.cap="Check weight at age generated from biomass_age$atoutput divided by nums$atoutput for up to 48 groups.", fig.show="hold"}
-
-# this uses result$nums so will need a weight at age to get biomass
-
-if(initCCA) datN <- CCAresults$nums
-if(initNEUS) datN <- NEUSresults$nums
-if(initNOBA) datN <- NOBAresults$nums
-
-survey_testNall <- create_survey(dat = datN,
-                                 time = timeall,
-                                 species = survspp,
-                                 boxes = boxall,
-                                 effic = effic1,
-                                 selex = selex1)
-
-# as above, make up a constant 0 cv for testing
-surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
-
-# now we need a weight at age to convert numbers to weight
-# if I do biomass_age$atoutput divided by nums$atoutput I should have wt@age, yes?
-
-nums_test <- with(datN, aggregate(atoutput, list(species, agecl), sum))
-names(nums_test) <- c("species", "agecl", "nums")
-
-bio_test  <- with(datB, aggregate(atoutput, list(species, agecl), sum))
-names(bio_test) <- c("species", "agecl", "wt")
-
-calcwtage <- merge(bio_test, nums_test) %>%
-  mutate(wtAtAge=wt/nums)
-
-wtagecheck <- ggplot(calcwtage, aes(x=agecl, y=wtAtAge)) +
-  geom_point() + 
-  theme_tufte() +
-  theme(legend.position = "top") +
-  labs(colour=scenario.name)
-
-wtagecheck + 
-  facet_wrap_paginate(~species, ncol=4, nrow=4, page=1, scales="free")
-
-wtagecheck + 
-  facet_wrap_paginate(~species, ncol=4, nrow=4, page=2, scales="free")
-
-wtagecheck + 
-  facet_wrap_paginate(~species, ncol=4, nrow=4, page=3, scales="free")
-
-# variable name needs to be wtAtAge or doesnt work
-wtage <- calcwtage %>%
-  select(species, agecl, wtAtAge)
-
-surveyB_fromN <- sample_survey_biomass(survey_testNall, surv_cv, wtage)
-
-if(initCCA) CCAsurveyB_fromN <- surveyB_fromN
-if(initNEUS) NEUSsurveyB_froN <- surveyB_fromN
-if(initNOBA) NOBAsurveyB_fromN <- surveyB_fromN
-
-```
-
-Now we plot the results of the numbers-based (census) survey biomass against the same Atlantis output file "[modelscenario]BiomIndx.txt" as above. 
-
-```{r matchBfromN, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; first 9 species." }
-
-if(initCCA) surveyB_fromN <- CCAsurveyB_fromN
-if(initNEUS) surveyB_froN <- NEUSsurveyB_fromN
-if(initNOBA) surveyB_fromN <- NOBAsurveyB_fromN
-
-#all species comparison, time intervals hardcoded for NEUS and NOBA
-compareB_N <-ggplot() +
-  geom_line(data=surveyB_fromN, aes(x=time/5,y=atoutput, color="survey census N->B"), 
-            alpha = 10/10) +
-  geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
-             alpha = 1/10) + 
-  theme_tufte() +
-  theme(legend.position = "top") +
-  labs(colour=scenario.name)
-
-compareB_N + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free") 
-
-```
-
-```{r matchBfromN2, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; next 9 species."}
-
-compareB_N + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free") 
-
-```
-
-```{r matchBfromN3, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; next 9 species."}
-
-compareB_N + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free") 
-
-```
-
-```{r matchBfromN4, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; last 9 species.Depending on the model, we may not show all species in this example."}
-
-compareB_N + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
-
-```
-
-We have more misses in the numbers with average weight estimation, so this needs more investigation and discussion. It may be best to have the survey index for testing derived directly from the true biomass output. 
+Given the misses using survey number outputs from run truth with a calculated weight at age, we will not repeat this example using numbers. 
 
 ## References
