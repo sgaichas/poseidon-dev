@@ -48,8 +48,8 @@ Abbreviated here; for a full explanation please see [TrueBioTest](https://sgaich
 ```{r initialize}
 
 initCCA <- FALSE
-initNEUS <- FALSE
-initNOBA <- TRUE
+initNEUS <- TRUE
+initNOBA <- FALSE
 
 if(initCCA){
   d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
@@ -125,6 +125,23 @@ if(initNOBA){
 
 ```
 
+We also read in previously generated survey census files based on true biomass results for comparison (see [TrueBioTest](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html).)
+
+```{r readsurvey1}
+
+if(initCCA) {
+  CCAsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+}
+
+if(initNEUS) {
+  NEUSsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+}
+
+if(initNOBA) {
+  NOBAsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+}
+
+```
 
 ## Simulate a survey part 2: create a standard survey
 
@@ -182,19 +199,25 @@ We use the following specifications for our default standard bottom trawl survey
 
 # general specifications for bottom trawl survey:
 #   once per year at mid year
-#   could generalize from the run.prm file: tstop/365 is n years of run
-#   max result$biomass_ages$time/ n years of run is steps per year
+#   could generalize from the run.prm file: 
+runpar <- load_runprm(d.name, run.prm.file)
+noutsteps <- runpar$tstop/runpar$outputstep
+stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
 #   take midpoint of 0, steps per year to start seq and go to max time by steps per year
-#   hardcoded for NEUS 1.0 in trunk here
-annualmidyear <- seq(3,251,5)
+midptyr <- round(median(seq(1,stepperyr)))
 
-#other options for NEUS
-annualspring <- seq(2,251,5)
-annualfall <- seq(4,251,5)
+annualmidyear <- seq(midptyr, noutsteps, stepperyr)
+
+#   hardcoded for NEUS 1.0 in trunk here
+# annualmidyear <- seq(3,251,5)
+# #other options for NEUS
+# annualspring <- seq(2,251,5)
+# annualfall <- seq(4,251,5)
 
 #   all fish (and sharks!! need dogfish in NEUS)
-survspp <- result$fgs$Name[result$fgs$IsTurnedOn==1 &
-                           result$fgs$GroupType %in% c("FISH", "SHARK")]
+# could add groups "CEP" for cephalopod, "PWN" for prawn, etc
+survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
+                           funct.groups$GroupType %in% c("FISH", "SHARK")]
 
 #   ~75% of boxes (leave off deeper boxes?)
 #   cant think of a way to generalize across models, must be hard coded
@@ -266,29 +289,29 @@ surv_cv_selflats <- data.frame(species=selflats, cv=rep(0.3,length(selflats)))
 surv_cv_mix <- bind_rows(surv_cv_nontrawl, surv_cv_pelagics, surv_cv_demersals, surv_cv_selflats)
 
 
-################# Below here is old from census, delete ################
-# should return all model areas
-boxpars <- load_box(d.name, box.file)
-boxall <- c(0:(boxpars$nbox - 1))
-
-# these are model specific, generalized above
-# if(initCCA) boxall <- c(0:88) 
-# if(initNEUS) boxall <- c(0:29)
-# if(initNOBA) boxall <- c(0:59) 
-
-# should return all model output timesteps; need to generalize
-if(initCCA) timeall <- c(0:100) 
-if(initNEUS) timeall <- c(0:251)
-if(initNOBA) timeall <- c(0:560) 
-  
-# define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
-# for ecosystem indicator work test all species, e.g.
-survspp <- funct.group.names 
-
-# to keep plots simpler, currently hardcoded for vertebrate/fished invert groups
-if(initCCA) survspp <- funct.group.names[c(1:44, 59:61, 65:68)] 
-if(initNEUS) survspp <- funct.group.names[1:21]
-if(initNOBA) survspp <- funct.group.names[1:36]
+# ################# Below here is old from census for reference, delete ################
+# # should return all model areas
+# boxpars <- load_box(d.name, box.file)
+# boxall <- c(0:(boxpars$nbox - 1))
+# 
+# # these are model specific, generalized above
+# # if(initCCA) boxall <- c(0:88) 
+# # if(initNEUS) boxall <- c(0:29)
+# # if(initNOBA) boxall <- c(0:59) 
+# 
+# # should return all model output timesteps; need to generalize
+# if(initCCA) timeall <- c(0:100) 
+# if(initNEUS) timeall <- c(0:251)
+# if(initNOBA) timeall <- c(0:560) 
+#   
+# # define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
+# # for ecosystem indicator work test all species, e.g.
+# survspp <- funct.group.names 
+# 
+# # to keep plots simpler, currently hardcoded for vertebrate/fished invert groups
+# if(initCCA) survspp <- funct.group.names[c(1:44, 59:61, 65:68)] 
+# if(initNEUS) survspp <- funct.group.names[1:21]
+# if(initNOBA) survspp <- funct.group.names[1:36]
   
 ```
 
@@ -333,19 +356,22 @@ Comparing our (census) survey based on true biomass from above with the Atlantis
 if(initCCA) {
   atBtxt2 <- read.table(here("atlantisoutput","CalCurrentSummitScenario1","outputCCV3BiomIndx.txt"), header=T)
   groupslookup <- load_fgs(dir = d.name, functional.groups.file)
-  surveyB_frombio <- CCAsurveyB_frombio
+  stdsurveyB_frombio <- CCAstdsurveyB_frombio
+  censusB_frombio <- CCAsurveyB_frombio
 }
 
 if(initNEUS) {
   atBtxt2 <- read.table(here("atlantisoutput","NEUStest20160303","neusDynEffort_Test1_BiomIndx.txt"), header=T)
   groupslookup <- load_fgs(dir = d.name, functional.groups.file)
-  surveyB_frombio <- NEUSsurveyB_frombio
+  stdsurveyB_frombio <- NEUSstdsurveyB_frombio
+  censusB_frombio <- NEUSsurveyB_frombio
 }
 
 if(initNOBA) {
   atBtxt2 <- read.table(here("atlantisoutput","NOBACERESGlobalSustainability","outputnordic_runresults_01BiomIndx.txt"), header=T) 
   groupslookup <- load_fgs(dir = d.name, functional.groups.file)
-  surveyB_frombio <- NOBAsurveyB_frombio
+  stdsurveyB_frombio <- NOBAstdsurveyB_frombio
+  censusB_frombio <- NOBAsurveyB_frombio
 }
 
 # lookup the matching names, put in time, species, biomass column format
@@ -358,17 +384,20 @@ atBtxt2tidy <- atBtxt2 %>%
   #select(Time, FPL:DIN) %>%
   rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
   gather(species, biomass, -Time) %>%
-  filter(species %in% levels(surveyB_frombio$species))
+  filter(species %in% levels(stdsurveyB_frombio$species))
+
+censusB_frombio <- censusB_frombio %>%
+  filter(species %in% levels(stdsurveyB_frombio$species))
 
 #all species comparison, time intervals hardcoded for NEUS and NOBA
 compareB <-ggplot() +
-  geom_line(data=surveyB_frombio, aes(x=time/5,y=atoutput, color="survey census B"), 
-            alpha = 10/10) +
+  geom_line(data=censusB_frombio, aes(x=time/5,y=atoutput, color="survey census B"), 
+            alpha = 5/10) +
   geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
-             alpha = 1/10) + 
+             alpha = 5/10) + 
   #geom_line(data=surveyB_frombio_eff, aes(x=time/5,y=atoutput, color="stdeffB")) +
   #geom_line(data=surveyB_frombio_effsel, aes(x=time/5,y=atoutput, color="stdeffselB")) +
-  geom_point(data=surveyB_frombio_effselcv, aes(x=time/5,y=atoutput, color="stdeffcvselB"),
+  geom_point(data=stdsurveyB_frombio, aes(x=time/5,y=atoutput, color="stdeffcvselB"),
               alpha = 1/2) +
 
   theme_tufte() +
@@ -393,9 +422,10 @@ compareB +
 ```
 
 ```{r matchBp4, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; last 9 species. Depending on the model, we may not show all species in this example."}
-compareB + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
-
+if(!initNEUS){
+  compareB + 
+    facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
+}
 ```
 
 Given the misses using survey number outputs from run truth with a calculated weight at age, we will not repeat this example using numbers. 

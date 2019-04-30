@@ -17,4 +17,8 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/NOBAExamples.html" target="_blank">Survey census visualization for NOBA - April 30, 2019</a>
 
+### Create a standard survey
+
+<a href="https://sgaichas.github.io/poseidon-dev/StandardSurveyTest.html" target="_blank">Initial survey tests - April 30, 2019</a>
+
 ### More to come later!
