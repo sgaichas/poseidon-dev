@@ -162,33 +162,37 @@ First, we map species into general groups for each model:
 #   demersals
 #   selected flatfish
 
-if(initCCA) { #REPLACE WITH CCA GROUPS
-  nontrawl <- c("Pisciv_T_Fish", "Shark_D", "Shark_P", "Reptile", "Mesopel_M_Fish")
-  pelagics <- c("Planktiv_L_Fish", "Planktiv_S_Fish", "Benthopel_Fish", "Pisciv_S_Fish")
-  demersals <- c("Pisciv_D_Fish", "Demersal_D_Fish","Demersal_E_Fish", "Demersal_S_Fish",
-                 "Demersal_B_Fish", "Demersal_DC_Fish", "Demersal_O_Fish",  "Demersal_F_Fish",
-                 "Shark_B", "SkateRay")
-  selflats <- c("Pisciv_B_Fish")
- 
+if(initCCA) { #Sarah's CCA Grouping
+  nontrawl <- c("Shark_C","Yelloweye_rockfish","Benthopel_Fish","Pisciv_S_Fish",
+                "Pisciv_T_Fish","Shark_D","Shark_P")
+  pelagics <- c("Pisciv_V_Fish","Demersal_S_Fish","Pacific_Ocean_Perch","Mesopel_M_Fish",
+                "Planktiv_L_Fish","Jack_mackerel","Planktiv_S_Fish","Pacific_sardine",
+                "Anchovy","Herring","Pisciv_B_Fish")
+  demersals <- c("Demersal_P_Fish","Planktiv_O_Fish","Demersal_D_Fish",
+                 "Demersal_DC_Fish","Demersal_O_Fish","Darkblotched_rockfish",
+                 "Demersal_F_Fish","Demersal_E_Fish","Bocaccio_rockfish",
+                 "Demersal_B_Fish","Shark_R","Mesopel_N_Fish","Shark_B","Spiny_dogfish",
+                 "SkateRay")
+  selflats <- c("Pisciv_D_Fish", "Arrowtooth_flounder","Petrale_sole")
 }
 
-if(initNEUS) {
+if(initNEUS) { # Sarah's NEUS Grouping
   nontrawl <- c("Pisciv_T_Fish", "Shark_D", "Shark_P", "Reptile", "Mesopel_M_Fish")
   pelagics <- c("Planktiv_L_Fish", "Planktiv_S_Fish", "Benthopel_Fish", "Pisciv_S_Fish")
-  demersals <- c("Pisciv_D_Fish", "Demersal_D_Fish","Demersal_E_Fish", "Demersal_S_Fish",
-                 "Demersal_B_Fish", "Demersal_DC_Fish", "Demersal_O_Fish",  "Demersal_F_Fish",
+  demersals <- c("Pisciv_D_Fish", "Demersal_D_Fish","Demersal_E_Fish", 
+                 "Demersal_S_Fish","Demersal_B_Fish","Demersal_DC_Fish",
+                 "Demersal_O_Fish","Demersal_F_Fish",
                  "Shark_B", "SkateRay")
   selflats <- c("Pisciv_B_Fish")
 }
 
-if(initNOBA) { #REPLACE WITH NOBA GROUPS
-  nontrawl <- c("Pisciv_T_Fish", "Shark_D", "Shark_P", "Reptile", "Mesopel_M_Fish")
-  pelagics <- c("Planktiv_L_Fish", "Planktiv_S_Fish", "Benthopel_Fish", "Pisciv_S_Fish")
-  demersals <- c("Pisciv_D_Fish", "Demersal_D_Fish","Demersal_E_Fish", "Demersal_S_Fish",
-                 "Demersal_B_Fish", "Demersal_DC_Fish", "Demersal_O_Fish",  "Demersal_F_Fish",
-                 "Shark_B", "SkateRay")
-  selflats <- c("Pisciv_B_Fish")
-  
+if(initNOBA) { # Sarah's NOBA Grouping
+  nontrawl <- c("Sharks_other", "Pelagic_large","Mesop_fish")
+  pelagics <- c("Pelagic_small","Redfish_other","Mackerel","Haddock",
+                "Saithe","Redfish","Blue_whiting","Norwegian_ssh","Capelin")
+  demersals <- c("Demersals_other","Demersal_large","Flatfish_other","Skates_rays",
+                 "Green_halibut","North_atl_cod","Polar_cod","Snow_crab")
+  selflats <- c("Long_rough_dab")
 }
 
 ```
@@ -216,13 +220,20 @@ annualmidyear <- seq(midptyr, noutsteps, stepperyr)
 
 #   all fish (and sharks!! need dogfish in NEUS)
 # could add groups "CEP" for cephalopod, "PWN" for prawn, etc
+
+# NOBA model has InvertType, changed to GroupType in file, but check Atlantis default
+if(initNOBA) funct.groups <- rename(funct.groups, GroupType = InvertType)
+
 survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
                            funct.groups$GroupType %in% c("FISH", "SHARK")]
 
-#   ~75% of boxes (leave off deeper boxes?)
-#   cant think of a way to generalize across models, must be hard coded
-#   hardcoded for NEUS 1.0 in trunk here
-boxsurv <- c(1:21)
+#   ~75-80% of boxes (leave off deeper boxes?)
+#   cant think of a way to generalize across models, must be hard coded in reality
+#   hardcoded for NEUS 1.0 in trunk here: boxsurv <- c(1:21)
+boxpars <- load_box(d.name, box.file)
+# should return all model areas
+# boxall <- c(0:(boxpars$nbox - 1))
+boxsurv <- c(2:round(0.8*(boxpars$nbox - 1)))
 
 #   define bottom trawl mixed efficiency
 ef.nt <- 0.01 # for large pelagics, reef dwellers, others not in trawlable habitat
@@ -262,7 +273,7 @@ selselflats <- data.frame(species=rep(selflats, each=10),
                           agecl=rep(c(1:10),length(selflats)),
                           selex=sigmoid(1,1,seq(-10,10,length.out=10)))
 
-# same selectivity for selflats and demersals for NEUS
+# same selectivity for selflats and demersals specified above
 # visualze selectivity curves for each group
 par(mfrow=c(2,2))
 par(mar=c(4,4,1,1))
@@ -280,39 +291,20 @@ selexmix <- bind_rows(selnontrawl, selpelagics, seldemersals, selselflats)
 # use this constant 0 cv for testing
 surv_cv_0 <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
 
+#   define bottom trawl survey cv by group
+cv.nt <- 1.0 # for large pelagics, reef dwellers, others not in trawlable habitat
+cv.pl <- 0.5  # for pelagics
+cv.dm <- 0.3  # for demersals
+cv.fl <- 0.3  # for selected flatfish
+
 # specify cv by species groups
-surv_cv_nontrawl <- data.frame(species=nontrawl, cv=rep(1.0,length(nontrawl)))
-surv_cv_pelagics <- data.frame(species=pelagics, cv=rep(0.5,length(pelagics)))
-surv_cv_demersals <- data.frame(species=demersals, cv=rep(0.3,length(demersals)))
-surv_cv_selflats <- data.frame(species=selflats, cv=rep(0.3,length(selflats)))
+surv_cv_nontrawl <- data.frame(species=nontrawl, cv=rep(cv.nt,length(nontrawl)))
+surv_cv_pelagics <- data.frame(species=pelagics, cv=rep(cv.pl,length(pelagics)))
+surv_cv_demersals <- data.frame(species=demersals, cv=rep(cv.dm,length(demersals)))
+surv_cv_selflats <- data.frame(species=selflats, cv=rep(cv.fl,length(selflats)))
 
 surv_cv_mix <- bind_rows(surv_cv_nontrawl, surv_cv_pelagics, surv_cv_demersals, surv_cv_selflats)
 
-
-# ################# Below here is old from census for reference, delete ################
-# # should return all model areas
-# boxpars <- load_box(d.name, box.file)
-# boxall <- c(0:(boxpars$nbox - 1))
-# 
-# # these are model specific, generalized above
-# # if(initCCA) boxall <- c(0:88) 
-# # if(initNEUS) boxall <- c(0:29)
-# # if(initNOBA) boxall <- c(0:59) 
-# 
-# # should return all model output timesteps; need to generalize
-# if(initCCA) timeall <- c(0:100) 
-# if(initNEUS) timeall <- c(0:251)
-# if(initNOBA) timeall <- c(0:560) 
-#   
-# # define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
-# # for ecosystem indicator work test all species, e.g.
-# survspp <- funct.group.names 
-# 
-# # to keep plots simpler, currently hardcoded for vertebrate/fished invert groups
-# if(initCCA) survspp <- funct.group.names[c(1:44, 59:61, 65:68)] 
-# if(initNEUS) survspp <- funct.group.names[1:21]
-# if(initNOBA) survspp <- funct.group.names[1:36]
-  
 ```
 
 Here we use `create_survey` on the biomass output of `run_truth` to create the survey, so the call to `sample_survey_biomass` will require a weight at age argument that is filled with 1's because no conversion from numbers to weight is necessary. 
