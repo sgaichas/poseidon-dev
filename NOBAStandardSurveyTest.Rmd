@@ -1,0 +1,402 @@
+---
+title: "Testing atlantisom: example bottom trawl survey index Norwegian-Barents Atlantis"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+bibliography: "packages.bib"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+# automatically create a bib database for R packages
+knitr::write_bib(c(
+  .packages(), 'knitr', 'rmarkdown', 'tidyr', 'dplyr', 'ggplot2',
+  'data.table', 'here', 'ggforce', 'ggthemes'
+), 'packages.bib')
+```
+
+## Introduction
+
+This page has visualizations for the NOBA model example, CERES Global Sustainability. For full explanation of methods, see the file linked at the beginning of each section.
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+library(ggforce)
+library(ggthemes)
+library(atlantisom)
+```
+
+```{r initialize}
+
+initCCA <- FALSE
+initNEUS <- FALSE
+initNOBA <- TRUE
+
+if(initCCA){
+  d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
+  functional.groups.file <- "CalCurrentV3Groups.csv"
+  biomass.pools.file <- "DIVCalCurrentV3_BIOL.nc"
+  biol.prm.file <- "CalCurrentV3_Biol.prm"
+  box.file <- "CalCurrentV3_utm.bgm"
+  initial.conditions.file <- "DIVCalCurrentV3_BIOL.nc"
+  run.prm.file <- "CalCurrentV3_run.xml"
+  scenario.name <- "CCV3"
+}
+
+if(initNEUS){
+  d.name <- here("atlantisoutput","NEUStest20160303")
+  functional.groups.file <- "NeusGroups.csv" 
+  biomass.pools.file <- ""
+  biol.prm.file <- "at_biol_neus_v15_DE.prm"
+  box.file <- "neus30_2006.bgm"
+  initial.conditions.file <- "inneus_2012.nc"
+  run.prm.file <- "at_run_neus_v15_DE.xml"
+  scenario.name <- "neusDynEffort_Test1_"
+}
+
+if(initNOBA){
+  d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
+  functional.groups.file <- "nordic_groups_v04.csv" 
+  biomass.pools.file <- "nordic_biol_v23.nc"
+  biol.prm.file <- "nordic_biol_incl_harv_v_007_3.prm"
+  box.file <- "Nordic02.bgm"
+  initial.conditions.file <- "nordic_biol_v23.nc"
+  run.prm.file <- "nordic_run_v01.xml"
+  scenario.name <- "nordic_runresults_01"
+}
+# NOBA note: output filenames in CCA and NEUS begin with "output" and the run_truth function is written to expect this. Need to check if default Atlantis output file nomenclature has changed or if NOBA is a special case. For now, NOBA filenames have been changed to include prefix "output"
+```
+
+
+```{r get_names, message=FALSE, warning=FALSE}
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+```
+
+
+```{r load_Rdata, message=FALSE, warning=FALSE}
+
+if(initCCA) {
+  d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
+  truth.file <- "outputCCV3run_truth.RData"
+  load(file.path(d.name, truth.file))
+  CCAresults <- result
+} 
+
+if(initNEUS) {
+  d.name <- here("atlantisoutput","NEUStest20160303")
+  truth.file <- "outputneusDynEffort_Test1_run_truth.RData" 
+  load(file.path(d.name, truth.file))
+  NEUSresults <- result
+}
+
+if(initNOBA){
+  d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
+  truth.file <- "outputnordic_runresults_01run_truth.RData" 
+  load(file.path(d.name, truth.file))
+  NOBAresults <- result
+}
+
+```
+
+```{r readsurvey1}
+
+if(initCCA) {
+  CCAsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+}
+
+if(initNEUS) {
+  NEUSsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+}
+
+if(initNOBA) {
+  NOBAsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+}
+
+```
+
+## Simulate a survey part 2: create a standard survey
+
+Full methods are explained [here](https://sgaichas.github.io/poseidon-dev/StandardSurveyTest.html).
+
+One approach to creating a standard survey is to map species into general groups that are likely to have similar efficency and selectivity. For example, we expect that a bottom trawl survey will have generally lower efficiency for pelagic species than for demersals. We can also set efficiency to a very small number for infrequently encountered species occupying habitats that are not suited to bottom trawl sampling. This can simulate survey sampling for "data poor" species. Similarly, a common selectivity at age (or in this case, Atlantis cohort) can be defined for each species group. 
+
+First, we map species into general groups for each model:
+
+```{r sppgroups, echo=TRUE}
+
+# make defaults that return a standard survey, implement in standard_survey
+# users need to map their species groups into these general ones
+#   large pelagics/reef associated/burrowers/otherwise non-trawlable
+#   pelagics
+#   demersals
+#   selected flatfish
+
+if(initCCA) { #Sarah's CCA Grouping
+  nontrawl <- c("Shark_C","Yelloweye_rockfish","Benthopel_Fish","Pisciv_S_Fish",
+                "Pisciv_T_Fish","Shark_D","Shark_P")
+  pelagics <- c("Pisciv_V_Fish","Demersal_S_Fish","Pacific_Ocean_Perch","Mesopel_M_Fish",
+                "Planktiv_L_Fish","Jack_mackerel","Planktiv_S_Fish","Pacific_sardine",
+                "Anchovy","Herring","Pisciv_B_Fish")
+  demersals <- c("Demersal_P_Fish","Planktiv_O_Fish","Demersal_D_Fish",
+                 "Demersal_DC_Fish","Demersal_O_Fish","Darkblotched_rockfish",
+                 "Demersal_F_Fish","Demersal_E_Fish","Bocaccio_rockfish",
+                 "Demersal_B_Fish","Shark_R","Mesopel_N_Fish","Shark_B","Spiny_dogfish",
+                 "SkateRay")
+  selflats <- c("Pisciv_D_Fish", "Arrowtooth_flounder","Petrale_sole")
+}
+
+if(initNEUS) { # Sarah's NEUS Grouping
+  nontrawl <- c("Pisciv_T_Fish", "Shark_D", "Shark_P", "Reptile", "Mesopel_M_Fish")
+  pelagics <- c("Planktiv_L_Fish", "Planktiv_S_Fish", "Benthopel_Fish", "Pisciv_S_Fish")
+  demersals <- c("Pisciv_D_Fish", "Demersal_D_Fish","Demersal_E_Fish", 
+                 "Demersal_S_Fish","Demersal_B_Fish","Demersal_DC_Fish",
+                 "Demersal_O_Fish","Demersal_F_Fish",
+                 "Shark_B", "SkateRay")
+  selflats <- c("Pisciv_B_Fish")
+}
+
+if(initNOBA) { # Sarah's NOBA Grouping
+  nontrawl <- c("Sharks_other", "Pelagic_large","Mesop_fish")
+  pelagics <- c("Pelagic_small","Redfish_other","Mackerel","Haddock",
+                "Saithe","Redfish","Blue_whiting","Norwegian_ssh","Capelin")
+  demersals <- c("Demersals_other","Demersal_large","Flatfish_other","Skates_rays",
+                 "Green_halibut","North_atl_cod","Polar_cod","Snow_crab")
+  selflats <- c("Long_rough_dab")
+}
+
+```
+
+We use the following specifications for our default standard bottom trawl survey, including survey cv by species group: 
+
+```{r stdbtsurvey-spec, message=FALSE, warning=FALSE, echo=TRUE}
+
+# general specifications for bottom trawl survey:
+#   once per year at mid year
+#   could generalize from the run.prm file: 
+runpar <- load_runprm(d.name, run.prm.file)
+noutsteps <- runpar$tstop/runpar$outputstep
+stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
+#   take midpoint of 0, steps per year to start seq and go to max time by steps per year
+midptyr <- round(median(seq(1,stepperyr)))
+
+annualmidyear <- seq(midptyr, noutsteps, stepperyr)
+
+#   hardcoded for NEUS 1.0 in trunk here
+# annualmidyear <- seq(3,251,5)
+# #other options for NEUS
+# annualspring <- seq(2,251,5)
+# annualfall <- seq(4,251,5)
+
+#   all fish (and sharks!! need dogfish in NEUS)
+# could add groups "CEP" for cephalopod, "PWN" for prawn, etc
+
+# NOBA model has InvertType, changed to GroupType in file, but check Atlantis default
+if(initNOBA) funct.groups <- rename(funct.groups, GroupType = InvertType)
+
+survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
+                           funct.groups$GroupType %in% c("FISH", "SHARK")]
+
+#   ~75-80% of boxes (leave off deeper boxes?)
+#   cant think of a way to generalize across models, must be hard coded in reality
+#   hardcoded for NEUS 1.0 in trunk here: boxsurv <- c(1:21)
+boxpars <- load_box(d.name, box.file)
+# should return all model areas
+# boxall <- c(0:(boxpars$nbox - 1))
+boxsurv <- c(2:round(0.8*(boxpars$nbox - 1)))
+
+#   define bottom trawl mixed efficiency
+ef.nt <- 0.01 # for large pelagics, reef dwellers, others not in trawlable habitat
+ef.pl <- 0.1  # for pelagics
+ef.dm <- 0.7  # for demersals
+ef.fl <- 1.1  # for selected flatfish
+
+# bottom trawl survey efficiency specification by species group
+effnontrawl <- data.frame(species=nontrawl, efficiency=rep(ef.nt,length(nontrawl)))
+effpelagics <- data.frame(species=pelagics, efficiency=rep(ef.pl,length(pelagics)))
+effdemersals <- data.frame(species=demersals, efficiency=rep(ef.dm,length(demersals)))
+effselflats <- data.frame(species=selflats, efficiency=rep(ef.fl,length(selflats)))
+
+efficmix <- bind_rows(effnontrawl, effpelagics, effdemersals, effselflats)
+
+#   mixed selectivity (using 10 agecl for all species)
+#     flat=1 for large pelagics, reef dwellers, others not in trawlable habitat
+#     sigmoid 0 to 1 with 0.5 inflection at agecl 3 for pelagics, reaching 1 at agecl 5, flat top
+#     sigmoid 0 to 1 with 0.5 inflection at agecl 5 for most demersals and flatfish, reaching 1 at agecl 7, flat top
+#     dome shaped 0 to 1 at agecl 6&7 for selected demersals, falling off to 0.7 by agecl 10
+
+sigmoid <- function(a,b,x) {
+  1 / (1 + exp(-a-b*x))
+}
+
+# survey selectivity specification by species group
+selnontrawl <- data.frame(species=rep(nontrawl, each=10),
+                          agecl=rep(c(1:10),length(nontrawl)),
+                          selex=rep(1.0,length(nontrawl)*10))
+selpelagics <- data.frame(species=rep(pelagics, each=10),
+                          agecl=rep(c(1:10),length(pelagics)),
+                          selex=sigmoid(5,1,seq(-10,10,length.out=10)))
+seldemersals <- data.frame(species=rep(demersals, each=10),
+                          agecl=rep(c(1:10),length(demersals)),
+                          selex=sigmoid(1,1,seq(-10,10,length.out=10)))
+selselflats <- data.frame(species=rep(selflats, each=10),
+                          agecl=rep(c(1:10),length(selflats)),
+                          selex=sigmoid(1,1,seq(-10,10,length.out=10)))
+
+# same selectivity for selflats and demersals specified above
+# visualze selectivity curves for each group
+par(mfrow=c(2,2))
+par(mar=c(4,4,1,1))
+plot(selnontrawl$agecl, selnontrawl$selex)
+plot(selpelagics$agecl, selpelagics$selex)
+plot(seldemersals$agecl, seldemersals$selex)
+plot(selselflats$agecl, selselflats$selex)
+par(mfrow=c(1,1))
+
+# implement dome shaped selectivity for a particular species and replace default
+# not done yet staying simple for now
+
+selexmix <- bind_rows(selnontrawl, selpelagics, seldemersals, selselflats)
+
+# use this constant 0 cv for testing
+surv_cv_0 <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+#   define bottom trawl survey cv by group
+cv.nt <- 1.0 # for large pelagics, reef dwellers, others not in trawlable habitat
+cv.pl <- 0.5  # for pelagics
+cv.dm <- 0.3  # for demersals
+cv.fl <- 0.3  # for selected flatfish
+
+# specify cv by species groups
+surv_cv_nontrawl <- data.frame(species=nontrawl, cv=rep(cv.nt,length(nontrawl)))
+surv_cv_pelagics <- data.frame(species=pelagics, cv=rep(cv.pl,length(pelagics)))
+surv_cv_demersals <- data.frame(species=demersals, cv=rep(cv.dm,length(demersals)))
+surv_cv_selflats <- data.frame(species=selflats, cv=rep(cv.fl,length(selflats)))
+
+surv_cv_mix <- bind_rows(surv_cv_nontrawl, surv_cv_pelagics, surv_cv_demersals, surv_cv_selflats)
+
+```
+
+Here we use `create_survey` on the biomass output of `run_truth` to create the survey, so the call to `sample_survey_biomass` will require a weight at age argument that is filled with 1's because no conversion from numbers to weight is necessary. 
+
+```{r stdsurveyBbased}
+
+# this uses result$biomass_ages to sample biomass directly
+
+if(initCCA) datB <- CCAresults$biomass_ages
+if(initNEUS) datB <- NEUSresults$biomass_ages
+if(initNOBA) datB <- NOBAresults$biomass_ages
+
+survey_testBstd <- create_survey(dat = datB,
+                                 time = annualmidyear,
+                                 species = survspp,
+                                 boxes = boxsurv,
+                                 effic = efficmix,
+                                 selex = selexmix)
+
+# call sample_survey_biomass with a bunch of 1s for weight at age
+# in the code it multiplies atoutput by wtatage so this allows us to use
+# biomass directly
+wtage <- data.frame(species=rep(survspp, each=10),
+                    agecl=rep(c(1:10),length(survspp)),
+                    wtAtAge=rep(1.0,length(survspp)*10))
+
+stdsurveyB_frombio <- sample_survey_biomass(survey_testBstd, surv_cv_mix, wtage)
+
+if(initCCA) CCAstdsurveyB_frombio <- stdsurveyB_frombio
+if(initNEUS) NEUSstdsurveyB_frombio <- stdsurveyB_frombio
+if(initNOBA) NOBAstdsurveyB_frombio <- stdsurveyB_frombio
+
+```
+
+```{r matchB, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; first 9 species.", message=FALSE, warning=FALSE}
+# plot some comparisons with Atlantis output
+
+# read Atlantis output files
+if(initCCA) {
+  atBtxt2 <- read.table(here("atlantisoutput","CalCurrentSummitScenario1","outputCCV3BiomIndx.txt"), header=T)
+  groupslookup <- load_fgs(dir = d.name, functional.groups.file)
+  stdsurveyB_frombio <- CCAstdsurveyB_frombio
+  censusB_frombio <- CCAsurveyB_frombio
+}
+
+if(initNEUS) {
+  atBtxt2 <- read.table(here("atlantisoutput","NEUStest20160303","neusDynEffort_Test1_BiomIndx.txt"), header=T)
+  groupslookup <- load_fgs(dir = d.name, functional.groups.file)
+  stdsurveyB_frombio <- NEUSstdsurveyB_frombio
+  censusB_frombio <- NEUSsurveyB_frombio
+}
+
+if(initNOBA) {
+  atBtxt2 <- read.table(here("atlantisoutput","NOBACERESGlobalSustainability","outputnordic_runresults_01BiomIndx.txt"), header=T) 
+  groupslookup <- load_fgs(dir = d.name, functional.groups.file)
+  stdsurveyB_frombio <- NOBAstdsurveyB_frombio
+  censusB_frombio <- NOBAsurveyB_frombio
+}
+
+# lookup the matching names, put in time, species, biomass column format
+# WARNING hardcoded for output with last species group as DIN
+groupslookup <- groupslookup %>%
+  filter(IsTurnedOn > 0)
+
+atBtxt2tidy <- atBtxt2 %>%
+  select(Time:DIN) %>%
+  #select(Time, FPL:DIN) %>%
+  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, biomass, -Time) %>%
+  filter(species %in% levels(stdsurveyB_frombio$species))
+
+censusB_frombio <- censusB_frombio %>%
+  filter(species %in% levels(stdsurveyB_frombio$species))
+
+#all species comparison, time intervals hardcoded for NEUS and NOBA
+compareB <-ggplot() +
+  geom_line(data=censusB_frombio, aes(x=time/5,y=atoutput, color="survey census B"), 
+            alpha = 5/10) +
+  geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
+             alpha = 5/10) + 
+  #geom_line(data=surveyB_frombio_eff, aes(x=time/5,y=atoutput, color="stdeffB")) +
+  #geom_line(data=surveyB_frombio_effsel, aes(x=time/5,y=atoutput, color="stdeffselB")) +
+  geom_point(data=stdsurveyB_frombio, aes(x=time/5,y=atoutput, color="stdeffcvselB"),
+              alpha = 1/2) +
+
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compareB + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free") 
+
+```
+
+```{r matchBp2, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; next 9 species."}
+compareB + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free") 
+
+```
+
+```{r matchBp3, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; next 9 species."}
+compareB + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free") 
+
+```
+
+```{r matchBp4, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; last 9 species. Depending on the model, we may not show all species in this example."}
+if(initCCA){
+  compareB + 
+    facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
+}
+```
+
+Given the misses using survey number outputs from run truth with a calculated weight at age, we will not repeat this example using numbers. 
