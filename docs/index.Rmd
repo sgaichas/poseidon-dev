@@ -27,5 +27,8 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/NOBAStandardSurveyTest.html" target="_blank">Standard survey visualization for NOBA - May 1, 2019</a>
 
+## Start age composition sampling: work in progress
+
+<a href="https://sgaichas.github.io/poseidon-dev/TrueLengthAgeCompTest.html" target="_blank">Initial age comp tests - May 2, 2019</a>
 
 ### More to come later!

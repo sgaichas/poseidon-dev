@@ -125,9 +125,9 @@ if(initNOBA){
 
 ```
 
-We also read in previously generated survey census files based on true biomass results for comparison (see [TrueBioTest](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html).)
+We can also read in previously generated survey census files based on true biomass results for comparison if necessary, but not yet used here (see [TrueBioTest](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html).)
 
-```{r readsurvey1}
+```{r readsurvey1, eval=FALSE}
 
 if(initCCA) {
   CCAsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
@@ -145,288 +145,217 @@ if(initNOBA) {
 
 ## Simulate a survey part 3: sample for length and age composition
 
-This section uses the `atlantisom::create_survey()` and # script for using create_survey with the true numbers at age directly
-# and then sample_fish to get a biolgical sample dataset
-# from that dataset:
-#   age samples from sample_ages
-#   length samples from sample_lengths (TO BE WRITTEN)
-#   weight samples from sample_weights (TO BE WRITTEN)
-#   diet samples from sample_diet
- `atlantisom::sample_survey_biomass()` functions by creating a standard survey covering discrete areas, times, and species, and with both incomplete efficiency and some kind of length selectivity. We will apply this standard survey and compare it with true output as an example of the type of information that can be generated for assessment model performance testing.
+This section uses the `atlantisom::create_survey()` and `atlantisom::sample_fish()` to get a biological sample dataset. From that dataset, several other functions can be run:
+
+ *  age samples from sample_ages
+ *  length samples from sample_lengths (TO BE WRITTEN)
+ *  weight samples from sample_weights (TO BE WRITTEN)
+ *  diet samples from sample_diet
 
 To create a survey, the user specifies the timing of the survey, which species are captured, the spatial coverage of the survey, the species-specific survey efficiency ("q"), and the selectivity at age for each species.
 
-One approach to creating a standard survey is to map species into general groups that are likely to have similar efficency and selectivity. For example, we expect that a bottom trawl survey will have generally lower efficiency for pelagic species than for demersals. We can also set efficiency to a very small number for infrequently encountered species occupying habitats that are not suited to bottom trawl sampling. This can simulate survey sampling for "data poor" species. Similarly, a common selectivity at age (or in this case, Atlantis cohort) can be defined for each species group. 
+The following settings should achieve a survey that samples all Atlantis model output timesteps, all fish and shark species, and all model polygons, with perfect efficiency and full selectivity for all ages: 
 
-First, we map species into general groups for each model:
+```{r census-spec, message=FALSE, warning=FALSE}
 
-```{r sppgroups}
+# should return a perfectly scaled survey 
+effic1 <- data.frame(species=funct.group.names,
+                     efficiency=rep(1.0,length(funct.group.names)))
 
-# make defaults that return a standard survey, implement in standard_survey
-# users need to map their species groups into these general ones
-#   large pelagics/reef associated/burrowers/otherwise non-trawlable
-#   pelagics
-#   demersals
-#   selected flatfish
+# should return all lengths fully sampled (Atlantis output is 10 age groups per spp)
+# BUT CHECK if newer Atlantis models can do age-specific outputs
+selex1 <- data.frame(species=rep(funct.group.names, each=10),
+                     agecl=rep(c(1:10),length(funct.group.names)),
+                     selex=rep(1.0,length(funct.group.names)*10))
 
-if(initCCA) { #Sarah's CCA Grouping
-  nontrawl <- c("Shark_C","Yelloweye_rockfish","Benthopel_Fish","Pisciv_S_Fish",
-                "Pisciv_T_Fish","Shark_D","Shark_P")
-  pelagics <- c("Pisciv_V_Fish","Demersal_S_Fish","Pacific_Ocean_Perch","Mesopel_M_Fish",
-                "Planktiv_L_Fish","Jack_mackerel","Planktiv_S_Fish","Pacific_sardine",
-                "Anchovy","Herring","Pisciv_B_Fish")
-  demersals <- c("Demersal_P_Fish","Planktiv_O_Fish","Demersal_D_Fish",
-                 "Demersal_DC_Fish","Demersal_O_Fish","Darkblotched_rockfish",
-                 "Demersal_F_Fish","Demersal_E_Fish","Bocaccio_rockfish",
-                 "Demersal_B_Fish","Shark_R","Mesopel_N_Fish","Shark_B","Spiny_dogfish",
-                 "SkateRay")
-  selflats <- c("Pisciv_D_Fish", "Arrowtooth_flounder","Petrale_sole")
-}
+# should return all model areas
+boxpars <- load_box(d.name, box.file)
+boxall <- c(0:(boxpars$nbox - 1))
 
-if(initNEUS) { # Sarah's NEUS Grouping
-  nontrawl <- c("Pisciv_T_Fish", "Shark_D", "Shark_P", "Reptile", "Mesopel_M_Fish")
-  pelagics <- c("Planktiv_L_Fish", "Planktiv_S_Fish", "Benthopel_Fish", "Pisciv_S_Fish")
-  demersals <- c("Pisciv_D_Fish", "Demersal_D_Fish","Demersal_E_Fish", 
-                 "Demersal_S_Fish","Demersal_B_Fish","Demersal_DC_Fish",
-                 "Demersal_O_Fish","Demersal_F_Fish",
-                 "Shark_B", "SkateRay")
-  selflats <- c("Pisciv_B_Fish")
-}
+# these are model specific, generalized above
+# if(initCCA) boxall <- c(0:88) 
+# if(initNEUS) boxall <- c(0:29)
+# if(initNOBA) boxall <- c(0:59) 
 
-if(initNOBA) { # Sarah's NOBA Grouping
-  nontrawl <- c("Sharks_other", "Pelagic_large","Mesop_fish")
-  pelagics <- c("Pelagic_small","Redfish_other","Mackerel","Haddock",
-                "Saithe","Redfish","Blue_whiting","Norwegian_ssh","Capelin")
-  demersals <- c("Demersals_other","Demersal_large","Flatfish_other","Skates_rays",
-                 "Green_halibut","North_atl_cod","Polar_cod","Snow_crab")
-  selflats <- c("Long_rough_dab")
-}
+# should return all model output timesteps; need to generalize
+# if(initCCA) timeall <- c(0:100) 
+# if(initNEUS) timeall <- c(0:251)
+# if(initNOBA) timeall <- c(0:560) 
 
-```
-
-We use the following specifications for our default standard bottom trawl survey, including survey cv by species group: 
-
-```{r stdbtsurvey-spec, message=FALSE, warning=FALSE}
-
-# general specifications for bottom trawl survey:
-#   once per year at mid year
-#   could generalize from the run.prm file: 
+# generalized
 runpar <- load_runprm(d.name, run.prm.file)
 noutsteps <- runpar$tstop/runpar$outputstep
 stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
-#   take midpoint of 0, steps per year to start seq and go to max time by steps per year
-midptyr <- round(median(seq(1,stepperyr)))
 
-annualmidyear <- seq(midptyr, noutsteps, stepperyr)
+timeall <- c(0:noutsteps)
+  
+# define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
+# for ecosystem indicator work test all species, e.g.
+survspp <- funct.group.names 
 
-#   hardcoded for NEUS 1.0 in trunk here
-# annualmidyear <- seq(3,251,5)
-# #other options for NEUS
-# annualspring <- seq(2,251,5)
-# annualfall <- seq(4,251,5)
+# to keep plots simpler, currently hardcoded for vertebrate/fished invert groups
+# if(initCCA) survspp <- funct.group.names[c(1:44, 59:61, 65:68)] 
+# if(initNEUS) survspp <- funct.group.names[1:21]
+# if(initNOBA) survspp <- funct.group.names[1:36]
 
-#   all fish (and sharks!! need dogfish in NEUS)
-# could add groups "CEP" for cephalopod, "PWN" for prawn, etc
-
+# for length and age groups lets just do fish and sharks
 # NOBA model has InvertType, changed to GroupType in file, but check Atlantis default
 if(initNOBA) funct.groups <- rename(funct.groups, GroupType = InvertType)
 
 survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
                            funct.groups$GroupType %in% c("FISH", "SHARK")]
 
-#   ~75-80% of boxes (leave off deeper boxes?)
-#   cant think of a way to generalize across models, must be hard coded in reality
-#   hardcoded for NEUS 1.0 in trunk here: boxsurv <- c(1:21)
-boxpars <- load_box(d.name, box.file)
-# should return all model areas
-# boxall <- c(0:(boxpars$nbox - 1))
-boxsurv <- c(2:round(0.8*(boxpars$nbox - 1)))
-
-#   define bottom trawl mixed efficiency
-ef.nt <- 0.01 # for large pelagics, reef dwellers, others not in trawlable habitat
-ef.pl <- 0.1  # for pelagics
-ef.dm <- 0.7  # for demersals
-ef.fl <- 1.1  # for selected flatfish
-
-# bottom trawl survey efficiency specification by species group
-effnontrawl <- data.frame(species=nontrawl, efficiency=rep(ef.nt,length(nontrawl)))
-effpelagics <- data.frame(species=pelagics, efficiency=rep(ef.pl,length(pelagics)))
-effdemersals <- data.frame(species=demersals, efficiency=rep(ef.dm,length(demersals)))
-effselflats <- data.frame(species=selflats, efficiency=rep(ef.fl,length(selflats)))
-
-efficmix <- bind_rows(effnontrawl, effpelagics, effdemersals, effselflats)
-
-#   mixed selectivity (using 10 agecl for all species)
-#     flat=1 for large pelagics, reef dwellers, others not in trawlable habitat
-#     sigmoid 0 to 1 with 0.5 inflection at agecl 3 for pelagics, reaching 1 at agecl 5, flat top
-#     sigmoid 0 to 1 with 0.5 inflection at agecl 5 for most demersals and flatfish, reaching 1 at agecl 7, flat top
-#     dome shaped 0 to 1 at agecl 6&7 for selected demersals, falling off to 0.7 by agecl 10
-
-sigmoid <- function(a,b,x) {
-  1 / (1 + exp(-a-b*x))
-}
-
-# survey selectivity specification by species group
-selnontrawl <- data.frame(species=rep(nontrawl, each=10),
-                          agecl=rep(c(1:10),length(nontrawl)),
-                          selex=rep(1.0,length(nontrawl)*10))
-selpelagics <- data.frame(species=rep(pelagics, each=10),
-                          agecl=rep(c(1:10),length(pelagics)),
-                          selex=sigmoid(5,1,seq(-10,10,length.out=10)))
-seldemersals <- data.frame(species=rep(demersals, each=10),
-                          agecl=rep(c(1:10),length(demersals)),
-                          selex=sigmoid(1,1,seq(-10,10,length.out=10)))
-selselflats <- data.frame(species=rep(selflats, each=10),
-                          agecl=rep(c(1:10),length(selflats)),
-                          selex=sigmoid(1,1,seq(-10,10,length.out=10)))
-
-# same selectivity for selflats and demersals specified above
-# visualze selectivity curves for each group
-par(mfrow=c(2,2))
-par(mar=c(4,4,1,1))
-plot(selnontrawl$agecl, selnontrawl$selex)
-plot(selpelagics$agecl, selpelagics$selex)
-plot(seldemersals$agecl, seldemersals$selex)
-plot(selselflats$agecl, selselflats$selex)
-par(mfrow=c(1,1))
-
-# implement dome shaped selectivity for a particular species and replace default
-# not done yet staying simple for now
-
-selexmix <- bind_rows(selnontrawl, selpelagics, seldemersals, selselflats)
-
-# use this constant 0 cv for testing
-surv_cv_0 <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
-
-#   define bottom trawl survey cv by group
-cv.nt <- 1.0 # for large pelagics, reef dwellers, others not in trawlable habitat
-cv.pl <- 0.5  # for pelagics
-cv.dm <- 0.3  # for demersals
-cv.fl <- 0.3  # for selected flatfish
-
-# specify cv by species groups
-surv_cv_nontrawl <- data.frame(species=nontrawl, cv=rep(cv.nt,length(nontrawl)))
-surv_cv_pelagics <- data.frame(species=pelagics, cv=rep(cv.pl,length(pelagics)))
-surv_cv_demersals <- data.frame(species=demersals, cv=rep(cv.dm,length(demersals)))
-surv_cv_selflats <- data.frame(species=selflats, cv=rep(cv.fl,length(selflats)))
-
-surv_cv_mix <- bind_rows(surv_cv_nontrawl, surv_cv_pelagics, surv_cv_demersals, surv_cv_selflats)
-
 ```
 
-Here we use `create_survey` on the biomass output of `run_truth` to create the survey, so the call to `sample_survey_biomass` will require a weight at age argument that is filled with 1's because no conversion from numbers to weight is necessary. 
+Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age and length composition. 
 
-```{r stdsurveyBbased}
+```{r stdsurveyNbased}
 
-# this uses result$biomass_ages to sample biomass directly
+# this uses result$nums, but we are not creating a biomass index this time, so we don't need a weight at age conversion
 
-if(initCCA) datB <- CCAresults$biomass_ages
-if(initNEUS) datB <- NEUSresults$biomass_ages
-if(initNOBA) datB <- NOBAresults$biomass_ages
+if(initCCA) datN <- CCAresults$nums
+if(initNEUS) datN <- NEUSresults$nums
+if(initNOBA) datN <- NOBAresults$nums
 
-survey_testBstd <- create_survey(dat = datB,
-                                 time = annualmidyear,
+survey_testNall <- create_survey(dat = datN,
+                                 time = timeall,
                                  species = survspp,
-                                 boxes = boxsurv,
-                                 effic = efficmix,
-                                 selex = selexmix)
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
 
-# call sample_survey_biomass with a bunch of 1s for weight at age
-# in the code it multiplies atoutput by wtatage so this allows us to use
-# biomass directly
-wtage <- data.frame(species=rep(survspp, each=10),
-                    agecl=rep(c(1:10),length(survspp)),
-                    wtAtAge=rep(1.0,length(survspp)*10))
+# consider saving this interim step if it takes a long time go generate
 
-stdsurveyB_frombio <- sample_survey_biomass(survey_testBstd, surv_cv_mix, wtage)
-
-if(initCCA) CCAstdsurveyB_frombio <- stdsurveyB_frombio
-if(initNEUS) NEUSstdsurveyB_frombio <- stdsurveyB_frombio
-if(initNOBA) NOBAstdsurveyB_frombio <- stdsurveyB_frombio
 
 ```
 
-Comparing our (census) survey based on true biomass from above with the Atlantis output file "[modelscenario]BiomIndx.txt" should give us a perfect match. Note that the our (census) survey may have more sampling in time than the Atlantis output file.
+Next, get true annual (cohort) age comp from this census survey based on run truth. (is there a standard Atlantis output I can compare this to as we did for biomass?)
 
-```{r matchB, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; first 9 species.", message=FALSE, warning=FALSE}
-# plot some comparisons with Atlantis output
+```{r truecohortagecomp}
+# what is true composition? need annual by species, use code from sample_fish
+# do tidyly
+dat2 <- survey_testNall %>%
+  group_by(species, agecl, time) %>%
+  summarize(numAtAge = sum(atoutput))
 
-# read Atlantis output files
-if(initCCA) {
-  atBtxt2 <- read.table(here("atlantisoutput","CalCurrentSummitScenario1","outputCCV3BiomIndx.txt"), header=T)
-  groupslookup <- load_fgs(dir = d.name, functional.groups.file)
-  stdsurveyB_frombio <- CCAstdsurveyB_frombio
-  censusB_frombio <- CCAsurveyB_frombio
-}
+#dat<-survey_testNall
+#dat2 <- aggregate(dat$atoutput,list(dat$species,dat$agecl,dat$time),sum)
+#names(dat2) <- c("species","agecl","time","numAtAge")
 
-if(initNEUS) {
-  atBtxt2 <- read.table(here("atlantisoutput","NEUStest20160303","neusDynEffort_Test1_BiomIndx.txt"), header=T)
-  groupslookup <- load_fgs(dir = d.name, functional.groups.file)
-  stdsurveyB_frombio <- NEUSstdsurveyB_frombio
-  censusB_frombio <- NEUSsurveyB_frombio
-}
+totN <- dat2 %>%
+  group_by(species, time) %>%
+  summarize(totN = sum(numAtAge))
 
-if(initNOBA) {
-  atBtxt2 <- read.table(here("atlantisoutput","NOBACERESGlobalSustainability","outputnordic_runresults_01BiomIndx.txt"), header=T) 
-  groupslookup <- load_fgs(dir = d.name, functional.groups.file)
-  stdsurveyB_frombio <- NOBAstdsurveyB_frombio
-  censusB_frombio <- NOBAsurveyB_frombio
-}
+#totN <- aggregate(dat2$numAtAge,list(dat2$species,dat2$time),sum )
+#names(totN) <- c("species","time","totN")
 
-# lookup the matching names, put in time, species, biomass column format
-# WARNING hardcoded for output with last species group as DIN
-groupslookup <- groupslookup %>%
-  filter(IsTurnedOn > 0)
+dat2totN <- merge(dat2, totN)
 
-atBtxt2tidy <- atBtxt2 %>%
-  select(Time:DIN) %>%
-  #select(Time, FPL:DIN) %>%
-  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
-  gather(species, biomass, -Time) %>%
-  filter(species %in% levels(stdsurveyB_frombio$species))
+ageclcomp <- ggplot(dat2totN, aes(x=agecl, y=numAtAge/totN, col=time)) +
+  geom_point()
 
-censusB_frombio <- censusB_frombio %>%
-  filter(species %in% levels(stdsurveyB_frombio$species))
+ageclcomp + facet_wrap(~species, ncol=5) #, scales="free")
 
-#all species comparison, time intervals hardcoded for NEUS and NOBA
-compareB <-ggplot() +
-  geom_line(data=censusB_frombio, aes(x=time/5,y=atoutput, color="survey census B"), 
-            alpha = 5/10) +
-  geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
-             alpha = 5/10) + 
-  #geom_line(data=surveyB_frombio_eff, aes(x=time/5,y=atoutput, color="stdeffB")) +
-  #geom_line(data=surveyB_frombio_effsel, aes(x=time/5,y=atoutput, color="stdeffselB")) +
-  geom_point(data=stdsurveyB_frombio, aes(x=time/5,y=atoutput, color="stdeffcvselB"),
-              alpha = 1/2) +
+```
 
+Then we use the `sample_fish` function and compare to true annual age comp calculated above as a test. These should match.
+
+```{r comptest1, message=FALSE, warning=FALSE}
+# setting the effN higher than actual numbers results in sampling all
+effNall <- data.frame(species=survspp, effN=rep(1e+15, length(survspp)))
+# rmultinom broke with that sample size
+#comptestall <- sample_fish(survey_testNall, effNall)
+#names(comptestall) <- c("species","agecl","polygon", "layer","time","numAtAgesamp")
+
+# this one is high but not equal to total for numerous groups
+effNhigh <- data.frame(species=survspp, effN=rep(1e+8, length(survspp)))
+
+comptesthigh <- sample_fish(survey_testNall, effNhigh)
+names(comptesthigh) <- c("species","agecl","polygon", "layer","time","numAtAgesamp")
+
+comptesttot <- aggregate(comptesthigh$numAtAgesamp,list(comptesthigh$species,comptesthigh$time),sum )
+names(comptesttot) <- c("species","time","totsamp")
+
+comptestprop <- merge(comptesthigh, comptesttot)
+
+# compare individual years, these proportions at age should match
+comparecomps <- ggplot() +
+  geom_point(data=subset(dat2totN, time==0), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
+  geom_point(data=subset(comptestprop, time==0), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3) +
   theme_tufte() +
   theme(legend.position = "top") +
   labs(colour=scenario.name)
 
-compareB + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free") 
+comparecomps + facet_wrap(~species, ncol=5)
+
+#ggsave("censuscomposition_time0.png", width=11, height=11)
+
+comparecomps <- ggplot() +
+  geom_point(data=subset(dat2totN, time==100), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
+  geom_point(data=subset(comptestprop, time==100), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+comparecomps + facet_wrap(~species, ncol=5)
+
+#ggsave("censuscomposition_time100.png", width=11, height=11)
+
+comparecomps <- ggplot() +
+  geom_point(data=subset(dat2totN, time==250), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
+  geom_point(data=subset(comptestprop, time==250), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+comparecomps + facet_wrap(~species, ncol=5)
+
+#ggsave("censuscomposition_time250.png", width=11, height=11)
+
+# and they do
+# differences for baleen and toothed whales are due to small total numbers
 
 ```
 
-```{r matchBp2, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; next 9 species."}
-compareB + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free") 
+And they did for NEUS the first time I did this, with some exceptions.
+
+The problems start when I try to do age to length, this function returns an error at present. 
+
+**Editing to be done in atlantisom (I have made local changes to calcage2length.R that are not pushed yet because I may have introduced an error)**
+
+```{r calcage2length-breaks, eval=FALSE}
+# now turn this into length comp with calc_age2length
+# function takes resn and nums as inputs so run survey and sample functions on resn as well
+if(initCCA) datresn <- CCAresults$resn
+if(initNEUS) datresn <- NEUSresults$resn
+if(initNOBA) datresn <- NOBAresults$resn
+
+survey_testresnall <- create_survey(dat = datresn,
+                                 time = seq(0,251,5), # use timeall? census?
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+lengthtesthigh <- sample_fish(survey_testNall, effNhigh)
+# use fish sampled from N along with survey of resn in function
+# calc_age2length uses nums (lengthtest) and finds matches in resn
+
+# provides ouput for an individual species and time slice
+# breaks for whole dataset (NA output all rows)
+
+if(initCCA) truth <- CCAresults
+if(initNEUS) truth <- NEUSresults
+if(initNOBA) truth <- NOBAresults
+
+length_census <- calc_age2length(structn = lengthtesthigh,
+                                 resn = survey_testresnall,
+                                 nums = lengthtesthigh,
+                                 biolprm = truth$biolprm, fgs = truth$fgs,
+                                 CVlenage = 0.1, remove.zeroes=TRUE)
 
 ```
 
-```{r matchBp3, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; next 9 species."}
-compareB + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free") 
 
-```
-
-```{r matchBp4, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; last 9 species. Depending on the model, we may not show all species in this example."}
-if(!initNEUS){
-  compareB + 
-    facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
-}
-```
-
-Given the misses using survey number outputs from run truth with a calculated weight at age, we will not repeat this example using numbers. 
 
 ## References
