@@ -47,8 +47,8 @@ Abbreviated here; for a full explanation please see [TrueBioTest](https://sgaich
 
 ```{r initialize}
 
-initCCA <- FALSE
-initNEUS <- TRUE
+initCCA <- TRUE
+initNEUS <- FALSE
 initNOBA <- FALSE
 
 if(initCCA){
@@ -205,6 +205,8 @@ if(initNOBA) funct.groups <- rename(funct.groups, GroupType = InvertType)
 survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
                            funct.groups$GroupType %in% c("FISH", "SHARK")]
 
+#if(initCCA) survspp <- survspp[!survspp %in% "Pisciv_T_Fish"]
+
 ```
 
 Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age and length composition. 
@@ -277,36 +279,39 @@ comptesttot <- aggregate(comptesthigh$numAtAgesamp,list(comptesthigh$species,com
 names(comptesttot) <- c("species","time","totsamp")
 
 comptestprop <- merge(comptesthigh, comptesttot)
+```
+
+```{r comptest1plot, message=FALSE, warning=FALSE}
 
 # compare individual years, these proportions at age should match
 comparecomps <- ggplot() +
-  geom_point(data=subset(dat2totN, time==0), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
-  geom_point(data=subset(comptestprop, time==0), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3) +
+  geom_point(data=subset(dat2totN, time==min(timeall)), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
+  geom_point(data=subset(comptestprop, time==min(timeall)), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3) +
   theme_tufte() +
   theme(legend.position = "top") +
-  labs(colour=scenario.name)
+  labs(colour=paste0(scenario.name, " start"))
 
 comparecomps + facet_wrap(~species, ncol=5)
 
 #ggsave("censuscomposition_time0.png", width=11, height=11)
 
 comparecomps <- ggplot() +
-  geom_point(data=subset(dat2totN, time==100), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
-  geom_point(data=subset(comptestprop, time==100), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
+  geom_point(data=subset(dat2totN, time==median(timeall)), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
+  geom_point(data=subset(comptestprop, time==median(timeall)), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
   theme_tufte() +
   theme(legend.position = "top") +
-  labs(colour=scenario.name)
+  labs(colour=paste0(scenario.name, " midpoint"))
 
 comparecomps + facet_wrap(~species, ncol=5)
 
 #ggsave("censuscomposition_time100.png", width=11, height=11)
 
 comparecomps <- ggplot() +
-  geom_point(data=subset(dat2totN, time==250), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
-  geom_point(data=subset(comptestprop, time==250), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
+  geom_point(data=subset(dat2totN, time==max(timeall)-1), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
+  geom_point(data=subset(comptestprop, time==max(timeall)-1), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
   theme_tufte() +
   theme(legend.position = "top") +
-  labs(colour=scenario.name)
+  labs(colour=paste0(scenario.name, " end"))
 
 comparecomps + facet_wrap(~species, ncol=5)
 
