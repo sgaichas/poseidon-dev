@@ -256,7 +256,11 @@ dat2totN <- merge(dat2, totN)
 ageclcomp <- ggplot(dat2totN, aes(x=agecl, y=numAtAge/totN, col=time)) +
   geom_point()
 
-ageclcomp + facet_wrap(~species, ncol=5) #, scales="free")
+ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
+ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
+ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
+ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
+#ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
 
 ```
 
@@ -291,7 +295,11 @@ comparecomps <- ggplot() +
   theme(legend.position = "top") +
   labs(colour=paste0(scenario.name, " start"))
 
-comparecomps + facet_wrap(~species, ncol=5)
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
+#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
 
 #ggsave("censuscomposition_time0.png", width=11, height=11)
 
@@ -302,7 +310,11 @@ comparecomps <- ggplot() +
   theme(legend.position = "top") +
   labs(colour=paste0(scenario.name, " midpoint"))
 
-comparecomps + facet_wrap(~species, ncol=5)
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
+#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
 
 #ggsave("censuscomposition_time100.png", width=11, height=11)
 
@@ -313,7 +325,11 @@ comparecomps <- ggplot() +
   theme(legend.position = "top") +
   labs(colour=paste0(scenario.name, " end"))
 
-comparecomps + facet_wrap(~species, ncol=5)
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
+#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
 
 #ggsave("censuscomposition_time250.png", width=11, height=11)
 
