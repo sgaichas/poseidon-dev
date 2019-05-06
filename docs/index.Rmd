@@ -39,5 +39,15 @@ CCA outputs had some 0 length at age, requiring changes to `atlantisom::sample_f
 
 <a href="https://sgaichas.github.io/poseidon-dev/NOBATrueLengthAgeCompTest.html" target="_blank">True and sample fish census comparison NOBA - May 6, 2019</a>
 
+Standard survey with composition sampling: impact of selectivity, `sample_fish`
+
+<a href="https://sgaichas.github.io/poseidon-dev/StdSurvLengthAgeCompTest.html" target="_blank">Compare true cohort comp with survey + sampling - May 6, 2019</a>
+
+<a href="https://sgaichas.github.io/poseidon-dev/NEUSStdSurvCohortCompTest.html" target="_blank">True cohort comp vs survey comparison NEUS - May 6, 2019</a>
+
+<a href="https://sgaichas.github.io/poseidon-dev/CCAStdSurvCohortCompTest.html" target="_blank">True cohort comp vs survey comparison CCA - May 6, 2019</a>
+
+<a href="https://sgaichas.github.io/poseidon-dev/NOBAStdSurvCohortCompTest.html" target="_blank">True cohort comp vs survey comparison NOBA - May 6, 2019</a>
+
 
 ### More to come later!
