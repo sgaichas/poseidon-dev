@@ -1,0 +1,317 @@
+---
+title: "Testing atlantisom: generate census length and age comps from Norwegian-Barents Atlantis"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+bibliography: "packages.bib"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+# automatically create a bib database for R packages
+knitr::write_bib(c(
+  .packages(), 'knitr', 'rmarkdown', 'tidyr', 'dplyr', 'ggplot2',
+  'data.table', 'here', 'ggforce', 'ggthemes'
+), 'packages.bib')
+```
+
+## Introduction
+
+This page has visualizations for the NOBA model example, CERES Global Sustainability. For full explanation of methods, see the file linked at the beginning of each section.
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+library(ggforce)
+library(ggthemes)
+library(atlantisom)
+```
+
+```{r initialize}
+
+initCCA <- FALSE
+initNEUS <- FALSE
+initNOBA <- TRUE
+
+if(initCCA){
+  d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
+  functional.groups.file <- "CalCurrentV3Groups.csv"
+  biomass.pools.file <- "DIVCalCurrentV3_BIOL.nc"
+  biol.prm.file <- "CalCurrentV3_Biol.prm"
+  box.file <- "CalCurrentV3_utm.bgm"
+  initial.conditions.file <- "DIVCalCurrentV3_BIOL.nc"
+  run.prm.file <- "CalCurrentV3_run.xml"
+  scenario.name <- "CCV3"
+}
+
+if(initNEUS){
+  d.name <- here("atlantisoutput","NEUStest20160303")
+  functional.groups.file <- "NeusGroups.csv" 
+  biomass.pools.file <- ""
+  biol.prm.file <- "at_biol_neus_v15_DE.prm"
+  box.file <- "neus30_2006.bgm"
+  initial.conditions.file <- "inneus_2012.nc"
+  run.prm.file <- "at_run_neus_v15_DE.xml"
+  scenario.name <- "neusDynEffort_Test1_"
+}
+
+if(initNOBA){
+  d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
+  functional.groups.file <- "nordic_groups_v04.csv" 
+  biomass.pools.file <- "nordic_biol_v23.nc"
+  biol.prm.file <- "nordic_biol_incl_harv_v_007_3.prm"
+  box.file <- "Nordic02.bgm"
+  initial.conditions.file <- "nordic_biol_v23.nc"
+  run.prm.file <- "nordic_run_v01.xml"
+  scenario.name <- "nordic_runresults_01"
+}
+# NOBA note: output filenames in CCA and NEUS begin with "output" and the run_truth function is written to expect this. Need to check if default Atlantis output file nomenclature has changed or if NOBA is a special case. For now, NOBA filenames have been changed to include prefix "output"
+```
+
+
+```{r get_names, message=FALSE, warning=FALSE}
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+```
+
+
+```{r load_Rdata, message=FALSE, warning=FALSE}
+
+if(initCCA) {
+  d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
+  truth.file <- "outputCCV3run_truth.RData"
+  load(file.path(d.name, truth.file))
+  CCAresults <- result
+} 
+
+if(initNEUS) {
+  d.name <- here("atlantisoutput","NEUStest20160303")
+  truth.file <- "outputneusDynEffort_Test1_run_truth.RData" 
+  load(file.path(d.name, truth.file))
+  NEUSresults <- result
+}
+
+if(initNOBA){
+  d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
+  truth.file <- "outputnordic_runresults_01run_truth.RData" 
+  load(file.path(d.name, truth.file))
+  NOBAresults <- result
+}
+
+```
+
+```{r readsurvey1, eval=FALSE}
+
+if(initCCA) {
+  CCAsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+}
+
+if(initNEUS) {
+  NEUSsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+}
+
+if(initNOBA) {
+  NOBAsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+}
+
+```
+
+## Simulate a survey part 3: sample for length and age composition
+
+Full methods are explained [here](https://sgaichas.github.io/poseidon-dev/TrueLengthAgeCompTest.html).
+
+The following settings should achieve a survey that samples all Atlantis model output timesteps, all fish and shark species, and all model polygons, with perfect efficiency and full selectivity for all ages: 
+
+```{r census-spec, message=FALSE, warning=FALSE, echo=TRUE}
+
+# should return a perfectly scaled survey 
+effic1 <- data.frame(species=funct.group.names,
+                     efficiency=rep(1.0,length(funct.group.names)))
+
+# should return all lengths fully sampled (Atlantis output is 10 age groups per spp)
+# BUT CHECK if newer Atlantis models can do age-specific outputs
+selex1 <- data.frame(species=rep(funct.group.names, each=10),
+                     agecl=rep(c(1:10),length(funct.group.names)),
+                     selex=rep(1.0,length(funct.group.names)*10))
+
+# should return all model areas
+boxpars <- load_box(d.name, box.file)
+boxall <- c(0:(boxpars$nbox - 1))
+
+# these are model specific, generalized above
+# if(initCCA) boxall <- c(0:88) 
+# if(initNEUS) boxall <- c(0:29)
+# if(initNOBA) boxall <- c(0:59) 
+
+# should return all model output timesteps; need to generalize
+# if(initCCA) timeall <- c(0:100) 
+# if(initNEUS) timeall <- c(0:251)
+# if(initNOBA) timeall <- c(0:560) 
+
+# generalized
+runpar <- load_runprm(d.name, run.prm.file)
+noutsteps <- runpar$tstop/runpar$outputstep
+stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
+
+timeall <- c(0:noutsteps)
+  
+# define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
+# for ecosystem indicator work test all species, e.g.
+survspp <- funct.group.names 
+
+# to keep plots simpler, currently hardcoded for vertebrate/fished invert groups
+# if(initCCA) survspp <- funct.group.names[c(1:44, 59:61, 65:68)] 
+# if(initNEUS) survspp <- funct.group.names[1:21]
+# if(initNOBA) survspp <- funct.group.names[1:36]
+
+# for length and age groups lets just do fish and sharks
+# NOBA model has InvertType, changed to GroupType in file, but check Atlantis default
+if(initNOBA) funct.groups <- rename(funct.groups, GroupType = InvertType)
+
+survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
+                           funct.groups$GroupType %in% c("FISH", "SHARK")]
+
+#if(initCCA) survspp <- survspp[!survspp %in% "Pisciv_T_Fish"]
+
+```
+
+Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age and length composition. 
+
+```{r stdsurveyNbased}
+
+# this uses result$nums, but we are not creating a biomass index this time, so we don't need a weight at age conversion
+
+if(initCCA) datN <- CCAresults$nums
+if(initNEUS) datN <- NEUSresults$nums
+if(initNOBA) datN <- NOBAresults$nums
+
+survey_testNall <- create_survey(dat = datN,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# consider saving this interim step if it takes a long time go generate
+
+
+```
+
+Next, get true annual (cohort) age comp from this census survey based on run truth. (is there a standard Atlantis output I can compare this to as we did for biomass?)
+
+```{r truecohortagecomp}
+# what is true composition? need annual by species, use code from sample_fish
+# do tidyly
+dat2 <- survey_testNall %>%
+  group_by(species, agecl, time) %>%
+  summarize(numAtAge = sum(atoutput))
+
+#dat<-survey_testNall
+#dat2 <- aggregate(dat$atoutput,list(dat$species,dat$agecl,dat$time),sum)
+#names(dat2) <- c("species","agecl","time","numAtAge")
+
+totN <- dat2 %>%
+  group_by(species, time) %>%
+  summarize(totN = sum(numAtAge))
+
+#totN <- aggregate(dat2$numAtAge,list(dat2$species,dat2$time),sum )
+#names(totN) <- c("species","time","totN")
+
+dat2totN <- merge(dat2, totN)
+
+ageclcomp <- ggplot(dat2totN, aes(x=agecl, y=numAtAge/totN, col=time)) +
+  geom_point()
+
+ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
+ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
+ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
+#ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
+#ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
+
+```
+
+Then we use the `sample_fish` function and compare to true annual age comp calculated above as a test. These should match. We show compositions sampled for the initial time step, a time step in the middle of the run, and the last timestep.
+
+```{r comptest1, message=FALSE, warning=FALSE}
+# setting the effN higher than actual numbers results in sampling all
+effNall <- data.frame(species=survspp, effN=rep(1e+15, length(survspp)))
+# rmultinom broke with that sample size
+#comptestall <- sample_fish(survey_testNall, effNall)
+#names(comptestall) <- c("species","agecl","polygon", "layer","time","numAtAgesamp")
+
+# this one is high but not equal to total for numerous groups
+effNhigh <- data.frame(species=survspp, effN=rep(1e+8, length(survspp)))
+
+comptesthigh <- sample_fish(survey_testNall, effNhigh)
+names(comptesthigh) <- c("species","agecl","polygon", "layer","time","numAtAgesamp")
+
+comptesttot <- aggregate(comptesthigh$numAtAgesamp,list(comptesthigh$species,comptesthigh$time),sum )
+names(comptesttot) <- c("species","time","totsamp")
+
+comptestprop <- merge(comptesthigh, comptesttot)
+```
+
+```{r comptest1plot, message=FALSE, warning=FALSE}
+
+# compare individual years, these proportions at age should match
+comparecomps <- ggplot() +
+  geom_point(data=subset(dat2totN, time==min(timeall)), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
+  geom_point(data=subset(comptestprop, time==min(timeall)), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=paste0(scenario.name, " start"))
+
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
+#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
+#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
+
+#ggsave("censuscomposition_time0.png", width=11, height=11)
+
+comparecomps <- ggplot() +
+  geom_point(data=subset(dat2totN, time==median(timeall)), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
+  geom_point(data=subset(comptestprop, time==median(timeall)), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=paste0(scenario.name, " midpoint"))
+
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
+#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
+#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
+
+#ggsave("censuscomposition_time100.png", width=11, height=11)
+
+comparecomps <- ggplot() +
+  geom_point(data=subset(dat2totN, time==max(timeall)-1), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
+  geom_point(data=subset(comptestprop, time==max(timeall)-1), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=paste0(scenario.name, " end"))
+
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
+comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
+#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
+#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
+
+#ggsave("censuscomposition_time250.png", width=11, height=11)
+
+# and they do
+# differences for baleen and toothed whales are due to small total numbers
+
+```
+
+NOBA matches perfectly here. 
