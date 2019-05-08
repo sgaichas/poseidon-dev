@@ -347,20 +347,34 @@ The problems start when I try to do age to length, this function returns an erro
 ```{r calcage2length-breaks, eval=FALSE}
 # now turn this into length comp with calc_age2length
 # function takes resn and nums as inputs so run survey and sample functions on resn as well
+
 if(initCCA) datresn <- CCAresults$resn
 if(initNEUS) datresn <- NEUSresults$resn
 if(initNOBA) datresn <- NOBAresults$resn
 
 survey_testresnall <- create_survey(dat = datresn,
-                                 time = seq(0,251,5), # use timeall? census?
+                                 time = timeall, # use timeall? yes to match Nall
                                  species = survspp,
                                  boxes = boxall,
                                  effic = effic1,
                                  selex = selex1)
 
+#also needs structn, apply survey to this as well
+if(initCCA) datstructn <- CCAresults$structn
+if(initNEUS) datstructn <- NEUSresults$structn
+if(initNOBA) datstructn <- NOBAresults$structn
+
+survey_teststructnall <- create_survey(dat = datstructn,
+                                 time = timeall, # use timeall? yes to match Nall
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+
 lengthtesthigh <- sample_fish(survey_testNall, effNhigh)
-# use fish sampled from N along with survey of resn in function
-# calc_age2length uses nums (lengthtest) and finds matches in resn
+# use fish sampled from N along with survey of resn and structn in function
+# calc_age2length uses nums (lengthtest) and finds matches in resn and structn
 
 # provides ouput for an individual species and time slice
 # breaks for whole dataset (NA output all rows)
@@ -369,7 +383,7 @@ if(initCCA) truth <- CCAresults
 if(initNEUS) truth <- NEUSresults
 if(initNOBA) truth <- NOBAresults
 
-length_census <- calc_age2length(structn = lengthtesthigh,
+length_census <- calc_age2length(structn = survey_teststructnall,
                                  resn = survey_testresnall,
                                  nums = lengthtesthigh,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
