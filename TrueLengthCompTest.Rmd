@@ -1,5 +1,5 @@
 ---
-title: "Testing atlantisom: generate census length and age comps"
+title: "Testing atlantisom: generate census length comps"
 author: "Sarah Gaichas and Christine Stawitz"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
@@ -143,7 +143,7 @@ if(initNOBA) {
 
 ```
 
-## Simulate a survey part 3: sample for length and age composition
+## Simulate a survey part 4: sample for length composition
 
 This section uses the `atlantisom::create_survey()` and `atlantisom::sample_fish()` to get a biological sample dataset. From that dataset, several other functions can be run:
 
@@ -151,7 +151,10 @@ This section uses the `atlantisom::create_survey()` and `atlantisom::sample_fish
  *  length samples from sample_lengths (TO BE WRITTEN)
  *  weight samples from sample_weights (TO BE WRITTEN)
  *  diet samples from sample_diet
+ 
+Atlantis outputs numbers by cohort (stage-age) and growth informtation, but does not output size of animals directly. The function we are testing here, `atlantisom::calc_age2length` converts numbers by cohort to a length composition. The [workflow originally envisioned](https://onedrive.live.com/?authkey=%21AFQkOoKRz64TLUw&cid=59547B4CB95EF108&id=59547B4CB95EF108%216291&parId=59547B4CB95EF108%216262&o=OneUp) was to create a survey, sample fish from the survey, then apply this function, but as written it may work better to create a length comp for the whole population, which could then be sampled. We'll work out the options here. 
 
+### This stuff is biolerplate from other docs, repeated here for completeness: 
 To create a survey, the user specifies the timing of the survey, which species are captured, the spatial coverage of the survey, the species-specific survey efficiency ("q"), and the selectivity at age for each species.
 
 The following settings should achieve a survey that samples all Atlantis model output timesteps, all fish and shark species, and all model polygons, with perfect efficiency and full selectivity for all ages: 
@@ -253,14 +256,14 @@ totN <- dat2 %>%
 
 dat2totN <- merge(dat2, totN)
 
-ageclcomp <- ggplot(dat2totN, aes(x=agecl, y=numAtAge/totN, col=time)) +
-  geom_point()
-
-ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
-ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
-ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
-ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
-#ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
+# ageclcomp <- ggplot(dat2totN, aes(x=agecl, y=numAtAge/totN, col=time)) +
+#   geom_point()
+# 
+# ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
+# ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
+# ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
+# ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
+# #ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
 
 ```
 
@@ -285,7 +288,7 @@ names(comptesttot) <- c("species","time","totsamp")
 comptestprop <- merge(comptesthigh, comptesttot)
 ```
 
-```{r comptest1plot, message=FALSE, warning=FALSE}
+```{r comptest1plot, message=FALSE, warning=FALSE, echo=FALSE, eval=FALSE}
 
 # compare individual years, these proportions at age should match
 comparecomps <- ggplot() +
@@ -338,13 +341,44 @@ comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales=
 
 ```
 
-And they did for NEUS the first time I did this, with some exceptions.
+And they mostly do aside from fish that have 0s in the first year (Planktiv_T_Fish.
 
-The problems start when I try to do age to length, this function returns an error at present. 
+The problems start when I try to do age to length, this function returns an error as written when `sample_fish` is run first. 
 
-**Editing to be done in atlantisom (I have made local changes to calcage2length.R that are not pushed yet because I may have introduced an error).**
+May 8 update: Found problem, fix may require rethinking sampling flow. Making another rmd (this one!) to deal with this.
 
-May 8 update: Found problem, fix may require rethinking sampling flow. Making another rmd to deal with this.
+So, test 1 is running `calc_age2length` with the full true dataset. This should work because there will be no aggregation of the output:
+
+```{r calcage2length-truth}
+
+if(initCCA) truth <- CCAresults
+if(initNEUS) truth <- NEUSresults
+if(initNOBA) truth <- NOBAresults
+
+length_census <- calc_age2length(structn = truth$structn,
+                                 resn = truth$resn,
+                                 nums = truth$nums,
+                                 biolprm = truth$biolprm, fgs = truth$fgs,
+                                 CVlenage = 0.1, remove.zeroes=TRUE)
+
+```
+
+This produces output. Visualize:
+
+```{r lengthcensus-vis}
+
+# for an example species, by polygon, layer because this is full resolution
+
+
+```
+
+
+So the question now is, do we run `create_survey` on the output of this, or do we `create_survey` on all three truth components first, then run `calc_age2length` to get a survey sample? This should work and will eliminate the unsampled areas/times/species.
+
+And then `sample_fish` from `calc_age2length` output? But also we need to run `sample_fish` to get the cohort (age) output (or do we? see below) so the multinomial in there will make different distributions for smaller sample sizes. Since we are trying to represent biological sampling as one set of sampled fish which we length, then take a subset of ages and weights, this may not work. 
+
+Or, we can sum the length atoutput from calc_age2length over size bins and back in to agecl bins to get age classes, then subsample this for ages? We also have mulen and muweight for each size bin (or is it agecl bin?) so can we back the individual weights for the aged fish subsample out of this?
+
 
 ```{r calcage2length-breaks, eval=FALSE}
 # now turn this into length comp with calc_age2length
