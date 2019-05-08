@@ -347,42 +347,53 @@ The problems start when I try to do age to length, this function returns an erro
 
 May 8 update: Found problem, fix may require rethinking sampling flow. Making another rmd (this one!) to deal with this.
 
-So, test 1 is running `calc_age2length` with the full true dataset. This should work because there will be no aggregation of the output:
+So, test 1 is running `calc_age2length` with the full true dataset. This should work because there will be no aggregation of the output (no, don't do this with the full dataset! example with one species instead):
 
-```{r calcage2length-truth, warning=FALSE, message=FALSE, eval=FALSE}
+```{r calcage2length-truth, warning=FALSE, message=FALSE}
 
 if(initCCA) truth <- CCAresults
 if(initNEUS) truth <- NEUSresults
 if(initNOBA) truth <- NOBAresults
 
-length_census <- calc_age2length(structn = truth$structn,
-                                 resn = truth$resn,
-                                 nums = truth$nums,
+# length_census <- calc_age2length(structn = truth$structn,
+#                                  resn = truth$resn,
+#                                  nums = truth$nums,
+#                                  biolprm = truth$biolprm, fgs = truth$fgs,
+#                                  CVlenage = 0.1, remove.zeroes=TRUE)
+# 
+# # never got here with full truth
+# saveRDS(length_census, file.path(d.name, paste0(scenario.name, "length_census.rds")))
+
+# try for a single species
+# everyone's favorite predator
+atf_truestructn <- truth$structn[truth$structn$species == "Arrowtooth_flounder",]
+atf_trueresn <- truth$resn[truth$resn$species == "Arrowtooth_flounder",] 
+atf_truenums <- truth$nums[truth$nums$species == "Arrowtooth_flounder",] 
+
+atf_length_census <- calc_age2length(structn = atf_truestructn,
+                                 resn = atf_trueresn,
+                                 nums = atf_truenums,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
                                  CVlenage = 0.1, remove.zeroes=TRUE)
 
-saveRDS(length_census, file.path(d.name, paste0(scenario.name, "length_census.rds")))
-
 ```
 
-This produces output, after a looooooong time. Its doing it for all species, which is a problem. Visualize a tiny bit:
+This produced output for a single species by mistake. It ran for hours on the full truth dataset and did not complete (I stopped it). Its doing it for all species, which is a problem. Rewrote for just one species to see full length comp by area and depth layer.
+
+Visualize a tiny bit:
 
 ```{r lengthcensus-vis}
 
 # for an example species, by polygon, layer because this is full resolution
 # everyone's favorite predator
 
-atf_length_census <- length_census$natlength %>%
-  filter(species %in% ("Arrowtooth_flounder"))
-
 
 
 ```
 
-
 So the question now is, do we run `create_survey` on the output of this, or do we `create_survey` on all three truth components first, then run `calc_age2length` to get a survey sample? The latter should work and will eliminate the unsampled areas/times/species.
 
-It should save time to run the census survey to get true length comps, because at least it aggregates over polygon and layer. Test this:
+Try again with survey sampling for nums, structn and resn, which limits the species list to fish and sharks, and also aggregates over layer and polygon. Test this:
 
 ```{r censussurvey-calcage2length, warning=FALSE, message=FALSE}
 
