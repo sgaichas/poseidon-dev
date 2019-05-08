@@ -361,6 +361,8 @@ length_census <- calc_age2length(structn = truth$structn,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
                                  CVlenage = 0.1, remove.zeroes=TRUE)
 
+saveRDS(length_census, file.path(d.name, paste0(scenario.name, "length_census.rds")))
+
 ```
 
 This produces output, after a looooooong time. Its doing it for all species, which is a problem. Visualize a tiny bit:
