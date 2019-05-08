@@ -349,7 +349,7 @@ May 8 update: Found problem, fix may require rethinking sampling flow. Making an
 
 So, test 1 is running `calc_age2length` with the full true dataset. This should work because there will be no aggregation of the output:
 
-```{r calcage2length-truth}
+```{r calcage2length-truth, warning=FALSE, message=FALSE, eval=FALSE}
 
 if(initCCA) truth <- CCAresults
 if(initNEUS) truth <- NEUSresults
@@ -363,17 +363,56 @@ length_census <- calc_age2length(structn = truth$structn,
 
 ```
 
-This produces output. Visualize:
+This produces output, after a looooooong time. Its doing it for all species, which is a problem. Visualize a tiny bit:
 
 ```{r lengthcensus-vis}
 
 # for an example species, by polygon, layer because this is full resolution
+# everyone's favorite predator
+
+atf_length_census <- length_census$natlength %>%
+  filter(species %in% ("Arrowtooth_flounder"))
+
 
 
 ```
 
 
-So the question now is, do we run `create_survey` on the output of this, or do we `create_survey` on all three truth components first, then run `calc_age2length` to get a survey sample? This should work and will eliminate the unsampled areas/times/species.
+So the question now is, do we run `create_survey` on the output of this, or do we `create_survey` on all three truth components first, then run `calc_age2length` to get a survey sample? The latter should work and will eliminate the unsampled areas/times/species.
+
+It should save time to run the census survey to get true length comps, because at least it aggregates over polygon and layer. Test this:
+
+```{r censussurvey-calcage2length, warning=FALSE, message=FALSE}
+
+if(initCCA) truth <- CCAresults
+if(initNEUS) truth <- NEUSresults
+if(initNOBA) truth <- NOBAresults
+
+survey_testresnall <- create_survey(dat = truth$resn,
+                                 time = timeall, # use timeall? yes to match Nall
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+survey_teststructnall <- create_survey(dat = truth$structn,
+                                 time = timeall, # use timeall? yes to match Nall
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# survey_testNall with truth$nums as dat was created above
+
+length_censussurv <- calc_age2length(structn = survey_teststructnall,
+                                 resn = survey_testresnall,
+                                 nums = survey_testNall,
+                                 biolprm = truth$biolprm, fgs = truth$fgs,
+                                 CVlenage = 0.1, remove.zeroes=TRUE)
+
+
+```
+
 
 And then `sample_fish` from `calc_age2length` output? But also we need to run `sample_fish` to get the cohort (age) output (or do we? see below) so the multinomial in there will make different distributions for smaller sample sizes. Since we are trying to represent biological sampling as one set of sampled fish which we length, then take a subset of ages and weights, this may not work. 
 
