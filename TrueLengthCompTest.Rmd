@@ -347,7 +347,7 @@ The problems start when I try to do age to length, this function returns an erro
 
 May 8 update: Found problem, fix may require rethinking sampling flow. Making another rmd (this one!) to deal with this.
 
-So, test 1 is running `calc_age2length` with the full true dataset. This should work because there will be no aggregation of the output (no, don't do this with the full dataset! example with one species instead):
+So, test 1 is running `calc_age2length` with the full true dataset. This should work because there will be no aggregation of the output (no, don't do this with the full dataset! example with one species instead. actually, don't even try this):
 
 ```{r calcage2length-truth, warning=FALSE, message=FALSE}
 
@@ -370,15 +370,16 @@ atf_truestructn <- truth$structn[truth$structn$species == "Arrowtooth_flounder",
 atf_trueresn <- truth$resn[truth$resn$species == "Arrowtooth_flounder",] 
 atf_truenums <- truth$nums[truth$nums$species == "Arrowtooth_flounder",] 
 
-atf_length_census <- calc_age2length(structn = atf_truestructn,
-                                 resn = atf_trueresn,
-                                 nums = atf_truenums,
-                                 biolprm = truth$biolprm, fgs = truth$fgs,
-                                 CVlenage = 0.1, remove.zeroes=TRUE)
+#atf_length_census <- calc_age2length(structn = atf_truestructn,
+#                                 resn = atf_trueresn,
+#                                 nums = atf_truenums,
+#                                 biolprm = truth$biolprm, fgs = truth$fgs,
+#                                 CVlenage = 0.1, remove.zeroes=TRUE)
+atf_length_census <- lenout
 
 ```
 
-This produced output for a single species by mistake. It ran for hours on the full truth dataset and did not complete (I stopped it). Its doing it for all species, which is a problem. Rewrote for just one species to see full length comp by area and depth layer.
+This produced output for a single species by mistake. It ran for hours on the full truth dataset, and on the just arrowtooth full truth dataset and did not complete (I stopped it). Testing for just one species and 500 index steps (of 103690) to see full length comp by area and depth layer.
 
 Visualize a tiny bit:
 
@@ -387,13 +388,24 @@ Visualize a tiny bit:
 # for an example species, by polygon, layer because this is full resolution
 # everyone's favorite predator
 
+lfplot <- ggplot(atf_length_census$natlength, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte()
+
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1)
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2)
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3)
+
+lfplot + facet_wrap_paginate(~polygon, ncol=4, nrow = 4, page = 1)
+lfplot + facet_wrap_paginate(~polygon, ncol=4, nrow = 4, page = 2)
+lfplot + facet_wrap_paginate(~polygon, ncol=4, nrow = 4, page = 3)
 
 
 ```
 
 So the question now is, do we run `create_survey` on the output of this, or do we `create_survey` on all three truth components first, then run `calc_age2length` to get a survey sample? The latter should work and will eliminate the unsampled areas/times/species.
 
-Try again with survey sampling for nums, structn and resn, which limits the species list to fish and sharks, and also aggregates over layer and polygon. Test this:
+Try again with survey sampling for nums, structn and resn, which limits the species list to fish and sharks, and also aggregates over layer and polygon. This will still take too long. Can we run with the sample_fish in nums? Test this:
 
 ```{r censussurvey-calcage2length, warning=FALSE, message=FALSE}
 
@@ -416,6 +428,11 @@ survey_teststructnall <- create_survey(dat = truth$structn,
                                  selex = selex1)
 
 # survey_testNall with truth$nums as dat was created above
+
+#cut down to single species
+atf_survey_teststructnall <- survey_teststructnall[survey_teststructnall$species == "Arrowtooth_flounder",]
+atf_survey_testresnall <- survey_testresnall[survey_testresnall$species == "Arrowtooth_flounder",]
+atf_survey_testNall <- survey_testNall[survey_testNall$species == "Arrowtooth_flounder",]
 
 length_censussurv <- calc_age2length(structn = survey_teststructnall,
                                  resn = survey_testresnall,
