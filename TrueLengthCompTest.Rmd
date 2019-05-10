@@ -51,39 +51,12 @@ initCCA <- TRUE
 initNEUS <- FALSE
 initNOBA <- FALSE
 
-if(initCCA){
-  d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
-  functional.groups.file <- "CalCurrentV3Groups.csv"
-  biomass.pools.file <- "DIVCalCurrentV3_BIOL.nc"
-  biol.prm.file <- "CalCurrentV3_Biol.prm"
-  box.file <- "CalCurrentV3_utm.bgm"
-  initial.conditions.file <- "DIVCalCurrentV3_BIOL.nc"
-  run.prm.file <- "CalCurrentV3_run.xml"
-  scenario.name <- "CCV3"
-}
+if(initCCA) source(here("config/CCConfig.R"))
 
-if(initNEUS){
-  d.name <- here("atlantisoutput","NEUStest20160303")
-  functional.groups.file <- "NeusGroups.csv" 
-  biomass.pools.file <- ""
-  biol.prm.file <- "at_biol_neus_v15_DE.prm"
-  box.file <- "neus30_2006.bgm"
-  initial.conditions.file <- "inneus_2012.nc"
-  run.prm.file <- "at_run_neus_v15_DE.xml"
-  scenario.name <- "neusDynEffort_Test1_"
-}
+if(initNEUS) source(here("config/NEUSConfig.R"))
 
-if(initNOBA){
-  d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
-  functional.groups.file <- "nordic_groups_v04.csv" 
-  biomass.pools.file <- "nordic_biol_v23.nc"
-  biol.prm.file <- "nordic_biol_incl_harv_v_007_3.prm"
-  box.file <- "Nordic02.bgm"
-  initial.conditions.file <- "nordic_biol_v23.nc"
-  run.prm.file <- "nordic_run_v01.xml"
-  scenario.name <- "nordic_runresults_01"
-}
-# NOBA note: output filenames in CCA and NEUS begin with "output" and the run_truth function is written to expect this. Need to check if default Atlantis output file nomenclature has changed or if NOBA is a special case. For now, NOBA filenames have been changed to include prefix "output"
+if(initNOBA) source(here("config/NOBAConfig.R"))
+
 ```
 
 
@@ -103,42 +76,21 @@ funct.group.names <- funct.groups %>%
 ```{r load_Rdata, message=FALSE, warning=FALSE}
 
 if(initCCA) {
-  d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
   truth.file <- "outputCCV3run_truth.RData"
   load(file.path(d.name, truth.file))
-  CCAresults <- result
+  truth <- result
 } 
 
 if(initNEUS) {
-  d.name <- here("atlantisoutput","NEUStest20160303")
   truth.file <- "outputneusDynEffort_Test1_run_truth.RData" 
   load(file.path(d.name, truth.file))
-  NEUSresults <- result
+  truth <- result
 }
 
 if(initNOBA){
-  d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
   truth.file <- "outputnordic_runresults_01run_truth.RData" 
   load(file.path(d.name, truth.file))
-  NOBAresults <- result
-}
-
-```
-
-We can also read in previously generated survey census files based on true biomass results for comparison if necessary, but not yet used here (see [TrueBioTest](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html).)
-
-```{r readsurvey1, eval=FALSE}
-
-if(initCCA) {
-  CCAsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
-}
-
-if(initNEUS) {
-  NEUSsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
-}
-
-if(initNOBA) {
-  NOBAsurveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+  truth <- result
 }
 
 ```
@@ -152,7 +104,7 @@ This section uses the `atlantisom::create_survey()` and `atlantisom::sample_fish
  *  weight samples from sample_weights (TO BE WRITTEN)
  *  diet samples from sample_diet
  
-Atlantis outputs numbers by cohort (stage-age) and growth informtation, but does not output size of animals directly. The function we are testing here, `atlantisom::calc_age2length` converts numbers by cohort to a length composition. The [workflow originally envisioned](https://onedrive.live.com/?authkey=%21AFQkOoKRz64TLUw&cid=59547B4CB95EF108&id=59547B4CB95EF108%216291&parId=59547B4CB95EF108%216262&o=OneUp) was to create a survey, sample fish from the survey, then apply this function, but as written it may work better to create a length comp for the whole population, which could then be sampled. We'll work out the options here. 
+Atlantis outputs numbers by cohort (stage-age) and growth informtation, but does not output size of animals directly. The function we are testing here, `atlantisom::calc_age2length` converts numbers by cohort to a length composition. The [workflow originally envisioned](https://onedrive.live.com/?authkey=%21AFQkOoKRz64TLUw&cid=59547B4CB95EF108&id=59547B4CB95EF108%216291&parId=59547B4CB95EF108%216262&o=OneUp) was to create a survey, sample fish from the survey, then apply this function. We determined that it will not work better to create a length comp for the whole population, which could then be sampled. We rethought what we needed [here](https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html) and test the new functions in this document. 
 
 ### This stuff is biolerplate from other docs, repeated here for completeness: 
 To create a survey, the user specifies the timing of the survey, which species are captured, the spatial coverage of the survey, the species-specific survey efficiency ("q"), and the selectivity at age for each species.
