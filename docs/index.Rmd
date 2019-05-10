@@ -57,6 +57,6 @@ Standard survey with composition sampling: impact of selectivity, `sample_fish`
 
 Difficult when you don't have a good idea of the outputs you are using!
 
-<a href="https://sgaichas.github.io/poseidon-dev/TrueLengthCompTest.html" target="_blank">Defeated by length compositions - May 8-9, 2019</a>
+<a href="https://sgaichas.github.io/poseidon-dev/TrueLengthCompTest_fail.html" target="_blank">Defeated by length compositions - May 8-9, 2019</a>
 
 ### More to come later!
