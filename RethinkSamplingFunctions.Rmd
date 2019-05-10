@@ -63,7 +63,7 @@ We need a way to appropriately aggregate the resn and structn outputs which are 
 
 We can either rewrite `aggregateData` to take another argument indicating aggregation by sum or median, or create separate functions `aggregateDataSum` and `aggregateDataMedian` to be used on the numbers/biomass or density outputs, respectively.  Either way we need to ensure that the appropriate aggregation function is used in `create_survey` and `sample_fish`
 
-Current `aggregateData` function, which is strangely not called by `sample_fish`
+Current `aggregateData` function, which is strangely not called by `sample_fish`. Or not so strange, since `aggregateData` defaults to aggregate only over layer and maintain polygons in the dataset?
 
 ```{r aggregateData}
 
@@ -87,4 +87,7 @@ knitr::include_graphics("https://dm2301files.storage.live.com/y4mZYTQWQxl_SZg2SQ
 
 1. write an aggregation function for resn and structn that applies the median
 2. rewrite `create_survey` to use alternate aggregation functions, or write `create_survey_nums` and `create_survey_wt` functions that use appropriate aggregation
+    + the latter may be better, because do we want to apply efficiency and selectivity to median weight densities? I don't think so?
+    + the fish still weighs the same, we just don't have the right proportion in the ecosystem (efficiency) or the right proportion at age (selectivty), both of which are taken care of in the numbers. 
+    + so maybe `aggregateDensityData` using the standard survey polygons gets us what we need as input to `sample_fish`?
 3. rewrite `sample_fish` to use alternate aggregation functions for each input type. Keeping this all in one function makes sense because the functional already takes both numbers and weights as inputs
