@@ -32,7 +32,7 @@ The original design of [atlantisom](https://github.com/r4atlantis/atlantisom) co
     + designed to use nums output with an average weight--but estimating average weight proved problematic the way I did it, which was too imprecise
     + can be used directly on biomass_ages output with a vector of average weight=1 (see [True Bio Test](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html))
 5. apply `sample_fish` to the output of `create_survey` to generate biological samples
-6. apply `calc_age2length` to output of 'sample_fish` to generate length compositions
+6. apply `calc_age2length` to output of `sample_fish` to generate length compositions
     + *FIRST BIG PROBLEM!* `calc_age2length` needs weight data at the same level of resolution as the nums data to estimate lengths using the length-weight relationship. 
     + Weight data comes from resn and structn. `calc_age2length` was originally tested with completely disaggregated outputs of `run_truth` and it generates length samples correctly that way
     + Initial `calc_age2length` testing with a real dataset revealed that it is entirely too slow to apply at the level of `run_truth` results for a full Atlantis model run and over many species (TrueLengthCompTest.Rmd)
