@@ -244,7 +244,7 @@ atf_length_censussurvsamp <- calc_age2length(structn = atf_structnall,
 
 ```
 
-Maybe this will work, we can hope.
+Maybe this will work, we can hope. It looks like it did...
 
 ```{r atflengthsamp1-test}
 
@@ -254,16 +254,26 @@ lfplot <- ggplot(atf_length_censussurvsamp$natlength, aes(upper.bins)) +
 
 lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
 lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
-# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
-# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 4, scales="free_y")
-# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 5, scales="free_y")
-# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 6, scales="free_y")
-# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 4, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 5, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 6, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
 ```
 
 ## Is this working??
 
-... the suspense is killing me
+OK, maybe we have something here. Next I need to see how long it takes to run for all species in the survey.
+
+```{r allspplength}
+
+length_censussurvsamp <- calc_age2length(structn = structnall,
+                                 resn = resnall,
+                                 nums = numsallhigh,
+                                 biolprm = truth$biolprm, fgs = truth$fgs,
+                                 CVlenage = 0.1, remove.zeroes=TRUE)
+
+```
 
 ## References
