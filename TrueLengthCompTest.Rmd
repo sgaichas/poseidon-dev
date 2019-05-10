@@ -260,6 +260,8 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 5, scales="free_y")
 lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 6, scales="free_y")
 lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
+# try dir = "v" option for vertical lf comparisons
+
 ```
 
 ## Is this working??
@@ -273,6 +275,9 @@ length_censussurvsamp <- calc_age2length(structn = structnall,
                                  nums = numsallhigh,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
                                  CVlenage = 0.1, remove.zeroes=TRUE)
+
+#save for later use, takes a long time to generate
+saveRDS(length_censussurvsamp, file.path(d.name, paste0(scenario.name, "length_censussurvsamp.rds")))
 
 ```
 
