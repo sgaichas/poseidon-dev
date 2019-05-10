@@ -118,7 +118,6 @@ effic1 <- data.frame(species=funct.group.names,
                      efficiency=rep(1.0,length(funct.group.names)))
 
 # should return all lengths fully sampled (Atlantis output is 10 age groups per spp)
-# BUT CHECK if newer Atlantis models can do age-specific outputs
 selex1 <- data.frame(species=rep(funct.group.names, each=10),
                      agecl=rep(c(1:10),length(funct.group.names)),
                      selex=rep(1.0,length(funct.group.names)*10))
@@ -127,17 +126,7 @@ selex1 <- data.frame(species=rep(funct.group.names, each=10),
 boxpars <- load_box(d.name, box.file)
 boxall <- c(0:(boxpars$nbox - 1))
 
-# these are model specific, generalized above
-# if(initCCA) boxall <- c(0:88) 
-# if(initNEUS) boxall <- c(0:29)
-# if(initNOBA) boxall <- c(0:59) 
-
-# should return all model output timesteps; need to generalize
-# if(initCCA) timeall <- c(0:100) 
-# if(initNEUS) timeall <- c(0:251)
-# if(initNOBA) timeall <- c(0:560) 
-
-# generalized
+# generalized timesteps all models
 runpar <- load_runprm(d.name, run.prm.file)
 noutsteps <- runpar$tstop/runpar$outputstep
 stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
@@ -148,11 +137,6 @@ timeall <- c(0:noutsteps)
 # for ecosystem indicator work test all species, e.g.
 survspp <- funct.group.names 
 
-# to keep plots simpler, currently hardcoded for vertebrate/fished invert groups
-# if(initCCA) survspp <- funct.group.names[c(1:44, 59:61, 65:68)] 
-# if(initNEUS) survspp <- funct.group.names[1:21]
-# if(initNOBA) survspp <- funct.group.names[1:36]
-
 # for length and age groups lets just do fish and sharks
 # NOBA model has InvertType, changed to GroupType in file, but check Atlantis default
 if(initNOBA) funct.groups <- rename(funct.groups, GroupType = InvertType)
@@ -160,21 +144,13 @@ if(initNOBA) funct.groups <- rename(funct.groups, GroupType = InvertType)
 survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
                            funct.groups$GroupType %in% c("FISH", "SHARK")]
 
-#if(initCCA) survspp <- survspp[!survspp %in% "Pisciv_T_Fish"]
-
 ```
 
-Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age and length composition. 
+Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age composition. 
 
 ```{r stdsurveyNbased}
 
-# this uses result$nums, but we are not creating a biomass index this time, so we don't need a weight at age conversion
-
-if(initCCA) datN <- CCAresults$nums
-if(initNEUS) datN <- NEUSresults$nums
-if(initNOBA) datN <- NOBAresults$nums
-
-survey_testNall <- create_survey(dat = datN,
+survey_testNall <- create_survey(dat = truth$nums,
                                  time = timeall,
                                  species = survspp,
                                  boxes = boxall,
@@ -195,16 +171,9 @@ dat2 <- survey_testNall %>%
   group_by(species, agecl, time) %>%
   summarize(numAtAge = sum(atoutput))
 
-#dat<-survey_testNall
-#dat2 <- aggregate(dat$atoutput,list(dat$species,dat$agecl,dat$time),sum)
-#names(dat2) <- c("species","agecl","time","numAtAge")
-
 totN <- dat2 %>%
   group_by(species, time) %>%
   summarize(totN = sum(numAtAge))
-
-#totN <- aggregate(dat2$numAtAge,list(dat2$species,dat2$time),sum )
-#names(totN) <- c("species","time","totN")
 
 dat2totN <- merge(dat2, totN)
 
@@ -215,190 +184,49 @@ dat2totN <- merge(dat2, totN)
 # ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
 # ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
 # ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
-# #ageclcomp + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
 
 ```
 
-Then we use the `sample_fish` function and compare to true annual age comp calculated above as a test. These should match.
+Then we use the `sample_fish` function with very high effN and compare to true annual age comp calculated above as a test, which matches as we have shown [here](https://sgaichas.github.io/poseidon-dev/TrueLengthAgeCompTest.html).
 
-```{r comptest1, message=FALSE, warning=FALSE}
-# setting the effN higher than actual numbers results in sampling all
-effNall <- data.frame(species=survspp, effN=rep(1e+15, length(survspp)))
-# rmultinom broke with that sample size
-#comptestall <- sample_fish(survey_testNall, effNall)
-#names(comptestall) <- c("species","agecl","polygon", "layer","time","numAtAgesamp")
+However. We need both numbers and weights to get the length comp, and ultimately the weight at age for use in assessments. 
+
+After using functions without thinking first and then [rethinking sampling flow](https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html), we will now test new functons to aggregate both densities and numbers appropriately for input into the biological sampling workflow. 
+
+What we want is to subset the nums, resn, and structn components of run_truth using the same create_survey design selecting boxes, time, and species. We need only apply survey efficiency and selectivity to nums, however. So perhaps the new aggregateDensityData function can be applied to resn and structn?
+
+```{r aggdens}
+
+# aggregate true resn per survey design
+survey_aggresnall <- aggregateDensityData(dat = truth$resn,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall)
+
+# aggregate true structn per survey design
+survey_aggstructnall <- aggregateDensityData(dat = truth$structn,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall)
+
+```
+
+Now we should have inputs to `sample_fish` on the same scale, and they need to be aggregated across boxes into a single biological sample for the whole survey. We are not maintaining spatial structure in sampling because it isn't used in most assessments.
+
+To do the proper aggregation and not apply the multinomial sampling to the density data, I rewrite `sample_fish` to apply the median if `sample=FALSE` in the function call. Test this:
+
+```{r censussurvey-calcage2length, warning=FALSE, message=FALSE}
 
 # this one is high but not equal to total for numerous groups
 effNhigh <- data.frame(species=survspp, effN=rep(1e+8, length(survspp)))
 
-comptesthigh <- sample_fish(survey_testNall, effNhigh)
-names(comptesthigh) <- c("species","agecl","polygon", "layer","time","numAtAgesamp")
-
-comptesttot <- aggregate(comptesthigh$numAtAgesamp,list(comptesthigh$species,comptesthigh$time),sum )
-names(comptesttot) <- c("species","time","totsamp")
-
-comptestprop <- merge(comptesthigh, comptesttot)
-```
-
-```{r comptest1plot, message=FALSE, warning=FALSE, echo=FALSE, eval=FALSE}
-
-# compare individual years, these proportions at age should match
-comparecomps <- ggplot() +
-  geom_point(data=subset(dat2totN, time==min(timeall)), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
-  geom_point(data=subset(comptestprop, time==min(timeall)), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3) +
-  theme_tufte() +
-  theme(legend.position = "top") +
-  labs(colour=paste0(scenario.name, " start"))
-
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
-#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
-
-#ggsave("censuscomposition_time0.png", width=11, height=11)
-
-comparecomps <- ggplot() +
-  geom_point(data=subset(dat2totN, time==median(timeall)), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
-  geom_point(data=subset(comptestprop, time==median(timeall)), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
-  theme_tufte() +
-  theme(legend.position = "top") +
-  labs(colour=paste0(scenario.name, " midpoint"))
-
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
-#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
-
-#ggsave("censuscomposition_time100.png", width=11, height=11)
-
-comparecomps <- ggplot() +
-  geom_point(data=subset(dat2totN, time==max(timeall)-1), aes(x=agecl, y=numAtAge/totN, color="true"), alpha = 0.3) +
-  geom_point(data=subset(comptestprop, time==max(timeall)-1), aes(x=agecl, y=numAtAgesamp/totsamp, color="samp"), alpha = 0.3)+
-  theme_tufte() +
-  theme(legend.position = "top") +
-  labs(colour=paste0(scenario.name, " end"))
-
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free")
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free")
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free")
-comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free")
-#comparecomps + facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 5, scales="free")
-
-#ggsave("censuscomposition_time250.png", width=11, height=11)
-
-# and they do
-# differences for baleen and toothed whales are due to small total numbers
-
-```
-
-And they mostly do aside from fish that have 0s in the first year (Planktiv_T_Fish.
-
-The problems start when I try to do age to length, this function returns an error as written when `sample_fish` is run first. 
-
-May 8 update: Found problem, fix may require rethinking sampling flow. Making another rmd (this one!) to deal with this.
-
-So, test 1 is running `calc_age2length` with the full true dataset. This should work because there will be no aggregation of the output (no, don't do this with the full dataset! example with one species instead. actually, don't even try this):
-
-```{r calcage2length-truth, warning=FALSE, message=FALSE, eval=FALSE}
-
-if(initCCA) truth <- CCAresults
-if(initNEUS) truth <- NEUSresults
-if(initNOBA) truth <- NOBAresults
-
-# length_census <- calc_age2length(structn = truth$structn,
-#                                  resn = truth$resn,
-#                                  nums = truth$nums,
-#                                  biolprm = truth$biolprm, fgs = truth$fgs,
-#                                  CVlenage = 0.1, remove.zeroes=TRUE)
-# 
-# # never got here with full truth
-# saveRDS(length_census, file.path(d.name, paste0(scenario.name, "length_census.rds")))
-
-# try for a single species
-# everyone's favorite predator
-atf_truestructn <- truth$structn[truth$structn$species == "Arrowtooth_flounder",]
-atf_trueresn <- truth$resn[truth$resn$species == "Arrowtooth_flounder",] 
-atf_truenums <- truth$nums[truth$nums$species == "Arrowtooth_flounder",] 
-
-#atf_length_census <- calc_age2length(structn = atf_truestructn,
-#                                 resn = atf_trueresn,
-#                                 nums = atf_truenums,
-#                                 biolprm = truth$biolprm, fgs = truth$fgs,
-#                                 CVlenage = 0.1, remove.zeroes=TRUE)
-atf_length_census <- lenout
-
-```
-
-This produced output for a single species by mistake. It ran for hours on the full truth dataset, and on the just arrowtooth full truth dataset and did not complete (I stopped it). Testing for just one species and 500 index steps (of 103690) to see full length comp by area and depth layer.
-
-Visualize a tiny bit:
-
-```{r lengthcensus-vis, eval=FALSE}
-
-# for an example species, by polygon, layer because this is full resolution
-# everyone's favorite predator
-
-lfplot <- ggplot(atf_length_census$natlength, aes(upper.bins)) +
-  geom_bar(aes(weight = atoutput)) +
-  theme_tufte()
-
-lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1)
-lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2)
-lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3)
-
-lfplot + facet_wrap_paginate(~polygon, ncol=4, nrow = 4, page = 1)
-lfplot + facet_wrap_paginate(~polygon, ncol=4, nrow = 4, page = 2)
-lfplot + facet_wrap_paginate(~polygon, ncol=4, nrow = 4, page = 3)
-
-
-```
-
-This works, but I can't show you because I ran it line by line from the function.
-
-So the question now is, do we run `create_survey` on the output of this, or do we `create_survey` on all three truth components first, then run `calc_age2length` to get a survey sample? The latter should work and will eliminate the unsampled areas/times/species.
-
-Try again with survey sampling for nums, structn and resn, which limits the species list to fish and sharks, and also aggregates over layer and polygon. This will still take too long. Can we run with the sample_fish in nums? Test this:
-
-```{r censussurvey-calcage2length, warning=FALSE, message=FALSE}
-
-if(initCCA) truth <- CCAresults
-if(initNEUS) truth <- NEUSresults
-if(initNOBA) truth <- NOBAresults
-
-survey_testresnall <- create_survey(dat = truth$resn,
-                                 time = timeall, # use timeall? yes to match Nall
-                                 species = survspp,
-                                 boxes = boxall,
-                                 effic = effic1,
-                                 selex = selex1)
-
-survey_teststructnall <- create_survey(dat = truth$structn,
-                                 time = timeall, # use timeall? yes to match Nall
-                                 species = survspp,
-                                 boxes = boxall,
-                                 effic = effic1,
-                                 selex = selex1)
-
-# survey_testNall with truth$nums as dat was created above
-
-#cut down to single species?
-atf_survey_teststructnall <- survey_teststructnall[survey_teststructnall$species == "Arrowtooth_flounder",]
-atf_survey_testresnall <- survey_testresnall[survey_testresnall$species == "Arrowtooth_flounder",]
-atf_survey_testNall <- survey_testNall[survey_testNall$species == "Arrowtooth_flounder",]
-
-# still a lot
-# if we apply the highest effN to structn and resn using sample fish, we should have the right atoutput for each agecl to apply to possibly subsampled nums.
-# as above, apply sample_fish to resnall and structnall
-# comptesthigh <- sample_fish(survey_testNall, effNhigh), but I renamed atoutput so do over without that
-
+# apply default sample fish as before to get numbers
 numsallhigh <- sample_fish(survey_testNall, effNhigh)
 
-#dont sample these, just aggregate them
-structnall <- sample_fish(survey_teststructnall, effNhigh, sample = FALSE)
+#dont sample these, just aggregate them using median
+structnall <- sample_fish(survey_aggstructnall, effNhigh, sample = FALSE)
 
-resnall <-  sample_fish(survey_testresnall, effNhigh, sample = FALSE)
+resnall <-  sample_fish(survey_aggresnall, effNhigh, sample = FALSE)
 
 # now cut these down to a single species for testing
 # this should still represent a census but with polygon and layer aggregated
@@ -416,7 +244,7 @@ atf_length_censussurvsamp <- calc_age2length(structn = atf_structnall,
 
 ```
 
-Trying to plot just this sample, ran very quickly. And this didn't work, aggregating structural and residual N is definitely wrong.
+Maybe this will work, we can hope.
 
 ```{r atflengthsamp1-test}
 
@@ -434,9 +262,8 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
 
 ```
 
-## Back to the drawing board!
+## Is this working??
 
-Need a couple more functions to do this correctly, see how I am [rethinking](https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html). 
-
+... the suspense is killing me
 
 ## References
