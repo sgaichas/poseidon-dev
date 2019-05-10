@@ -23,7 +23,7 @@ The original design of [atlantisom](https://github.com/r4atlantis/atlantisom) co
     + `catch$atoutput` is fishery catch in numbers of individuals
     + `nums$atoutput` is numbers of individuals
     + `resn$atoutput` is Nitrogen reserve weight in mg/m^3
-    + `structn$atoutput`is Nitrogen reserve weight in mg/m^3
+    + `structn$atoutput`is Nitrogen structural weight in mg/m^3
 2. additional components of the `run_truth` return (default name `result`) are key factors needed for conversions and interpreting the outputs (described elsewhere):
     + `biolprm`
     + `fgs`
