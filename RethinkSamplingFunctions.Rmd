@@ -1,0 +1,90 @@
+---
+title: "Rethinking sampling functions to include weights and numbers"
+author: "Sarah Gaichas"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Introduction: the problem
+
+The original design of [atlantisom](https://github.com/r4atlantis/atlantisom) conceived at the [2015 Atlantis Summit](https://research.csiro.au/atlantis/atlantis-summit/) in Honolulu, Hawaii, USA.had the following workflow:
+
+1. apply `run_truth` to a set of Atlantis model outputs, which returns 'atoutput' components in the following units by species, agecl (Atlantis cohort, often in units of maxage/10), polygon (model box), layer (model depth), and time (model toutinc or outputstep):
+    + `biomass_eaten$atoutput` is eaten biomass in t for each functional group?
+        + `biomass_eaten$vol` is volume aggregated over layers
+        + `biomass_eaten$prey` is the prey item eaten?
+        + `biomass_eaten$dietcomp` is proportion in diet?
+        + `biomass_eaten$bio_eaten` is different from atoutput but how?
+    + `biomass_ages$atoutput` is  biomass in t from `calc_biomass_age`
+    + `catch$atoutput` is fishery catch in numbers of individuals
+    + `nums$atoutput` is numbers of individuals
+    + `resn$atoutput` is Nitrogen reserve weight in mg/m^3
+    + `structn$atoutput`is Nitrogen reserve weight in mg/m^3
+2. additional components of the `run_truth` return (default name `result`) are key factors needed for conversions and interpreting the outputs (described elsewhere):
+    + `biolprm`
+    + `fgs`
+3. apply `create_survey` to the result output of `run_truth`
+4. apply `sample_survey_biomass` to the output of `create_survey` to get an index
+    + designed to use nums output with an average weight--but estimating average weight proved problematic the way I did it, which was too imprecise
+    + can be used directly on biomass_ages output with a vector of average weight=1 (see [True Bio Test](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html))
+5. apply `sample_fish` to the output of `create_survey` to generate biological samples
+6. apply `calc_age2length` to output of 'sample_fish` to generate length compositions
+    + *FIRST BIG PROBLEM!* `calc_age2length` needs weight data at the same level of resolution as the nums data to estimate lengths using the length-weight relationship. 
+    + Weight data comes from resn and structn. `calc_age2length` was originally tested with completely disaggregated outputs of `run_truth` and it generates length samples correctly that way
+    + Initial `calc_age2length` testing with a real dataset revealed that it is entirely too slow to apply at the level of `run_truth` results for a full Atlantis model run and over many species (TrueLengthCompTest.Rmd)
+    + Attempts to aggregate structn and resn results to the `create_survey` and `sample_fish` level were incorrect, because:
+    + *we cannot apply functions designed for numbers output that aggregate based on sum to resn and structn outputs which are in units of N per volume*
+    + So actually, this problem reaches all the way back to `create_survey` which is designed for nums output and aggregates using a sum:
+    
+```{r createsurvey}
+
+knitr::include_graphics("https://dm2301files.storage.live.com/y4mSPipdQ7jyZNNfmpslxt7sCy7DqcQ0wMM40iLU1LLwfprFtKrjNJtHdibguUzNb9qY2vqluaHtpnKsUqkJ_wk3PpGCBtZmLGMdDSF1TVPsjeRWwtGjx8AIdNDiw9xvGmXf4aMnjXJ9DK9QW63JRZusH2uKgO1Mjd-8AEY554sLUG9xC9NFGaktffG2Ep5y8sz09stoHEM2pqG1I_oNtHGbg/CreateSurvey.png?psid=1&width=960&height=720")
+
+```
+
+    
+The next three biological sampling steps after creating the length composition are taking a subset of the `sample_fish` for lengths using `sample_length` (though this could be 100% sample as is often done on a survey), taking a subset of the `sample_fish` for ages and applying ageing error using `sample_ages`, and finally taking a sample of individual fish weights, perhaps the same sample that was aged as is done on some surveys) using `sample_weight`. (So far only `sample_ages` is drafted and the other two functions remain to be written.)
+
+```{r samplingworkflow}
+
+knitr::include_graphics("https://dm2301files.storage.live.com/y4mV1y2g-JoSJFProk32x9SjWofLHwF_WtQc4Ipz8M2ZLc7hypg4yTYAgvB0IjwVLfjVw4fCNFP9l6lbWQIFI8NtzaIHjxgGEmptz9I9cB5jA5VUCJ_gJmSYSfI8_au29U_nuP5-zw-qkBBINifEo8RlJSvOEol5qu5IfI4BLk5YjjxTomMcbDVtOUBIJQHMEZjRUnlPhy7lV4x5ckvz5WfWA/SamplingWorkflow.png?psid=1&width=960&height=720")
+
+```
+
+## Proposed solution
+
+I think we should keep the workflow designed at the Atlantis summit because this is the way surveys generally operate.
+
+We need a way to appropriately aggregate the resn and structn outputs which are densitites. A mean or median across layers and polygons would be appropriate. The `run_truth` function calls `calc_biomass_age` which uses median to aggregate these outputs to generate the biomass_ages result component.
+
+We can either rewrite `aggregateData` to take another argument indicating aggregation by sum or median, or create separate functions `aggregateDataSum` and `aggregateDataMedian` to be used on the numbers/biomass or density outputs, respectively.  Either way we need to ensure that the appropriate aggregation function is used in `create_survey` and `sample_fish`
+
+Current `aggregateData` function, which is strangely not called by `sample_fish`
+
+```{r aggregateData}
+
+knitr::include_graphics("https://dm2301files.storage.live.com/y4mlnKwEPKB-fwO50OZng5CBgAwpz_T3Wc_K8BEdyLLAt-WnSs8Qd4YJY1i4hO0Zja9F6Vx1X3WiIDB1pFlBVW9YQDfKGvczcddyoZbl_bvUmPOsdGN4eHiAgyh_rKZ_Op286QWAPURty0QsJsNOhUNzBAc8326d8cKW9QmTlsncAJDDoU5wMdJgWRoalD939BG4Pg2SbyLxBe9tLfYm1xD_g/aggregateData.png?psid=1&width=960&height=720")
+
+```
+
+While we are at it, catch biomass is apparently calculated by `run_truth` but not exported, so I think we should export that all at once. Right now only catch in numbers is exported, but catch biomass is most often what management is based on and is an input to most assessment models. 
+
+For fisheries, the plan would be to run `create_fishery_subset` similar to `create_survey` and then `sample_fish` with the same functions as above to get the catch at length and catch at age samples.
+
+Current `create_fishery_subset` function, as yet untested:
+
+```{r createfishery}
+
+knitr::include_graphics("https://dm2301files.storage.live.com/y4mZYTQWQxl_SZg2SQVNtRiv5OjAyv7ML3FqiVW2dY0SZmUlUO91Mm55pNAamQ-Kz7V_p2dH2UrEIGVttXXmiiN4L6HOBJTexTtqu43r9VH4IOdc-XPmsACvcnmzCrUIjqvr6NPJGwpds4_KxLEvlnfGJ3ZobYsxKwIUhObm6Uyq2deLPjZUuMT06YTELfTWbZBcDIR42waSKhxpUKlQXiaIw/CreateFisherySubset.png?psid=1&width=960&height=720")
+
+```
+
+## To Do List:
+
+1. write an aggregation function for resn and structn that applies the median
+2. rewrite `create_survey` to use alternate aggregation functions, or write `create_survey_nums` and `create_survey_wt` functions that use appropriate aggregation
+3. rewrite `sample_fish` to use alternate aggregation functions for each input type. Keeping this all in one function makes sense because the functional already takes both numbers and weights as inputs

@@ -349,7 +349,7 @@ May 8 update: Found problem, fix may require rethinking sampling flow. Making an
 
 So, test 1 is running `calc_age2length` with the full true dataset. This should work because there will be no aggregation of the output (no, don't do this with the full dataset! example with one species instead. actually, don't even try this):
 
-```{r calcage2length-truth, warning=FALSE, message=FALSE}
+```{r calcage2length-truth, warning=FALSE, message=FALSE, eval=FALSE}
 
 if(initCCA) truth <- CCAresults
 if(initNEUS) truth <- NEUSresults
@@ -383,7 +383,7 @@ This produced output for a single species by mistake. It ran for hours on the fu
 
 Visualize a tiny bit:
 
-```{r lengthcensus-vis}
+```{r lengthcensus-vis, eval=FALSE}
 
 # for an example species, by polygon, layer because this is full resolution
 # everyone's favorite predator
@@ -402,6 +402,8 @@ lfplot + facet_wrap_paginate(~polygon, ncol=4, nrow = 4, page = 3)
 
 
 ```
+
+This works, but I can't show you because I ran it line by line from the function.
 
 So the question now is, do we run `create_survey` on the output of this, or do we `create_survey` on all three truth components first, then run `calc_age2length` to get a survey sample? The latter should work and will eliminate the unsampled areas/times/species.
 
@@ -429,84 +431,60 @@ survey_teststructnall <- create_survey(dat = truth$structn,
 
 # survey_testNall with truth$nums as dat was created above
 
-#cut down to single species
+#cut down to single species?
 atf_survey_teststructnall <- survey_teststructnall[survey_teststructnall$species == "Arrowtooth_flounder",]
 atf_survey_testresnall <- survey_testresnall[survey_testresnall$species == "Arrowtooth_flounder",]
 atf_survey_testNall <- survey_testNall[survey_testNall$species == "Arrowtooth_flounder",]
 
-length_censussurv <- calc_age2length(structn = survey_teststructnall,
-                                 resn = survey_testresnall,
-                                 nums = survey_testNall,
+# still a lot
+# if we apply the highest effN to structn and resn using sample fish, we should have the right atoutput for each agecl to apply to possibly subsampled nums.
+# as above, apply sample_fish to resnall and structnall
+# comptesthigh <- sample_fish(survey_testNall, effNhigh), but I renamed atoutput so do over without that
+
+numsallhigh <- sample_fish(survey_testNall, effNhigh)
+
+#dont sample these, just aggregate them
+structnall <- sample_fish(survey_teststructnall, effNhigh, sample = FALSE)
+
+resnall <-  sample_fish(survey_testresnall, effNhigh, sample = FALSE)
+
+# now cut these down to a single species for testing
+# this should still represent a census but with polygon and layer aggregated
+
+atf_numsallhigh <- numsallhigh[numsallhigh$species == "Arrowtooth_flounder",]
+atf_structnall <- structnall[structnall$species == "Arrowtooth_flounder",]
+atf_resnall <- resnall[resnall$species == "Arrowtooth_flounder",]
+
+atf_length_censussurvsamp <- calc_age2length(structn = atf_structnall,
+                                 resn = atf_resnall,
+                                 nums = atf_numsallhigh,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
                                  CVlenage = 0.1, remove.zeroes=TRUE)
 
 
 ```
 
+Trying to plot just this sample, ran very quickly. And this didn't work, aggregating structural and residual N is definitely wrong.
 
-And then `sample_fish` from `calc_age2length` output? But also we need to run `sample_fish` to get the cohort (age) output (or do we? see below) so the multinomial in there will make different distributions for smaller sample sizes. Since we are trying to represent biological sampling as one set of sampled fish which we length, then take a subset of ages and weights, this may not work. 
+```{r atflengthsamp1-test}
 
-Or, we can sum the length atoutput from calc_age2length over size bins and back in to agecl bins to get age classes, then subsample this for ages? We also have mulen and muweight for each size bin (or is it agecl bin?) so can we back the individual weights for the aged fish subsample out of this?
+lfplot <- ggplot(atf_length_censussurvsamp$natlength, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte()
 
-
-```{r calcage2length-breaks, eval=FALSE}
-# now turn this into length comp with calc_age2length
-# function takes resn and nums as inputs so run survey and sample functions on resn as well
-# do we need to run the survey if calc_age2length does matching based on sample_fish?
-
-if(initCCA) datresn <- CCAresults$resn
-if(initNEUS) datresn <- NEUSresults$resn
-if(initNOBA) datresn <- NOBAresults$resn
-
-survey_testresnall <- create_survey(dat = datresn,
-                                 time = timeall, # use timeall? yes to match Nall
-                                 species = survspp,
-                                 boxes = boxall,
-                                 effic = effic1,
-                                 selex = selex1)
-
-#also needs structn, apply survey to this as well
-if(initCCA) datstructn <- CCAresults$structn
-if(initNEUS) datstructn <- NEUSresults$structn
-if(initNOBA) datstructn <- NOBAresults$structn
-
-survey_teststructnall <- create_survey(dat = datstructn,
-                                 time = timeall, # use timeall? yes to match Nall
-                                 species = survspp,
-                                 boxes = boxall,
-                                 effic = effic1,
-                                 selex = selex1)
-
-
-lengthtesthighN <- sample_fish(survey_testNall, effNhigh)
-# use fish sampled from N along with survey of resn and structn in function
-# calc_age2length uses nums (lengthtest) and finds matches in resn and structn
-
-# BUT: expecting raw nums from truth, not sample_fish nums with polygon already aggregated, so this never matches as written.
-
-# solutions, run sample_fish on structn and resn prior to input--*trying*
-# or don't sameple_fish on nums first, but I think we want to sample_fish first in the workflow, then convert that sample to lengths, ages, and weights.
-
-# unfortunately, if we are really sampling with low effN, these will be sampling cohorts with different probabilities across nums, structn, and resn, so do we need a length comp on the whole thing first and then sample it??
-
-lengthtesthighstructn <- sample_fish(survey_teststructnall, effNhigh)
-lengthtesthighresn <- sample_fish(survey_testresnall, effNhigh)
-
-# provides ouput for an individual species and time slice
-# breaks for whole dataset (NA output all rows)
-
-if(initCCA) truth <- CCAresults
-if(initNEUS) truth <- NEUSresults
-if(initNOBA) truth <- NOBAresults
-
-length_census <- calc_age2length(structn = survey_teststructnall,
-                                 resn = survey_testresnall,
-                                 nums = lengthtesthigh,
-                                 biolprm = truth$biolprm, fgs = truth$fgs,
-                                 CVlenage = 0.1, remove.zeroes=TRUE)
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
+# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
+# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 4, scales="free_y")
+# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 5, scales="free_y")
+# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 6, scales="free_y")
+# lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
 ```
 
+## Back to the drawing board!
+
+Need a couple more functions to do this correctly, see how I am [rethinking](https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html). 
 
 
 ## References
