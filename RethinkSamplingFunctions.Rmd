@@ -90,4 +90,4 @@ knitr::include_graphics("https://dm2301files.storage.live.com/y4mZYTQWQxl_SZg2SQ
     + the latter may be better, because do we want to apply efficiency and selectivity to median weight densities? I don't think so?
     + the fish still weighs the same, we just don't have the right proportion in the ecosystem (efficiency) or the right proportion at age (selectivty), both of which are taken care of in the numbers. 
     + so maybe `aggregateDensityData` using the standard survey polygons gets us what we need as input to `sample_fish`?
-3. rewrite `sample_fish` to use alternate aggregation functions for each input type. Keeping this all in one function makes sense because the functional already takes both numbers and weights as inputs
+3. rewrite `sample_fish` to use alternate aggregation functions for each input type. Keeping this all in one function makes sense because the biological sampling already needs both numbers and weights as inputs
