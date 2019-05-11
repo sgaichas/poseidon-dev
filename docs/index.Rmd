@@ -11,6 +11,8 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html" target="_blank">Big picture and new functions needed - May 10, 2019</a>
 
+May 11: Changes to `atlantisom::sample_fish` and new `atlantisom::aggregateDensityData` functions seem to work. See below under [Length compositions].
+
 ### Testing the atlantisom code
 
 <a href="https://sgaichas.github.io/poseidon-dev/TrueBioTest.html" target="_blank">Installation and initial tests - April 26, 2019, updated April 30, 2019</a>
@@ -58,5 +60,10 @@ Standard survey with composition sampling: impact of selectivity, `sample_fish`
 Difficult when you don't have a good idea of the outputs you are using!
 
 <a href="https://sgaichas.github.io/poseidon-dev/TrueLengthCompTest_fail.html" target="_blank">Defeated by length compositions - May 8-9, 2019</a>
+
+Better when you do:
+
+<a href="https://sgaichas.github.io/poseidon-dev/TrueLengthCompTest.html" target="_blank">Victory: length compositions - May 11, 2019</a>
+
 
 ### More to come later!
