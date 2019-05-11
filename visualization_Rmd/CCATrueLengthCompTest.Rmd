@@ -269,9 +269,10 @@ Demo plots for other species:
 
 ```{r moreplots, echo=TRUE}
 
-ss_length_censussurvsamp <- length_censussurvsamp[length_censussurvsamp$species == "Herring",]
+ss_length_censussurvsamp <- length_censussurvsamp$natlength %>%
+  filter(species == "Herring")
 
-lfplot <- ggplot(ss_length_censussurvsamp$natlength, aes(upper.bins)) +
+lfplot <- ggplot(ss_length_censussurvsamp, aes(upper.bins)) +
   geom_bar(aes(weight = atoutput)) +
   theme_tufte()
 
@@ -287,4 +288,3 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
 So this looks like our best approximation of a true length comp for a particular Atlantis run. Comparisons with standard surveys next.
 
-## References
