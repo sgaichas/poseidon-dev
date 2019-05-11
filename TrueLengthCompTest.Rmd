@@ -213,7 +213,7 @@ survey_aggstructnall <- aggregateDensityData(dat = truth$structn,
 
 Now we should have inputs to `sample_fish` on the same scale, and they need to be aggregated across boxes into a single biological sample for the whole survey. We are not maintaining spatial structure in sampling because it isn't used in most assessments.
 
-To do the proper aggregation and not apply the multinomial sampling to the density data, I rewrite `sample_fish` to apply the median if `sample=FALSE` in the function call. Test this:
+To do the proper aggregation and not apply the multinomial sampling to the density data, I rewrote `sample_fish` to apply the median if `sample=FALSE` in the function call. Test this:
 
 ```{r censussurvey-calcage2length, warning=FALSE, message=FALSE}
 
