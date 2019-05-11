@@ -268,7 +268,7 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
 OK, maybe we have something here. Next I need to see how long it takes to run for all species in the survey.
 
-```{r allspplength}
+```{r allspplength, eval=FALSE}
 
 length_censussurvsamp <- calc_age2length(structn = structnall,
                                  resn = resnall,
@@ -280,5 +280,7 @@ length_censussurvsamp <- calc_age2length(structn = structnall,
 saveRDS(length_censussurvsamp, file.path(d.name, paste0(scenario.name, "length_censussurvsamp.rds")))
 
 ```
+
+Answer: this ran for 5.5 hours. But it was really only 5 hours 20 minutes that was the last code block! Saving the file is highly recommended.
 
 ## References
