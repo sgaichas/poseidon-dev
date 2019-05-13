@@ -302,7 +302,7 @@ resnstd <-  sample_fish(survey_aggresnstd, effNmix, sample = FALSE)
 
 atf_numsstd <- numsstd[numsstd$species == "Arrowtooth_flounder",]
 atf_structnstd <- structnstd[structnstd$species == "Arrowtooth_flounder",]
-atf_resnstd <- resnall[resnstd$species == "Arrowtooth_flounder",]
+atf_resnstd <- resnstd[resnstd$species == "Arrowtooth_flounder",]
 
 atf_length_stdsurv <- calc_age2length(structn = atf_structnstd,
                                  resn = atf_resnstd,
