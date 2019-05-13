@@ -105,6 +105,12 @@ noutsteps <- runpar$tstop/runpar$outputstep
 stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
 
 timeall <- c(0:noutsteps)
+
+# not enough memory to do all NOBA outputsteps, change to once per year
+midptyr <- round(median(seq(1,stepperyr)))
+
+annualmidyear <- seq(midptyr, noutsteps, stepperyr)
+
   
 # define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
 # for ecosystem indicator work test all species, e.g.
@@ -119,12 +125,12 @@ survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
 
 ```
 
-Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age composition. 
+Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age composition. *Sampling once per year, rather than output timestep.*
 
 ```{r stdsurveyNbased, echo=TRUE}
 
 survey_testNall <- create_survey(dat = truth$nums,
-                                 time = timeall,
+                                 time = annualmidyear,
                                  species = survspp,
                                  boxes = boxall,
                                  effic = effic1,
@@ -163,19 +169,19 @@ Then we use the `sample_fish` function with very high effN and compare to true a
 
 The following gets both numbers and weights to get the length comp, and ultimately the weight at age for use in assessments. 
 
-First we subset the nums, resn, and structn components of `run_truth` using the same `create_survey` design selecting boxes, time, and species. We need only apply survey efficiency and selectivity to nums, however (done above), so we apply `aggregateDensityData` here. 
+First we subset the nums, resn, and structn components of `run_truth` using the same `create_survey` design selecting boxes, time (*once per year for NOBA*), and species. We need only apply survey efficiency and selectivity to nums, however (done above), so we apply `aggregateDensityData` here. 
 
 ```{r aggdens, echo=TRUE}
 
 # aggregate true resn per survey design
 survey_aggresnall <- aggregateDensityData(dat = truth$resn,
-                                 time = timeall,
+                                 time = annualmidyear,
                                  species = survspp,
                                  boxes = boxall)
 
 # aggregate true structn per survey design
 survey_aggstructnall <- aggregateDensityData(dat = truth$structn,
-                                 time = timeall,
+                                 time = annualmidyear,
                                  species = survspp,
                                  boxes = boxall)
 
@@ -242,9 +248,13 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
 ## Run for all species then SAVE
 
-This code block can take hours (5+ for CCA and 18+ for NOBA) to run, so be prepared, but then the saved file can be read back in to have length comps for all surveyed species. For a normal survey query we would have only one output timestep per year, which should save some time.
+This code block can take hours (5+ for CCA and estimated 17+ for NOBA, but it never finished after 32+) to run, so be prepared, but then the saved file can be read back in to have length comps for all surveyed species. For a normal survey query we would have only one output timestep per year, which should save some time.
+
+And lets change NOBA to estimate length only 1 timestep per year (~2.5 hours to run):
 
 ```{r allspplength, echo=TRUE, eval=FALSE}
+
+
 
 length_censussurvsamp <- calc_age2length(structn = structnall,
                                  resn = resnall,
@@ -259,7 +269,7 @@ saveRDS(length_censussurvsamp, file.path(d.name, paste0(scenario.name, "length_c
 
 Read it back in:
 
-```{r loadlengthcomp, echo=TRUE, eval=FALSE}
+```{r loadlengthcomp, echo=TRUE}
 
 length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length_censussurvsamp.rds")))
 
@@ -267,7 +277,7 @@ length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length
 
 Demo plots for other species:
 
-```{r moreplots, echo=TRUE, eval=FALSE}
+```{r moreplots, echo=TRUE}
 
 ss_length_censussurvsamp <- length_censussurvsamp$natlength %>%
   filter(species == "Norwegian_ssh")
@@ -286,5 +296,5 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
 ```
 
-So this looks like our best approximation of a true length comp for a particular Atlantis run. Comparisons with standard surveys next.
+So this looks like our best approximation of a true length comp for a particular Atlantis run (although it seems critical to limit output to allow functions to finish). Comparisons with standard surveys next.
 
