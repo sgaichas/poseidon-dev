@@ -67,5 +67,9 @@ Better when you do:
 
 <a href="https://sgaichas.github.io/poseidon-dev/CCATrueLengthCompTest.html" target="_blank">CCA length composition examples - May 11, 2019</a>
 
+But don't try running length comps at the subannual level for all species.
+
+<a href="https://sgaichas.github.io/poseidon-dev/NOBATrueLengthCompTest.html" target="_blank">NOBA length composition examples - May 13, 2019</a>
+
 
 ### More to come later!
