@@ -200,7 +200,7 @@ resnall <-  sample_fish(survey_aggresnall, effNhigh, sample = FALSE)
 
 ```
 
-Select a single species for testing. Generating length composition for a single species should take just a few minutes to run. 
+Select a single species for testing. Generating length composition for a single species should take just a few minutes to run. Update: for NOBA with many output timesteps, even a single species took 15-20 minutes.
 
 ```{r singlespp-lengthcomp, echo=TRUE}
 
@@ -242,9 +242,9 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
 ## Run for all species then SAVE
 
-This code block can take hours (5+ for CCA) to run, so be prepared, but then the saved file can be read back in to have length comps for all surveyed species.
+This code block can take hours (5+ for CCA and 18+ for NOBA) to run, so be prepared, but then the saved file can be read back in to have length comps for all surveyed species. For a normal survey query we would have only one output timestep per year, which should save some time.
 
-```{r allspplength, echo=TRUE}
+```{r allspplength, echo=TRUE, eval=FALSE}
 
 length_censussurvsamp <- calc_age2length(structn = structnall,
                                  resn = resnall,
@@ -259,7 +259,7 @@ saveRDS(length_censussurvsamp, file.path(d.name, paste0(scenario.name, "length_c
 
 Read it back in:
 
-```{r loadlengthcomp, echo=TRUE}
+```{r loadlengthcomp, echo=TRUE, eval=FALSE}
 
 length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length_censussurvsamp.rds")))
 
@@ -267,7 +267,7 @@ length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length
 
 Demo plots for other species:
 
-```{r moreplots, echo=TRUE}
+```{r moreplots, echo=TRUE, eval=FALSE}
 
 ss_length_censussurvsamp <- length_censussurvsamp$natlength %>%
   filter(species == "Norwegian_ssh")
