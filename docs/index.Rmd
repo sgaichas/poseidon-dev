@@ -73,5 +73,8 @@ But don't try running length comps at the subannual level for all species.
 
 <a href="https://sgaichas.github.io/poseidon-dev/NEUSTrueLengthCompTest.html" target="_blank">NEUS length composition examples - May 13, 2019</a>
 
+Standard survey with length sampling: impact of selectivity, `sample_fish`
+
+<a href="https://sgaichas.github.io/poseidon-dev/StdSurvLengthCompTest.html" target="_blank">Compare survey + sampled lengths with true - May 14, 2019</a>
 
 ### More to come later!
