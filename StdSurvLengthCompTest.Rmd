@@ -337,7 +337,7 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
 Now run for all species in the survey.
 
-```{r allspplengthsamp}
+```{r allspplengthsamp, eval=FALSE}
 
 length_stdsurv <- calc_age2length(structn = structnstd,
                                  resn = resnstd,
@@ -354,7 +354,7 @@ Runtime for census lengths was 5.5 hours for CCA. For standard survey lengths ru
 
 Compare sampled lf with census from [here](https://sgaichas.github.io/poseidon-dev/CCATrueLengthCompTest.html): 
 
-```{r loadlengthcomp, echo=TRUE, eval=FALSE}
+```{r loadlengthcomp, echo=TRUE}
 
 length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length_censussurvsamp.rds")))
 
@@ -362,19 +362,32 @@ length_stdsurv <- readRDS(file.path(d.name, paste0(scenario.name, "length_stdsur
 
 ```
 
-Comparison plots for other species:
+Comparison plots for other species. Blue bars are the census length sample and red outlines are the survey sample (standardized for comparison; census total n lengths is 1e+8 while sample total n lengths is 1000):
 
-```{r moreplots, echo=TRUE, eval=FALSE}
+```{r moreplots, echo=TRUE}
 
+# select a species
 ss_length_censussurvsamp <- length_censussurvsamp$natlength %>%
   filter(species == "Herring")
 
 ss_length_stdsurv <- length_stdsurv$natlength %>%
   filter(species == "Herring")
 
+# make proportion at length to plot together
+lf_census_tot <- aggregate(ss_length_censussurvsamp$atoutput,list(ss_length_censussurvsamp$time),sum )
+names(lf_census_tot) <- c("time","totlen")
+
+lf_census_prop <- merge(ss_length_censussurvsamp, lf_census_tot)
+
+lf_samp_tot <- aggregate(ss_length_stdsurv$atoutput,list(ss_length_stdsurv$time),sum )
+names(lf_samp_tot) <- c("time","totsamp")
+
+lf_samp_prop <- merge(ss_length_stdsurv, lf_samp_tot)
+
 # add sample, this is census, probably want it first?
-lfplot <- ggplot(ss_length_censussurvsamp, aes(upper.bins)) +
-  geom_bar(aes(weight = atoutput)) +
+lfplot <- ggplot(mapping=aes(x=upper.bins)) +
+  geom_bar(data=lf_census_prop, aes(weight = atoutput/totlen), fill="blue") +
+  geom_bar(data=lf_samp_prop, aes(weight = atoutput/totsamp), colour="red") +
   theme_tufte()
 
 lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
@@ -387,5 +400,6 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
 
 ```
 
+Here as with [cohort sampling](https://sgaichas.github.io/poseidon-dev/StdSurvLengthAgeCompTest.html), the impact of survey selectivity is much larger than sampling error with effN of 1000. We could try effN that is lower, but 1000 lengths may be reasonable from a survey. A `sample_lengths` function could add further measuremet error on top of this, if desired (though measurement error at the 1 cm level may be negligible).
 
 ## References
