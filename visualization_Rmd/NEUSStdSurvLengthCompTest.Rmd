@@ -17,7 +17,7 @@ knitr::write_bib(c(
 
 ## Introduction
 
-This page has visualizations for the CCA model example, Atlantis Summit Common Scenario 1. For full explanation of methods, see the file linked at the beginning of each section. 
+This page has visualizations for the NEUS model example, test03032016 (note! a not fully calibrated model). For full explanation of methods, see the file linked at the beginning of each section.
 
 ```{r message=FALSE, warning=FALSE}
 library(tidyr)
