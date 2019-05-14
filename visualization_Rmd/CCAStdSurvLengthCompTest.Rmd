@@ -275,13 +275,13 @@ resnstd <-  sample_fish(survey_aggresnstd, effNmix, sample = FALSE)
 
 # now cut these down to a single species for testing
 
-atf_numsstd <- numsstd[numsstd$species == "Arrowtooth_flounder",]
-atf_structnstd <- structnstd[structnstd$species == "Arrowtooth_flounder",]
-atf_resnstd <- resnstd[resnstd$species == "Arrowtooth_flounder",]
+ss_numsstd <- numsstd[numsstd$species == "Arrowtooth_flounder",]
+ss_structnstd <- structnstd[structnstd$species == "Arrowtooth_flounder",]
+ss_resnstd <- resnstd[resnstd$species == "Arrowtooth_flounder",]
 
-atf_length_stdsurv <- calc_age2length(structn = atf_structnstd,
-                                 resn = atf_resnstd,
-                                 nums = atf_numsstd,
+ss_length_stdsurv <- calc_age2length(structn = ss_structnstd,
+                                 resn = ss_resnstd,
+                                 nums = ss_numsstd,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
                                  CVlenage = 0.1, remove.zeroes=TRUE)
 
@@ -292,11 +292,10 @@ Plot samples one species:
 
 ```{r atflengthsamp1-test}
 
-lfplot <- ggplot(atf_length_stdsurv$natlength, aes(upper.bins)) +
+lfplot <- ggplot(ss_length_stdsurv$natlength, aes(upper.bins)) +
   geom_bar(aes(weight = atoutput)) +
   theme_tufte() +
-  theme(legend.position = "top") +
-  labs(colour=paste(scenario.name, atf_length_stdsurv$natlength$species))
+  labs(subtitle = paste(scenario.name, ss_length_stdsurv$natlength$species))
 
 lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
 lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
@@ -366,8 +365,7 @@ lfplot <- ggplot(mapping=aes(x=upper.bins)) +
   geom_bar(data=lf_census_prop, aes(weight = atoutput/totlen), fill="blue") +
   geom_bar(data=lf_samp_prop, aes(weight = atoutput/totsamp), colour="red") +
   theme_tufte() +
-  theme(legend.position = "top") +
-  labs(colour=paste(scenario.name, lf_census_prop$species))
+  labs(subtitle = paste(scenario.name, lf_census_prop$species))
 
 lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
 lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
