@@ -49,13 +49,21 @@ knitr::include_graphics("https://dm2301files.storage.live.com/y4mSPipdQ7jyZNNfmp
     
 The next three biological sampling steps after creating the length composition are taking a subset of the `sample_fish` for lengths using `sample_length` (though this could be 100% sample as is often done on a survey), taking a subset of the `sample_fish` for ages and applying ageing error using `sample_ages`, and finally taking a sample of individual fish weights, perhaps the same sample that was aged as is done on some surveys) using `sample_weight`. (So far only `sample_ages` is drafted and the other two functions remain to be written.)
 
+## May 15: True age estimation needs to happen in here
+
+The sequence `create_survey` to `sample_fish` to `calc_age2length` now works. It can go as pictured below if there are not multiple true ages in an age class. Revisions to work on:
+
+1. For clarity, `calc_age2length` should be renamed `calc_stage2length`
+2. Between `sample_fish` and `sample_ages` we need the already written `calc_stage2age` function, which calls `calc_Z`. Test these next.
+3. Similarly, between `sample_fish` and `sample_weight` we will need to expand to true ages for a weight-at-age vector (for species where stage=age, this is already output as muweight from the `calc_(st)age2length` function).
+
 ```{r samplingworkflow}
 
 knitr::include_graphics("https://dm2301files.storage.live.com/y4mV1y2g-JoSJFProk32x9SjWofLHwF_WtQc4Ipz8M2ZLc7hypg4yTYAgvB0IjwVLfjVw4fCNFP9l6lbWQIFI8NtzaIHjxgGEmptz9I9cB5jA5VUCJ_gJmSYSfI8_au29U_nuP5-zw-qkBBINifEo8RlJSvOEol5qu5IfI4BLk5YjjxTomMcbDVtOUBIJQHMEZjRUnlPhy7lV4x5ckvz5WfWA/SamplingWorkflow.png?psid=1&width=960&height=720")
 
 ```
 
-## Proposed solution
+## Proposed solution (now done for calc_age2length)
 
 I think we should keep the workflow designed at the Atlantis summit because this is the way surveys generally operate.
 
@@ -86,8 +94,11 @@ knitr::include_graphics("https://dm2301files.storage.live.com/y4mZYTQWQxl_SZg2SQ
 ## To Do List:
 
 1. write an aggregation function for resn and structn that applies the median
+    + **Done 10 May, `aggregateDensityData`**
 2. rewrite `create_survey` to use alternate aggregation functions, or write `create_survey_nums` and `create_survey_wt` functions that use appropriate aggregation
     + the latter may be better, because do we want to apply efficiency and selectivity to median weight densities? I don't think so?
     + the fish still weighs the same, we just don't have the right proportion in the ecosystem (efficiency) or the right proportion at age (selectivty), both of which are taken care of in the numbers. 
     + so maybe `aggregateDensityData` using the standard survey polygons gets us what we need as input to `sample_fish`?
+    + **Yes, did the latter was done**
 3. rewrite `sample_fish` to use alternate aggregation functions for each input type. Keeping this all in one function makes sense because the biological sampling already needs both numbers and weights as inputs
+    + **Done 10 May, use sample=FALSE option**

@@ -9,7 +9,7 @@ These pages document initial testing of the atlantisom package in development at
  
 ### Read this first on overall workflow
 
-<a href="https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html" target="_blank">Big picture and new functions needed - May 10, 2019</a>
+<a href="https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html" target="_blank">Big picture and new functions needed - May 10, 2019, updated May 15, 2019</a>
 
 May 11: Changes to `atlantisom::sample_fish` and new `atlantisom::aggregateDensityData` functions seem to work. See below under [Length compositions].
 
