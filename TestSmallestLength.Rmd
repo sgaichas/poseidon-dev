@@ -213,4 +213,57 @@ lfplot
 
 This suggests that the smallest Greenland turbot in the ecosystem are ~25 cm over all of the timesteps we checked. Does this make sense? 
 
-Or do we need to change something about the length comp estimation?
+## Quick test with saved CCA census output
+
+Here we check the CCA model (Atlantis Summit Common Scenario 1) saved length census output for small species at Isaac's suggestion:
+
+```{r loadCCAlengthcomp, echo=TRUE}
+
+source(here("config/CCConfig.R"))
+
+length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length_censussurvsamp.rds")))
+
+```
+
+Sardine:
+```{r plotCCAsardine}
+ss_length_censussurvsamp <- length_censussurvsamp$natlength %>%
+  filter(species == "Pacific_sardine")
+
+lfplot <- ggplot(ss_length_censussurvsamp, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name, ss_length_censussurvsamp$species))
+
+lfplot
+```
+
+Anchovy:
+```{r plotCCAanchovy}
+ss_length_censussurvsamp <- length_censussurvsamp$natlength %>%
+  filter(species == "Anchovy")
+
+lfplot <- ggplot(ss_length_censussurvsamp, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name, ss_length_censussurvsamp$species))
+
+lfplot
+```
+
+Herring:
+```{r plotCCAherring}
+ss_length_censussurvsamp <- length_censussurvsamp$natlength %>%
+  filter(species == "Herring")
+
+lfplot <- ggplot(ss_length_censussurvsamp, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,ss_length_censussurvsamp$species))
+
+lfplot
+```
+
+How do these three look? 
+
+Do we need to change something about the length comp estimation?
