@@ -49,13 +49,25 @@ knitr::include_graphics("https://dm2301files.storage.live.com/y4mSPipdQ7jyZNNfmp
     
 The next three biological sampling steps after creating the length composition are taking a subset of the `sample_fish` for lengths using `sample_length` (though this could be 100% sample as is often done on a survey), taking a subset of the `sample_fish` for ages and applying ageing error using `sample_ages`, and finally taking a sample of individual fish weights, perhaps the same sample that was aged as is done on some surveys) using `sample_weight`. (So far only `sample_ages` is drafted and the other two functions remain to be written.)
 
-## May 15: True age estimation needs to happen in here
+## May 15: True age estimation needs to happen in here?
 
 The sequence `create_survey` to `sample_fish` to `calc_age2length` now works. It can go as pictured below if there are not multiple true ages in an age class. Revisions to work on:
 
-1. For clarity, `calc_age2length` should be renamed `calc_stage2length`
-2. Between `sample_fish` and `sample_ages` we need the already written `calc_stage2age` function, which calls `calc_Z`. Test these next.
+1. For clarity, `calc_age2length` should be renamed `calc_stage2length` if we are planning to use it directly between Atlantis cohorts and lengths as tested here.
+2. Between `sample_fish` and `sample_ages` we need the already written `calc_stage2age` function, which calls `calc_Z`. Test these next. But see below.
 3. Similarly, between `sample_fish` and `sample_weight` we will need to expand to true ages for a weight-at-age vector (for species where stage=age, this is already output as muweight from the `calc_(st)age2length` function).
+
+BUT `calc_stage2age` is designed to work on true outputs (it makes no sense to expand age classes from survey-selectivity affected output). In theory this should be integrated into `run_truth` but I am wary of introducing this approximation so far upstream. On the other hand, what choice to we have if we want true age outputs? We either need the direct output from the most recent codebase(s) or we have to do this approximation to get age input to stock assessment models.
+
+So, lets try integrating `calc_stage2age` into `run_truth` as planned and we can compare the outputs to what we already have for the stage data. We will want to compare census biomass, survey biomass, length comps...
+    + write another truth function that works on the Atlantis true age output?
+    + load YOY file into run_truth (uses load_YOY function)
+    + do we have to apply before calc_biomass_age, and sub output of calc_stage2age in for nums?
+    + if so, how do we deal with the structn and resn portions? 
+
+Then we need to revise `calc_age2length` to work for true ages, as it is now hardcoded to expext 10 age classes.
+
+If we do those two things, this sampling flow remains the same, but has `calc_age2length` as the intermediate step before lengths and weights, which will come out from the true age classes.
 
 ```{r samplingworkflow}
 
