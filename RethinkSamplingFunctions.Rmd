@@ -60,6 +60,7 @@ The sequence `create_survey` to `sample_fish` to `calc_age2length` now works. It
 BUT `calc_stage2age` is designed to work on true outputs (it makes no sense to expand age classes from survey-selectivity affected output). In theory this should be integrated into `run_truth` but I am wary of introducing this approximation so far upstream. On the other hand, what choice to we have if we want true age outputs? We either need the direct output from the most recent codebase(s) or we have to do this approximation to get age input to stock assessment models.
 
 So, lets try integrating `calc_stage2age` into `run_truth` as planned and we can compare the outputs to what we already have for the stage data. We will want to compare census biomass, survey biomass, length comps...
+
     + write another truth function that works on the Atlantis true age output?
     + load YOY file into run_truth (uses load_YOY function)
     + do we have to apply before calc_biomass_age, and sub output of calc_stage2age in for nums?
