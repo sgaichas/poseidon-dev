@@ -77,4 +77,11 @@ Standard survey with length sampling: impact of selectivity, `sample_fish`
 
 <a href="https://sgaichas.github.io/poseidon-dev/StdSurvLengthCompTest.html" target="_blank">Compare survey + sampled lengths with true - May 14, 2019</a>
 
+<a href="https://sgaichas.github.io/poseidon-dev/CCAStdSurvLengthCompTest.html" target="_blank">CCA compare survey + sampled lengths with true - May 14, 2019</a>
+
+<a href="https://sgaichas.github.io/poseidon-dev/NOBAStdSurvLengthCompTest.html" target="_blank">NOBA compare survey + sampled lengths with true - May 15, 2019</a>
+
+<a href="https://sgaichas.github.io/poseidon-dev/NEUSStdSurvLengthCompTest.html" target="_blank">NEUS compare survey + sampled lengths with true - May 15, 2019</a>
+
+
 ### More to come later!
