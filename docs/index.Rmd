@@ -13,6 +13,8 @@ These pages document initial testing of the atlantisom package in development at
 
 May 11: Changes to `atlantisom::sample_fish` and new `atlantisom::aggregateDensityData` functions seem to work. See below under [Length compositions].
 
+May 15: Changes to `atlantisom::calc_age2length` to allow user specified max length bin seem to work. Also listed under [Length compositions].
+
 ### Testing the atlantisom code
 
 <a href="https://sgaichas.github.io/poseidon-dev/TrueBioTest.html" target="_blank">Installation and initial tests - April 26, 2019, updated April 30, 2019</a>
@@ -83,5 +85,8 @@ Standard survey with length sampling: impact of selectivity, `sample_fish`
 
 <a href="https://sgaichas.github.io/poseidon-dev/NEUSStdSurvLengthCompTest.html" target="_blank">NEUS compare survey + sampled lengths with true - May 15, 2019</a>
 
+Test new user specified max length bin for a large species:
+
+<a href="https://sgaichas.github.io/poseidon-dev/TestBiggerMaxLen.html" target="_blank">Default 150 cm, try different max - May 15, 2019</a>
 
 ### More to come later!
