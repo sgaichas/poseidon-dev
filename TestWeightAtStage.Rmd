@@ -1,5 +1,5 @@
 ---
-title: "Testing atlantisom: visualize weight at (st)age output. How shall we interplolate this for true ages?"
+title: "Testing atlantisom: visualize weight at (st)age output. How should we interplolate this for true ages?"
 author: "Sarah Gaichas and Christine Stawitz"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
@@ -19,10 +19,12 @@ knitr::write_bib(c(
 
 Now we delve into the calculation of true age classes and weight-at-age from standard Atlantis output age class, which is generally in 10 stages of maxage/10 true age classes for all but the newest Atlantis models. Note that modern Atlantis models can output true age classes in two output files (from the wiki):
 
->ANNAGEBIO.nc: This output provides numbers in each annual age class (so mapped from Atlantis "age class" which can contain multiple years to true annual age classes). Set flag_age_output to 1 to get this output. Tracers provided are:
+>**ANNAGEBIO.nc**: This output provides numbers in each annual age class (so mapped from Atlantis "age class" which can contain multiple years to true annual age classes). Set flag_age_output to 1 to get this output. Tracers provided are:
+>
 >   + Numbers at age per species
 >
->ANNAGECATCH.nc: This output provides numbers at annual age class (so mapped from Atlantis "age class" which can contain multiple years to true annual age classes) in the catch and discards (summed over all fleets). Set flag_age_output to 1 to get this output. Tracers provided are:
+>**ANNAGECATCH.nc**: This output provides numbers at annual age class (so mapped from Atlantis "age class" which can contain multiple years to true annual age classes) in the catch and discards (summed over all fleets). Set flag_age_output to 1 to get this output. Tracers provided are:
+>
 >   + Numbers at age per species in the catch
 >   + Numbers at age per species in the discards
 
@@ -312,7 +314,7 @@ length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length
 
 ```
 
-Sardine:
+Sardine:  
 ```{r plotCCAsardine}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Pacific_sardine")
@@ -328,7 +330,7 @@ wageplot <- ggplot(censuswt, aes(time, atoutput)) +
 wageplot + facet_wrap(c("species"), scales="free_y")
 ```
 
-Anchovy:
+Anchovy:  
 ```{r plotCCAanchovy}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Anchovy")
@@ -344,7 +346,7 @@ wageplot <- ggplot(censuswt, aes(time, atoutput)) +
 wageplot + facet_wrap(c("species"), scales="free_y")
 ```
 
-Herring:
+Herring:  
 ```{r plotCCAherring}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Herring")
@@ -364,7 +366,7 @@ How do these three look? Herring had a rough period from model years 15-30 or so
 
 Now for some CCA groups with multiple true ages per stage.
 
-Pacific hake, 2 true ages per class:
+Pacific hake, 2 true ages per class:  
 ```{r plotCCAhake}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Mesopel_M_Fish")
