@@ -30,7 +30,7 @@ Now we delve into the calculation of true age classes and weight-at-age from sta
 
 Future `atlantisom` users should take advantage of this direct output, and some `atlantisom` functions will have to be rewritten to use it.
 
-However, The CCA model does not produce this output, and other legacy models may not, so we still need the `atlantisom` functions `calc_stage2age` and the associated `calc_Z`.  This function will be tested. However, it produces numbers at age but not weight. Weight-at-true-age is needed as an input to stock assessment models using empirical weight at age. See discussion [here](ttps://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html)
+However, The CCA model does not produce this output, and other legacy models may not, so we still need the `atlantisom` functions `calc_stage2age` and the associated `calc_Z`.  This function will be tested. However, it produces numbers at age but not weight. Weight-at-true-age is needed as an input to stock assessment models using empirical weight at age. See discussion [here](https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html).
 
 Therefore, our first step is understanding what the 10 class weight at age (output as `mulength` from `calc_age2length`) looks like for a variety of species.
 
