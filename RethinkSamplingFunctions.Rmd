@@ -65,6 +65,15 @@ So, lets try integrating `calc_stage2age` into `run_truth` as planned and we can
     + load YOY file into run_truth (uses load_YOY function)
     + do we have to apply before calc_biomass_age, and sub output of calc_stage2age in for nums?
     + if so, how do we deal with the structn and resn portions? 
+    
+    May 16: Discussion with Isaac and Patrick: how to split weights to true age bins?
+    + Simple interpolation? within a year or across years
+    + Is Z calc lagged? doesnt look like it, simple within year Z like catch curve
+    + Check whether there is a plus group in any Atlantis model--shouldn't be
+    + First try a linear interpolation between weight groups
+    + This may be more wrong for smallest fastest growing age classes
+    + If so we can write something else for younger classes
+    + Midpoint of weight for each age is the goal
 
 Then we need to revise `calc_age2length` to work for true ages, as it is now hardcoded to expext 10 age classes.
 
