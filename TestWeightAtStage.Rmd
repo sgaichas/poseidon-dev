@@ -204,28 +204,96 @@ We should get the upper end of Greenland halibut with a 200cm max length bin. Th
 
 ```{r vis-wtageclass-test}
 
-wageplot <- ggplot(ss_length_census$muweight, aes(agecl)) +
-  geom_bar(aes(weight = atoutput)) +
+wageplot <- ggplot(length_census$muweight, aes(agecl, atoutput)) +
+  geom_point(aes(colour = time)) +
   theme_tufte() +
-  labs(subtitle = paste(scenario.name, ss_length_census$muweight$species))
+  theme(legend.position = "bottom") +
+  scale_x_discrete(limits=c(1:10)) +
+  xlab("age class") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste(scenario.name))
 
-wageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
-wageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
-wageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
-wageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 4, scales="free_y")
-wageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 5, scales="free_y")
-wageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 6, scales="free_y")
-wageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 7, scales="free_y")
+wageplot + facet_wrap(c("species"), scales="free_y")
 
 ```
 
-How much does weight at age class vary over time?
+How much does weight at age class vary over time? Here are a couple of annual cycles:
 
-Aggregate wt age stage over all of these time steps (first 22+ years):
+```{r vis-wtageclass-test2}
 
-```{r aggwtcomp, eval=FALSE}
-#this isn't appropriate
-wageplot
+wtageyr1 <- length_census$muweight %>%
+  filter(time<5)
+
+wageplot <- ggplot(wtageyr1, aes(agecl, atoutput)) +
+  geom_line(aes(colour = factor(time))) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  scale_x_discrete(limits=c(1:10)) +
+  xlab("age class") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste0(scenario.name, " initial year"))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
+
+```
+```{r vis-wtageclass-test3}
+
+wtageyrmid <- length_census$muweight %>%
+  filter(between(time, 50,54))
+
+wageplot <- ggplot(wtageyrmid, aes(agecl, atoutput)) +
+  geom_line(aes(colour = factor(time))) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  scale_x_discrete(limits=c(1:10)) +
+  xlab("age class") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste0(scenario.name, " year 10"))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
+
+```
+```{r vis-wtageclass-test4}
+
+wtageyr20 <- length_census$muweight %>%
+  filter(between(time, 100,104))
+
+wageplot <- ggplot(wtageyr20, aes(agecl, atoutput)) +
+  geom_line(aes(colour = factor(time))) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  scale_x_discrete(limits=c(1:10)) +
+  xlab("age class") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste0(scenario.name, " year 20"))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
+
+```
+
+There are some interesting jumps between age classes. Most pronounced for herring, but those are real age classes!
+
+Change in wt at age over time for age classes using an annual mid-year snapshot (survey) (first 22+ years of NOBA model run):
+
+```{r aggwtcomp}
+
+# from std survey code and model step info read in above
+midptyr <- round(median(seq(1,stepperyr)))
+annualmidyear <- seq(midptyr, noutsteps, stepperyr)
+
+wtage_annsurv <- length_census$muweight %>%
+  filter(time %in% annualmidyear)
+
+wageplot <- ggplot(wtage_annsurv, aes(time, atoutput)) +
+  geom_line(aes(colour = factor(agecl))) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  xlab("model timestep (5 per year)") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
+
 
 ```
 
