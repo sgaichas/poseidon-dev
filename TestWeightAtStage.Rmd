@@ -304,7 +304,7 @@ wageplot + facet_wrap(c("species"), scales="free_y")
 
 Here we check the CCA model (Atlantis Summit Common Scenario 1) saved length and weight census output for small species at Isaac's suggestion (all three of the following are true age classes, NumAgeClassSize=1 per Atlantis agecl bin:
 
-```{r loadCCAlengthcomp, echo=TRUE, eval=FALSE}
+```{r loadCCAlengthcomp, echo=TRUE}
 
 source(here("config/CCConfig.R"))
 
@@ -313,7 +313,7 @@ length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length
 ```
 
 Sardine:
-```{r plotCCAsardine, eval=FALSE}
+```{r plotCCAsardine}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Pacific_sardine")
 
@@ -329,7 +329,7 @@ wageplot + facet_wrap(c("species"), scales="free_y")
 ```
 
 Anchovy:
-```{r plotCCAanchovy, eval=FALSE}
+```{r plotCCAanchovy}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Anchovy")
 
@@ -345,7 +345,7 @@ wageplot + facet_wrap(c("species"), scales="free_y")
 ```
 
 Herring:
-```{r plotCCAherring, eval=FALSE}
+```{r plotCCAherring}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Herring")
 
@@ -365,7 +365,7 @@ How do these three look? Herring had a rough period from model years 15-30 or so
 Now for some CCA groups with multiple true ages per stage.
 
 Pacific hake, 2 true ages per class:
-```{r plotCCAhake, eval=FALSE}
+```{r plotCCAhake}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Mesopel_M_Fish")
 
@@ -381,7 +381,7 @@ wageplot + facet_wrap(c("species"), scales="free_y")
 ```
 
 Bocaccio rockfish, 5 true ages per age class:
-```{r plotCCAbocaccio, eval=FALSE}
+```{r plotCCAbocaccio}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Bocaccio_rockfish")
 
@@ -397,7 +397,7 @@ wageplot + facet_wrap(c("species"), scales="free_y")
 ```
 
 Yelloweye rockfish, most extreme at 12 true ages per age class:
-```{r plotCCAYelloweye, eval=FALSE}
+```{r plotCCAYelloweye}
 censuswt <- length_censussurvsamp$muweight %>%
   filter(species == "Yelloweye_rockfish")
 
