@@ -231,19 +231,30 @@ If we were to do simple interpolation on this output, we can approximate weight 
 
 ```{r interpolate-wtage}
 # a function to go into atlantisom, sketched here, reuse calc_stage2age as possible
+
+fgs.dir <- here("atlantisoutput", "NOBACERESGlobalSustainability")
+fgs.file <-  "nordic_groups_v04.csv"
+wtagecl_data <- wtage_annsurv
+  
 calc_wtTrueage <- function(wtagecl_data, fgs.file) {
   # get number of ages per agecl from fgs.file
-  # match species in wtagecl_data to those species in the fgs file
-  fgs <- load_fgs(fgs.file)
+  fgs <- load_fgs(fgs.dir, fgs.file)
   species.code <- fgs$Code
   turnedon <- fgs[fgs$IsTurnedOn > 0, ]
-  names <- turnedon$Code
 
   # Figure out the groups that have multiple ages classes in each stage (or
-  # cohort)
+  # cohort) this is from the full model
   multiple_ages <- turnedon[turnedon$NumAgeClassSize>1, c(1,4,10)]
+  
+  # match species in wtagecl_data to those species in the fgs file
+  sppwt <- levels(wtagecl_data$species)
+  multiple_ages <- multiple_ages[multiple_ages$Name %in% sppwt, ]
+  
+  #now get indices
+  names <- multiple_ages$Code
   num_multi_age <- dim(multiple_ages)[1]
 
+  # timesteps from input wt file
   ntimesteps <- length(unique(wtagecl_data$time))
 
   # find weight increment for a timestep
