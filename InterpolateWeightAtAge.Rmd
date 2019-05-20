@@ -257,8 +257,12 @@ calc_wtTrueage <- function(wtagecl_data, fgs.file) {
   # timesteps from input wt file
   ntimesteps <- length(unique(wtagecl_data$time))
 
+  # make a dataframe the right dimensions for all age classes
+  wtage_out <- data.frame()
+  
   # find weight increment for a timestep
   # muweight for agecl+1 - muweight for agecl
+  
 
   # divide weight increment by number of ages per agecl (could decay with increasing age, but how different from equal increment?)
 
