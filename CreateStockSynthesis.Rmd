@@ -60,3 +60,59 @@ sardine.data$agebin_vector
 
 ```
 
+## Writing index data
+To edit index data, use the `atlantisom` sampling functions to extract survey biomass and numbers. These can then be written using the `SS_write_CPUE` function.
+
+```{r}
+results <- get(load("CalCurrentResults.RData"))
+devtools::load_all()
+species=c("Pacific_sardine")
+
+#Sample all boxes
+boxes <- unique(results$nums$polygon)
+
+#Efficiency of the survey
+effic <- data.frame(species=species, efficiency=0.5)
+
+# Assume uniform selectivity
+sel<- data.frame(species=rep(species,10),
+               agecl=c(1:10),
+              selex=rep(1,10))
+
+#Sample survey
+survey_out <- create_survey(dat=results$nums, time=seq(1,99,1), species=species, boxes=boxes, effic=effic, selex=sel)
+
+#Need to replace with interp function
+wtAtAge <- data.frame(species=rep("Pacific_sardine",10),
+                agecl=1:10,
+                wtAtAge=c(0.0542, 0.0837,	0.1103,	0.1323,	0.1497,	0.163,	0.1729,	0.1801,	0.1854,	0.1941))
+cv <- data.frame(species="Pacific_sardine", cv=c(0.2))
+
+#Sample survey biomass
+survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
+
+#Sample survey numbers
+survObsNum <- sample_survey_numbers(dat=survey_out,cv=cv)
+nyears <- 50
+burnin <- 30
+
+#Test writing CPUE in biomass
+sardine.data <- SS_write_CPUE(ss_data_list = sardine.data,
+              cpue_data = list(survObsBiom$atoutput[burnin:(burnin+nyears-1)]),
+              CVs = c(0.2),
+              data_years = c(nyears),
+              sampling_month = list(rep(1,nyears)),
+              units = "biomass")
+
+#Test writing CPUE in numbers
+sardine.data <- SS_write_CPUE(ss_data_list = sardine.data,
+                             cpue_data = list(survObsNum$atoutput[burnin:(burnin+nyears-1)]),
+                             CVs = c(0.2),
+                             data_years = c(nyears),
+                             sampling_month = list(rep(1,nyears)),
+                             units = "numbers")
+
+sardine.data$CPUE
+```
+
+

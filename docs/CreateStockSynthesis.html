@@ -1331,6 +1331,111 @@ sardine.data$Lbin_method</code></pre>
 sardine.data$agebin_vector</code></pre>
 <pre><code>##  [1]  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15</code></pre>
 </div>
+<div id="writing-index-data" class="section level2">
+<h2>Writing index data</h2>
+<p>To edit index data, use the <code>atlantisom</code> sampling functions to extract survey biomass and numbers. These can then be written using the <code>SS_write_CPUE</code> function.</p>
+<pre class="r"><code>results &lt;- get(load(&quot;CalCurrentResults.RData&quot;))
+devtools::load_all()</code></pre>
+<pre><code>## Loading atlantisom</code></pre>
+<pre class="r"><code>species=c(&quot;Pacific_sardine&quot;)
+
+#Sample all boxes
+boxes &lt;- unique(results$nums$polygon)
+
+#Efficiency of the survey
+effic &lt;- data.frame(species=species, efficiency=0.5)
+
+# Assume uniform selectivity
+sel&lt;- data.frame(species=rep(species,10),
+               agecl=c(1:10),
+              selex=rep(1,10))
+
+#Sample survey
+survey_out &lt;- create_survey(dat=results$nums, time=seq(1,99,1), species=species, boxes=boxes, effic=effic, selex=sel)
+
+#Need to replace with interp function
+wtAtAge &lt;- data.frame(species=rep(&quot;Pacific_sardine&quot;,10),
+                agecl=1:10,
+                wtAtAge=c(0.0542, 0.0837,   0.1103, 0.1323, 0.1497, 0.163,  0.1729, 0.1801, 0.1854, 0.1941))
+cv &lt;- data.frame(species=&quot;Pacific_sardine&quot;, cv=c(0.2))
+
+#Sample survey biomass
+survObsBiom &lt;- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
+
+#Sample survey numbers
+survObsNum &lt;- sample_survey_numbers(dat=survey_out,cv=cv)
+nyears &lt;- 50
+burnin &lt;- 30
+
+#Test writing CPUE in biomass
+sardine.data &lt;- SS_write_CPUE(ss_data_list = sardine.data,
+              cpue_data = list(survObsBiom$atoutput[burnin:(burnin+nyears-1)]),
+              CVs = c(0.2),
+              data_years = c(nyears),
+              sampling_month = list(rep(1,nyears)),
+              units = &quot;biomass&quot;)
+
+#Test writing CPUE in numbers
+sardine.data &lt;- SS_write_CPUE(ss_data_list = sardine.data,
+                             cpue_data = list(survObsNum$atoutput[burnin:(burnin+nyears-1)]),
+                             CVs = c(0.2),
+                             data_years = c(nyears),
+                             sampling_month = list(rep(1,nyears)),
+                             units = &quot;numbers&quot;)
+
+sardine.data$CPUE</code></pre>
+<pre><code>##    year seas index      obs se_log
+## 1  1913    1     1 15660344    0.2
+## 2  1914    1     1  9277081    0.2
+## 3  1915    1     1 13181514    0.2
+## 4  1916    1     1 11125654    0.2
+## 5  1917    1     1 10523215    0.2
+## 6  1918    1     1 10827753    0.2
+## 7  1919    1     1 14818721    0.2
+## 8  1920    1     1  8234669    0.2
+## 9  1921    1     1 11596620    0.2
+## 10 1922    1     1 11109997    0.2
+## 11 1923    1     1  8597770    0.2
+## 12 1924    1     1 12927811    0.2
+## 13 1925    1     1 11110628    0.2
+## 14 1926    1     1 10166858    0.2
+## 15 1927    1     1  8528294    0.2
+## 16 1928    1     1 11929303    0.2
+## 17 1929    1     1 10563093    0.2
+## 18 1930    1     1 11304412    0.2
+## 19 1931    1     1 11895100    0.2
+## 20 1932    1     1 10079121    0.2
+## 21 1933    1     1 13772638    0.2
+## 22 1934    1     1 10620109    0.2
+## 23 1935    1     1 19065548    0.2
+## 24 1936    1     1 11419273    0.2
+## 25 1937    1     1  8082584    0.2
+## 26 1938    1     1 10067944    0.2
+## 27 1939    1     1  7512004    0.2
+## 28 1940    1     1 12150127    0.2
+## 29 1941    1     1 16272593    0.2
+## 30 1942    1     1 11739630    0.2
+## 31 1943    1     1  9591076    0.2
+## 32 1944    1     1 11875775    0.2
+## 33 1945    1     1  6420724    0.2
+## 34 1946    1     1 11632205    0.2
+## 35 1947    1     1 10429051    0.2
+## 36 1948    1     1  7708014    0.2
+## 37 1949    1     1  7313838    0.2
+## 38 1950    1     1 11193335    0.2
+## 39 1951    1     1 12482549    0.2
+## 40 1952    1     1 15473367    0.2
+## 41 1953    1     1  9705709    0.2
+## 42 1954    1     1  7810471    0.2
+## 43 1955    1     1  6134721    0.2
+## 44 1956    1     1 14916995    0.2
+## 45 1957    1     1 12065302    0.2
+## 46 1958    1     1  8669171    0.2
+## 47 1959    1     1  8955303    0.2
+## 48 1960    1     1 14334470    0.2
+## 49 1961    1     1  8893560    0.2
+## 50 1962    1     1 11748132    0.2</code></pre>
+</div>
 
 
 
