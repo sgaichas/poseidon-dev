@@ -1,0 +1,62 @@
+---
+title: "WritingSSfiles"
+author: "Christine Stawitz"
+date: "May 14, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(here)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "C:/Users/chris/Documents/GitHub/atlantisom/")
+```
+
+## Introduction
+
+This page discusses reading in an existing stock assessment file and replacing the data values with those from the `atlantisom` package. To read in the Stock Synthesis files, first ensure you have the latest version of `r4ss`
+
+```{r packages, eval=FALSE}
+devtools::install_github("r4ss/r4ss", dependencies = FALSE)
+```
+
+## Sardine example
+
+Dummy files are in the package directory; use `r4ss` to load the dummy data file
+
+```{r readdata, echo=FALSE}
+require(r4ss)
+#Read in sardine data file
+sardine.data <- r4ss::SS_readdat_3.30("./inst/extdata/Sardine_SS_files/sardEM_3_3.dat")
+```
+
+Below, we can see the structure of the catch and CPUE data
+```{r}
+sardine.data$catch
+
+sardine.data$CPUE
+```
+
+We can next look at age composition data
+```{r}
+sardine.data$agecomp
+
+sardine.data$lencomp
+```
+
+We may also need to access or modify the setup variables before the data matrices.
+
+```{r}
+#CPUE units, SD and error structure
+sardine.data$CPUEinfo
+
+#Number of length bins
+sardine.data$N_lbins
+
+#Length bin method
+sardine.data$Lbin_method
+
+#Vector of age bins
+sardine.data$agebin_vector
+
+```
+
