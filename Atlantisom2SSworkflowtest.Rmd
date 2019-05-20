@@ -1,0 +1,436 @@
+---
+title: "Testing atlantisom: true biomass output from Atlantis"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+bibliography: "packages.bib"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# automatically create a bib database for R packages
+knitr::write_bib(c(
+  .packages(), 'knitr', 'rmarkdown', 'tidyr', 'dplyr', 'ggplot2',
+  'data.table', 'here', 'ggforce', 'ggthemes'
+), 'packages.bib')
+```
+
+## Introduction
+
+This page documents initial testing of the atlantisom package in development at https://github.com/r4atlantis/atlantisom using three different [Atlantis](https://research.csiro.au/atlantis/) output datasets. Development of atlantisom began at the [2015 Atlantis Summit](https://research.csiro.au/atlantis/atlantis-summit/) in Honolulu, Hawaii, USA. 
+
+The purpose of atlantisom is to use existing Atlantis model output to generate input datasets for a variety of models, so that the performance of these models can be evaluated against known (simulated) ecosystem dynamics. Atlantis models can be run using different climate forcing, fishing, and other scenarios. Users of atlantisom will be able to specify fishery independent and fishery dependent sampling in space and time, as well as species-specific catchability, selectivty, and other observation processes for any Atlantis scenario. Internally consistent multispecies and ecosystem datasets with known observation error characteristics will be the atlantisom outputs, for use in individual model performance testing, comparing performance of alternative models, and performance testing of model ensembles against "true" Atlantis outputs.
+
+On this page we demonstrate use of atlantisom on the California Current output files to provide inputs for a stock assessment model implemented in Stock Synthesis [@SSREF]. 
+
+## Setup
+
+First, you will want to set up libraries and install atlantisom if you haven't already. This document is written in in R Markdown [@R-rmarkdown], and we use several packages to produce the outputs [@R-tidyr; @R-dplyr; @R-ggplot2; @R-here; @R-ggforce; @R-ggthemes]. 
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+library(ggforce)
+library(ggthemes)
+```
+
+If you want to load the local of the atlantisom R package, use devtools. The R package here is helpful for installing from your local atlantisom directory, as it avoids hardcoding the specific location. The code below is not running from our local atlantisom directory and is not evaluated:
+
+```{r eval=FALSE, message=FALSE, warning=FALSE}
+require(devtools)
+package.dir <- here()
+devtools::load_all(package.dir)
+```
+
+Or you can install directly from the Github repository.
+
+```{r eval=FALSE, message=FALSE, warning=FALSE}
+devtools::install_github("r4atlantis\atlantisom")
+```
+
+Next, load the package. 
+
+```{r message=FALSE, warning=FALSE}
+library(atlantisom)
+```
+
+## Initializing input files and directories
+
+You will first need to tell `atlantisom` to know where to look for the output and input files from your atlantis model run. Here, we will give the directory where the Atlantis inputs and outputs are stored `d.name`, the location of the functional groups file `functional.group.file` (.csv), the biomass pools file `biomass.pools.file` (.nc), the box locations file `box.file` (.bgm), an `initial.conditions.file` (.nc), the biology .prm file `biol.prm.file` (.prm), and the run .prm file `run.prm.file` (.prm). You will also need to specify a scenario name, which will be used to define the output files (i.e. output is stored in a number of netCDF files of the format: output<scenario><value>.nc). All of these files should be stored in `d.name`.
+
+In general, Atlantis model output files that are sufficiently detailed to mimic fishery sampling in space and time are too large to store on GitHub, so are not included as examples with the atlantisom code. 
+
+In this example, we have a local folder "atlantisoutput" and the output of interest in a subdirectory:
+
+  * "CalCurrentClimateTest1": California Current Atlantis model output from Isaac Kaplan's google drive \outputFolderAllOff2013Oceanography using the Hodgson et al. 2018 configuration.
+
+Our directory structure is set up to take advantage of `here()` to allow setup on a different computer.
+
+```{r initialize}
+
+initCCA <- FALSE
+initNEUS <- FALSE
+initNOBA <- TRUE
+
+if(initCCA){
+  d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
+  functional.groups.file <- "CalCurrentV3Groups.csv"
+  biomass.pools.file <- "DIVCalCurrentV3_BIOL.nc"
+  biol.prm.file <- "CalCurrentV3_Biol.prm"
+  box.file <- "CalCurrentV3_utm.bgm"
+  initial.conditions.file <- "DIVCalCurrentV3_BIOL.nc"
+  run.prm.file <- "CalCurrentV3_run.xml"
+  scenario.name <- "CCV3"
+}
+
+if(initNEUS){
+  d.name <- here("atlantisoutput","NEUStest20160303")
+  functional.groups.file <- "NeusGroups.csv" 
+  biomass.pools.file <- ""
+  biol.prm.file <- "at_biol_neus_v15_DE.prm"
+  box.file <- "neus30_2006.bgm"
+  initial.conditions.file <- "inneus_2012.nc"
+  run.prm.file <- "at_run_neus_v15_DE.xml"
+  scenario.name <- "neusDynEffort_Test1_"
+}
+
+if(initNOBA){
+  d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
+  functional.groups.file <- "nordic_groups_v04.csv" 
+  biomass.pools.file <- "nordic_biol_v23.nc"
+  biol.prm.file <- "nordic_biol_incl_harv_v_007_3.prm"
+  box.file <- "Nordic02.bgm"
+  initial.conditions.file <- "nordic_biol_v23.nc"
+  run.prm.file <- "nordic_run_v01.xml"
+  scenario.name <- "nordic_runresults_01"
+}
+# NOBA note: output filenames in CCA and NEUS begin with "output" and the run_truth function is written to expect this. Need to check if default Atlantis output file nomenclature has changed or if NOBA is a special case. For now, NOBA filenames have been changed to include prefix "output"
+```
+
+## Getting the "true" operating model values
+
+There are a number of functions in the package that begin with the prefix `load` that load various files. See documentation if you'd only like to load one file. The `atlantisom::run_truth()` function uses the above file definitions and calls a number of the `load` functions to read in all of the atlantis output. Note: this call reads in a number of large .nc files, so it will take a few minutes to return.
+
+```{r get_names, message=FALSE, warning=FALSE}
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+```
+
+```{r get_truth, message=FALSE, warning=FALSE, eval=FALSE}
+#Store all loaded results into an R object
+results <- run_truth(scenario = scenario.name,
+          dir = d.name,
+          file_fgs = functional.groups.file,
+          file_bgm = box.file,
+          select_groups = funct.group.names,
+          file_init = initial.conditions.file,
+          file_biolprm = biol.prm.file,
+          file_runprm = run.prm.file
+)
+
+if(initCCA) CCAresults <- results
+if(initNEUS) NEUSresults <- results
+if(initNOBA) NOBAresults <- results
+
+```
+
+Now the R object `results` with the comprehensive results from the Atlantis model has been read in. It is also saved as an .RData file titled "output[scenario.name]run_truth.RData" in the directory with the model output, so that later analyses can use `base::load()` instead of taking the time to rerun `atlantisom::run_truth()`. 
+
+Note: on Sarah's laptop, CCA took ~40 minutes to return from `run_truth` and NOBA took an hour and 26 minutes to return. Therefore, reading the .RData file in as below is advised after the first run to make the plots comparing systems later in this document.
+
+```{r load_Rdata, message=FALSE, warning=FALSE}
+
+if(initCCA) {
+  d.name <- here("atlantisoutput","CalCurrentSummitScenario1")
+  truth.file <- "outputCCV3run_truth.RData"
+  load(file.path(d.name, truth.file))
+  CCAresults <- result
+} 
+
+if(initNEUS) {
+  d.name <- here("atlantisoutput","NEUStest20160303")
+  truth.file <- "outputneusDynEffort_Test1_run_truth.RData" 
+  load(file.path(d.name, truth.file))
+  NEUSresults <- result
+}
+
+if(initNOBA){
+  d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
+  truth.file <- "outputnordic_runresults_01run_truth.RData" 
+  load(file.path(d.name, truth.file))
+  NOBAresults <- result
+}
+
+```
+
+
+## Simulate a survey part 1: census to compare with truth
+
+This section tests the `atlantisom::create_survey()` and `atlantisom::sample_survey_biomass()` functions by comparing a census (survey sampling everything) with the results generated by `atlantisom::run_truth()` above. 
+
+To create a survey, the user specifies the timing of the survey, which species are captured, the spatial coverage of the survey, the species-specific survey efficiency ("q"), and the selectivity at age for each species. 
+
+The following settings should achieve a survey that samples all Atlantis model output timesteps, all species, and all model polygons, with perfect efficiency and full selectivity for all ages: 
+
+```{r census-spec, message=FALSE, warning=FALSE}
+
+# should return a perfectly scaled survey 
+effic1 <- data.frame(species=funct.group.names,
+                     efficiency=rep(1.0,length(funct.group.names)))
+
+# should return all lengths fully sampled (Atlantis output is 10 age groups per spp)
+# BUT CHECK if newer Atlantis models can do age-specific outputs
+selex1 <- data.frame(species=rep(funct.group.names, each=10),
+                     agecl=rep(c(1:10),length(funct.group.names)),
+                     selex=rep(1.0,length(funct.group.names)*10))
+
+# should return all model areas
+boxpars <- load_box(d.name, box.file)
+boxall <- c(0:(boxpars$nbox - 1))
+
+# these are model specific, generalized above
+# if(initCCA) boxall <- c(0:88) 
+# if(initNEUS) boxall <- c(0:29)
+# if(initNOBA) boxall <- c(0:59) 
+
+# should return all model output timesteps; need to generalize
+if(initCCA) timeall <- c(0:100) 
+if(initNEUS) timeall <- c(0:251)
+if(initNOBA) timeall <- c(0:560) 
+  
+# define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
+# for ecosystem indicator work test all species, e.g.
+survspp <- funct.group.names 
+
+# to keep plots simpler, currently hardcoded for vertebrate/fished invert groups
+if(initCCA) survspp <- funct.group.names[c(1:44, 59:61, 65:68)] 
+if(initNEUS) survspp <- funct.group.names[1:21]
+if(initNOBA) survspp <- funct.group.names[1:36]
+  
+```
+
+Because the results of `run_truth` provide both biomass at age and numbers at age, we can use `create_survey` on both with some modifications. The following uses the biomass output of `run_truth` to create the survey, so the call to `sample_survey_biomass` will require a weight at age argument that is filled with 1's because no conversion from numbers to weight is necessary. Because we are making a census for testing, the survey cv argument is set to 0. 
+
+```{r surveyBbased}
+
+# this uses result$biomass_ages to sample biomass directly
+
+if(initCCA) datB <- CCAresults$biomass_ages
+if(initNEUS) datB <- NEUSresults$biomass_ages
+if(initNOBA) datB <- NOBAresults$biomass_ages
+
+survey_testBall <- create_survey(dat = datB,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+# call sample_survey_biomass with a bunch of 1s for weight at age
+# in the code it multiplies atoutput by wtatage so this allows us to use
+# biomass directly
+wtage <- data.frame(species=rep(survspp, each=10),
+                    agecl=rep(c(1:10),length(survspp)),
+                    wtAtAge=rep(1.0,length(survspp)*10))
+
+surveyB_frombio <- sample_survey_biomass(survey_testBall, surv_cv, wtage)
+
+#save for later use, takes a long time to generate
+saveRDS(surveyB_frombio, file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+
+if(initCCA) CCAsurveyB_frombio <- surveyB_frombio
+if(initNEUS) NEUSsurveyB_frombio <- surveyB_frombio
+if(initNOBA) NOBAsurveyB_frombio <- surveyB_frombio
+
+```
+
+Comparing our (census) survey based on true biomass from above with the Atlantis output file "[modelscenario]BiomIndx.txt" should give us a perfect match. Note that the our (census) survey may have more sampling in time than the Atlantis output file.
+
+```{r matchB, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; first 9 species.", message=FALSE, warning=FALSE}
+# plot some comparisons with Atlantis output
+
+# read Atlantis output files
+if(initCCA) {
+  atBtxt2 <- read.table(here("atlantisoutput","CalCurrentSummitScenario1","outputCCV3BiomIndx.txt"), header=T)
+  groupslookup <- load_fgs(dir = d.name, functional.groups.file)
+  surveyB_frombio <- CCAsurveyB_frombio
+}
+
+if(initNEUS) {
+  atBtxt2 <- read.table(here("atlantisoutput","NEUStest20160303","neusDynEffort_Test1_BiomIndx.txt"), header=T)
+  groupslookup <- load_fgs(dir = d.name, functional.groups.file)
+  surveyB_frombio <- NEUSsurveyB_frombio
+}
+
+if(initNOBA) {
+  atBtxt2 <- read.table(here("atlantisoutput","NOBACERESGlobalSustainability","outputnordic_runresults_01BiomIndx.txt"), header=T) 
+  groupslookup <- load_fgs(dir = d.name, functional.groups.file)
+  surveyB_frombio <- NOBAsurveyB_frombio
+}
+
+# lookup the matching names, put in time, species, biomass column format
+# WARNING hardcoded for output with last species group as DIN
+groupslookup <- groupslookup %>%
+  filter(IsTurnedOn > 0)
+
+atBtxt2tidy <- atBtxt2 %>%
+  select(Time:DIN) %>%
+  #select(Time, FPL:DIN) %>%
+  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, biomass, -Time) %>%
+  filter(species %in% levels(surveyB_frombio$species))
+
+#all species comparison, time intervals hardcoded for NEUS and NOBA
+compareB <-ggplot() +
+  geom_line(data=surveyB_frombio, aes(x=time/5,y=atoutput, color="survey census B"), 
+            alpha = 10/10) +
+  geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
+             alpha = 1/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compareB + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free") 
+
+```
+
+```{r matchBp2, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; next 9 species."}
+compareB + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free") 
+
+```
+
+```{r matchBp3, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; next 9 species."}
+compareB + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free") 
+
+```
+
+```{r matchBp4, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; last 9 species. Depending on the model, we may not show all species in this example."}
+compareB + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
+
+```
+
+After comparing the survey census based on the biomass output of `run_truth`, we now look at a biomass index that is estimated based on numbers in the survey census and an average weight at age. This is more complex, but may be closer to the way some assessments handle survey observations. 
+
+```{r surveyNbased, fig.cap="Check weight at age generated from biomass_age$atoutput divided by nums$atoutput for up to 48 groups.", fig.show="hold"}
+
+# this uses result$nums so will need a weight at age to get biomass
+
+if(initCCA) datN <- CCAresults$nums
+if(initNEUS) datN <- NEUSresults$nums
+if(initNOBA) datN <- NOBAresults$nums
+
+survey_testNall <- create_survey(dat = datN,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# as above, make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+# now we need a weight at age to convert numbers to weight
+# if I do biomass_age$atoutput divided by nums$atoutput I should have wt@age, yes?
+
+nums_test <- with(datN, aggregate(atoutput, list(species, agecl), sum))
+names(nums_test) <- c("species", "agecl", "nums")
+
+bio_test  <- with(datB, aggregate(atoutput, list(species, agecl), sum))
+names(bio_test) <- c("species", "agecl", "wt")
+
+calcwtage <- merge(bio_test, nums_test) %>%
+  mutate(wtAtAge=wt/nums)
+
+wtagecheck <- ggplot(calcwtage, aes(x=agecl, y=wtAtAge)) +
+  geom_point() + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+wtagecheck + 
+  facet_wrap_paginate(~species, ncol=4, nrow=4, page=1, scales="free")
+
+wtagecheck + 
+  facet_wrap_paginate(~species, ncol=4, nrow=4, page=2, scales="free")
+
+wtagecheck + 
+  facet_wrap_paginate(~species, ncol=4, nrow=4, page=3, scales="free")
+
+# variable name needs to be wtAtAge or doesnt work
+wtage <- calcwtage %>%
+  select(species, agecl, wtAtAge)
+
+surveyB_fromN <- sample_survey_biomass(survey_testNall, surv_cv, wtage)
+#save for later use, takes a long time to generate
+saveRDS(surveyB_fromN, file.path(d.name, paste0(scenario.name, "surveyBfromNcensus.rds")))
+
+if(initCCA) CCAsurveyB_fromN <- surveyB_fromN
+if(initNEUS) NEUSsurveyB_froN <- surveyB_fromN
+if(initNOBA) NOBAsurveyB_fromN <- surveyB_fromN
+
+```
+
+Now we plot the results of the numbers-based (census) survey biomass against the same Atlantis output file "[modelscenario]BiomIndx.txt" as above. 
+
+```{r matchBfromN, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; first 9 species." }
+
+if(initCCA) surveyB_fromN <- CCAsurveyB_fromN
+if(initNEUS) surveyB_froN <- NEUSsurveyB_fromN
+if(initNOBA) surveyB_fromN <- NOBAsurveyB_fromN
+
+#all species comparison, time intervals hardcoded for NEUS and NOBA
+compareB_N <-ggplot() +
+  geom_line(data=surveyB_fromN, aes(x=time/5,y=atoutput, color="survey census N->B"), 
+            alpha = 10/10) +
+  geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
+             alpha = 1/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compareB_N + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free") 
+
+```
+
+```{r matchBfromN2, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; next 9 species."}
+
+compareB_N + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free") 
+
+```
+
+```{r matchBfromN3, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; next 9 species."}
+
+compareB_N + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free") 
+
+```
+
+```{r matchBfromN4, fig.cap="Testing whether the survey census based on numbers converted to biomass gives the same results as the Atlantis output biomass index file; last 9 species.Depending on the model, we may not show all species in this example."}
+
+compareB_N + 
+  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
+
+```
+
+We have more misses in the numbers with average weight estimation, so this needs more investigation and discussion. It may be best to have the survey index for testing derived directly from the true biomass output. 
+
+## References
