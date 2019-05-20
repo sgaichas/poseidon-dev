@@ -125,7 +125,7 @@ if(!file.exists(file.path(d.name,
 
 Now the R object `truth` with the comprehensive results from the Atlantis model has been read in. It is also saved as an .RData file titled "output[scenario.name]run_truth.RData" in the directory with the model output, so that later analyses can use `base::load()` instead of taking the time to rerun `atlantisom::run_truth()`. 
 
-Note: on Sarah's laptop, CCA took ~40 minutes to return from `run_truth` and NOBA took an hour and 26 minutes to return. Therefore, reading the .RData file in as below is advised after the first run to make the plots comparing systems later in this document.
+Note: on Sarah's laptop, CCA took ~2.5 hours to return from `run_truth` and NOBA took an hour and 26 minutes to return. Therefore, reading the .RData file in as below is advised after the first run to make the plots comparing systems later in this document.
 
 ## Simulate a survey part 1: census to compare with truth
 
@@ -175,7 +175,7 @@ survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
 
 Because the results of `run_truth` provide both biomass at age and numbers at age, we can use `create_survey` on both with some modifications. The following uses the biomass output of `run_truth` to create the survey, so the call to `sample_survey_biomass` will require a weight at age argument that is filled with 1's because no conversion from numbers to weight is necessary. Because we are making a census for testing, the survey cv argument is set to 0. 
 
-```{r surveyBbased}
+```{r surveyBbased, eval=F}
 
 # this uses result$biomass_ages to sample biomass directly, no need for wt@age est
 
@@ -205,13 +205,14 @@ saveRDS(surveyB_frombio, file.path(d.name, paste0(scenario.name, "surveyBcensus.
 
 Comparing our (census) survey based on true biomass from above with the Atlantis output file "[modelscenario]BiomIndx.txt" should give us a perfect match. Note that the our (census) survey may have more sampling in time than the Atlantis output file.
 
-```{r matchB, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; first 9 species.", message=FALSE, warning=FALSE}
+```{r matchB, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; first 36 species.", message=FALSE, warning=FALSE}
 # plot some comparisons with Atlantis output
 
 # read Atlantis output files
-  atBtxt2 <- read.table(here(d.name, paste0("output", scenario.name, "BiomIndx.txt")), header=T)
+atBtxt2 <- read.table(file.path(d.name, paste0("output", scenario.name, "BiomIndx.txt")), header=T)
 
-
+surveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+  
 # lookup the matching names, put in time, species, biomass column format
 # WARNING hardcoded for output with last species group as DIN
 groupslookup <- funct.groups %>%
@@ -224,7 +225,7 @@ atBtxt2tidy <- atBtxt2 %>%
   gather(species, biomass, -Time) %>%
   filter(species %in% levels(surveyB_frombio$species))
 
-#all species comparison, time intervals hardcoded for NEUS and NOBA
+#all species comparison, time intervals hardcoded for 5 steps per year
 compareB <-ggplot() +
   geom_line(data=surveyB_frombio, aes(x=time/5,y=atoutput, color="survey census B"), 
             alpha = 10/10) +
@@ -247,7 +248,7 @@ compareB +
 
 After comparing the survey census based on the biomass output of `run_truth`, we now look at a biomass index that is estimated based on numbers in the survey census for assessments that take numbers input directly. We need to skip the average weight part of `sample_survey_biomass` but keep the rest. Hence the new function `sample_survey_numbers`.
 
-```{r surveyNbased}
+```{r surveyNbased, eval=F}
 
 # this uses result$nums and a new function to get survey index in numbers (abundance)
 
@@ -263,61 +264,100 @@ surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
 
 surveyN <- sample_survey_numbers(survey_testNall, surv_cv)
 
+#save for later use, takes a long time to generate
+saveRDS(surveyN, file.path(d.name, paste0(scenario.name, "surveyNcensus.rds")))
+
 ```
 
-The next steps of sampling can get us a proper weight at age. Here again a census to generate length comps, which need an average weight at age and carry it forward. First we `sample_fish` (nums and weight components):
+We get true numbers at age at each output step by appling `sample_fish` to the survey_testNall result if the model group has one true age per output age class:
 
-```{r biolsampling}
+```{r truenatagecl, eval=FALSE}
+# We need an effective N for the sample fish function, setting equal to actual N
+# this one is high but not equal to total for numerous groups
+effNhigh <- data.frame(species=survspp, effN=rep(1e+8, length(survspp)))
+
+numsallhigh <- sample_fish(survey_testNall, effNhigh)
+
+#save for later use, takes a long time to generate
+saveRDS(numsallhigh, file.path(d.name, paste0(scenario.name, "Natageclcensus.rds")))
+
+```
+
+
+The next steps of sampling can get us a proper weight at age. Here again a census to generate length comps, which need an average weight at age and carry it forward. First we `sample_fish` (nums and weight components).
+
+On a full model run this takes far too long with all species, so we cut it down to a few assessment species here:
+
+```{r ss-biolsampling}
+
+# get only assessed species, hardcoded here for CCA sardine, hake, bocaccio
+spp.name <- funct.group.names[funct.group.names %in% c("Pacific_sardine",
+                                                       "Mesopel_M_Fish",
+                                                       "Bocaccio_rockfish")]
+
+survey_ssN <- create_survey(dat = truth$nums,
+                                 time = timeall,
+                                 species = spp.name,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
 
 # We need an effective N for the sample fish function, setting equal to actual N
 # this one is high but not equal to total for numerous groups
 effNhigh <- data.frame(species=survspp, effN=rep(1e+8, length(survspp)))
 
 # apply default sample fish as before to get numbers
-numsallhigh <- sample_fish(survey_testNall, effNhigh)
+numssshigh <- sample_fish(survey_ssN, effNhigh)
 
 # aggregate true resn per survey design
-aggresnall <- aggregateDensityData(dat = truth$resn,
-                                 time = c(0:111),
+aggresnss <- aggregateDensityData(dat = truth$resn,
+                                 time = timeall,
                                  species = spp.name,
                                  boxes = boxall)
 
 # aggregate true structn per survey design
-aggstructnall <- aggregateDensityData(dat = truth$structn,
-                                 time = c(0:111),
+aggstructnss <- aggregateDensityData(dat = truth$structn,
+                                 time = timeall,
                                  species = spp.name,
                                  boxes = boxall)
 
 #dont sample these, just aggregate them using median
-structnall <- sample_fish(aggstructnall, effNhigh, sample = FALSE)
+structnss <- sample_fish(aggstructnss, effNhigh, sample = FALSE)
 
-resnall <-  sample_fish(aggresnall, effNhigh, sample = FALSE)
+resnss <-  sample_fish(aggresnss, effNhigh, sample = FALSE)
 
 
 ```
 
-Then we calculate lengths with `calc_age2length`
+Then we calculate lengths with `calc_age2length`. This will probably not work for the full run with all species outputs 5x per year, but should be ok with 3 species. 
 
 ```{r lengthcomp-wtage}
 
-length_census <- calc_age2length(structn = structnall,
-                                 resn = resnall,
-                                 nums = numsallhigh,
+length_census_ss <- calc_age2length(structn = structnss,
+                                 resn = resnss,
+                                 nums = numssshigh,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
-                                 maxbin = 200,
                                  CVlenage = 0.1, remove.zeroes=TRUE)
 
 ```
 
-Now we can test the full `sample_survey_biomass` from nums to biomass index:
+
+```{r savelengths}
+#save for later use, takes a long time to generate
+saveRDS(length_census_ss, file.path(d.name, paste0(scenario.name, "length_census_sardhakeboca.rds")))
+```
+
+Now we can test the full `sample_survey_biomass` from nums to biomass index with these three species:
 
 ```{r compare-surveys}
 # apply the proper weight at age (from saved census calc_age2length) to N survey
 
-wtage <- length_census$muweight %>%
+length_census_ss <- readRDS(file.path(d.name, paste0(scenario.name, "length_census_sardhakeboca.rds")))
+
+wtage <- length_census_ss$muweight %>%
   select(species, agecl, wtAtAge = atoutput)
 
-surveyB_fromN <- sample_survey_biomass(survey_testNall, surv_cv, wtage)
+surveyB_fromN <- sample_survey_biomass(survey_ssN, surv_cv, wtage)
 
 ```
 
@@ -325,7 +365,14 @@ Now we plot the results of the numbers-based (census) survey against the same At
 
 ```{r matchB_Nsurveys }
 
-#all species comparison, time intervals hardcoded for NEUS and NOBA
+atBtxt2tidy <- atBtxt2 %>%
+  select(Time:DIN) %>%
+  #select(Time, FPL:DIN) %>%
+  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, biomass, -Time) %>%
+  filter(species %in% levels(surveyB_fromN$species))
+
+#all species comparison, time intervals hardcoded for 5 steps per year
 compareB_N <-ggplot() +
   geom_line(data=surveyB_fromN, aes(x=time/5,y=atoutput, color="survey census N->B"), 
             alpha = 10/10) +
