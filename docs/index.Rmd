@@ -9,9 +9,11 @@ These pages document initial testing of the atlantisom package in development at
  
 ### Read this first on overall workflow
 
-<a href="https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html" target="_blank">Big picture and new functions needed - May 10, 2019</a>
+<a href="https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html" target="_blank">Big picture and new functions needed - May 10, 2019, updated May 16, 2019</a>
 
 May 11: Changes to `atlantisom::sample_fish` and new `atlantisom::aggregateDensityData` functions seem to work. See below under [Length compositions].
+
+May 15: Changes to `atlantisom::calc_age2length` to allow user specified max length bin seem to work. Also listed under [Length compositions].
 
 ### Testing the atlantisom code
 
@@ -33,7 +35,7 @@ May 11: Changes to `atlantisom::sample_fish` and new `atlantisom::aggregateDensi
 
 <a href="https://sgaichas.github.io/poseidon-dev/NOBAStandardSurveyTest.html" target="_blank">Standard survey visualization for NOBA - May 1, 2019</a>
 
-### Start age composition sampling: work in progress
+### Start age composition sampling: by output age class, not true age
 
 <a href="https://sgaichas.github.io/poseidon-dev/TrueLengthAgeCompTest.html" target="_blank">Initial age comp tests - May 2, 2019, updated May 6, 2019</a>
 
@@ -72,6 +74,30 @@ But don't try running length comps at the subannual level for all species.
 <a href="https://sgaichas.github.io/poseidon-dev/NOBATrueLengthCompTest.html" target="_blank">NOBA length composition examples - May 13, 2019</a>
 
 <a href="https://sgaichas.github.io/poseidon-dev/NEUSTrueLengthCompTest.html" target="_blank">NEUS length composition examples - May 13, 2019</a>
+
+Standard survey with length sampling: impact of selectivity, `sample_fish`
+
+<a href="https://sgaichas.github.io/poseidon-dev/StdSurvLengthCompTest.html" target="_blank">Compare survey + sampled lengths with true - May 14, 2019</a>
+
+<a href="https://sgaichas.github.io/poseidon-dev/CCAStdSurvLengthCompTest.html" target="_blank">CCA compare survey + sampled lengths with true - May 14, 2019</a>
+
+<a href="https://sgaichas.github.io/poseidon-dev/NOBAStdSurvLengthCompTest.html" target="_blank">NOBA compare survey + sampled lengths with true - May 15, 2019</a>
+
+<a href="https://sgaichas.github.io/poseidon-dev/NEUSStdSurvLengthCompTest.html" target="_blank">NEUS compare survey + sampled lengths with true - May 15, 2019</a>
+
+Test new user specified max length bin for a large species:
+
+<a href="https://sgaichas.github.io/poseidon-dev/TestBiggerMaxLen.html" target="_blank">Default 150 cm, try different max - May 15, 2019</a>
+
+Do we see ever small fish for large species? Is this normal, or a problem with length estimation?
+
+<a href="https://sgaichas.github.io/poseidon-dev/TestSmallestLength.html" target="_blank">Are length comps OK on the small end? - May 15, 2019</a>
+
+May 16: Isaac says CCA fish look reasonable. NOBA Greenland halibut growth parameterization was reportedly "a nightmare" with conflicting science and datasets, so maybe we don't worry too much about them right now.
+
+### Weight at age: by output age class, how to get to true age basis?
+
+<a href="https://sgaichas.github.io/poseidon-dev/TestWeightAtStage.html" target="_blank">How much variability in weight at stage? - May 16, 2019</a>
 
 
 ### More to come later!
