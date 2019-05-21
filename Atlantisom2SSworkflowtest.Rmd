@@ -21,7 +21,7 @@ This page documents initial testing of the atlantisom package in development at 
 
 The purpose of atlantisom is to use existing Atlantis model output to generate input datasets for a variety of models, so that the performance of these models can be evaluated against known (simulated) ecosystem dynamics. Atlantis models can be run using different climate forcing, fishing, and other scenarios. Users of atlantisom will be able to specify fishery independent and fishery dependent sampling in space and time, as well as species-specific catchability, selectivty, and other observation processes for any Atlantis scenario. Internally consistent multispecies and ecosystem datasets with known observation error characteristics will be the atlantisom outputs, for use in individual model performance testing, comparing performance of alternative models, and performance testing of model ensembles against "true" Atlantis outputs.
 
-On this page we demonstrate use of atlantisom on the California Current output files to provide inputs for a stock assessment model implemented in Stock Synthesis [@SSREF]. 
+On this page we demonstrate use of atlantisom on the California Current output files to provide inputs for a stock assessment model implemented in Stock Synthesis [insert SSREF]. 
 
 ## Setup
 
