@@ -331,7 +331,7 @@ resnss <-  sample_fish(aggresnss, effNhigh, sample = FALSE)
 
 Then we calculate lengths with `calc_age2length`. This will probably not work for the full run with all species outputs 5x per year, but should be ok with 3 species. 
 
-```{r lengthcomp-wtage}
+```{r lengthcomp-wtage, eval=FALSE}
 
 length_census_ss <- calc_age2length(structn = structnss,
                                  resn = resnss,
