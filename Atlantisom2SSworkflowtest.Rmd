@@ -339,12 +339,9 @@ length_census_ss <- calc_age2length(structn = structnss,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
                                  CVlenage = 0.1, remove.zeroes=TRUE)
 
-```
-
-
-```{r savelengths}
 #save for later use, takes a long time to generate
 saveRDS(length_census_ss, file.path(d.name, paste0(scenario.name, "length_census_sardhakeboca.rds")))
+
 ```
 
 Now we can test the full `sample_survey_biomass` from nums to biomass index with these three species:
