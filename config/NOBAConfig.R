@@ -6,9 +6,5 @@ box.file <- "Nordic02.bgm"
 initial.conditions.file <- "nordic_biol_v23.nc"
 run.prm.file <- "nordic_run_v01.xml"
 scenario.name <- "nordic_runresults_01"
-d.name <- here("atlantisoutput","NOBACERESGlobalSustainability")
-truth.file <- "outputnordic_runresults_01run_truth.RData" 
-
-timeall <- c(0:560)
-funct.group.indices <- c(1:36)
-atlantis.output <- here("atlantisoutput","NOBACERESGlobalSustainability","outputnordic_runresults_01BiomIndx.txt")
+bioind.file <- "outputnordic_runresults_01BiomIndx.txt"
+catch.file <- "outputnordic_runresults_01Catch.txt"
