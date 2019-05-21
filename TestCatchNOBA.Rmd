@@ -1,5 +1,5 @@
 ---
-title: "Testing atlantisom: fishery catch data tests"
+title: "Testing atlantisom: fishery catch data tests, NOBA"
 author: "Sarah Gaichas and Christine Stawitz"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
@@ -151,7 +151,7 @@ atCtxt <- read.table(file.path(d.name, catch.file), header=T)
 atCtxt <- atCtxt[, -grep("TsAct", colnames(atCtxt))] #hardcoded for catch.txt output 
 
 fishedlookup <- funct.groups %>%
-  filter(IsFished > 0)
+  filter((isFished) > 0)  # WARNING NOBA has isFished while CCA has IsFished
 
 atCtxttidy <- atCtxt %>%
   rename_(.dots=with(fishedlookup, setNames(as.list(as.character(Code)), Name))) %>%
@@ -159,7 +159,7 @@ atCtxttidy <- atCtxt %>%
   filter(species %in% levels(catchbio_series$species))
 
 compare_catchB <-ggplot() +
-  geom_line(data=catchbio_series, aes(x=time,y=atoutput, color="catch atlantisom"), 
+  geom_line(data=catchbio_series, aes(x=time/fstepperyr,y=atoutput, color="catch1 atlantisom"), 
             alpha = 10/10) +
   geom_point(data=atCtxttidy, aes(x=Time/365,y=catchbio, color="txt output catch bio"),
              alpha = 1/10) + 
@@ -173,17 +173,21 @@ compare_catchB +
 ```
 
 
-Did it work for NOBA?
+No, it does not match. It seems the problem is in calculating catch biomass at age; the CATCH.nc output file does not include a layer, so the aggregation of structn and resn over layers (using medians) in lines 58-67 in `calc_biomass_age` may be resulting in this mismatch. If catch happened in a particular layer, it is aggregated in the output CATCH.nc file, so we don't know which layer has the appropriate weight info. The `calc_biomass_age` function works on the truth$nums output because no aggregation of structn and resn is necessary, all have a layer field. 
 
-Now test catch at age in numbers from truth$catch
+This does make me worry about the aggregation we apply to get weight at age for sampled fish. However, it appeared to recover the total biomass time series, so maybe it is ok. There may be something else wrong with the portion of the calc_biomass_age function that only applies to catch.
 
-## Modify below to test biological sampling from fisheries
+One workaround is to assume the total catch in the catch.txt output file is correct and use that directly as catch biomass for atlantisom. We will have only annual total catch and no way to break it into seasons, but maybe that is ok.
 
-Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age composition (for just one species in this case). The `sample_fish` applies the median for aggregation and does not apply multinomial sampling if `sample=FALSE` in the function call. 
+Then we would take catch at age in numbers from truth$catch (directly from CATCH.nc file) as below. California current will still need a correction to this due to the fishery output writing bug in the older atlantis codebase.
+
+## Test biological sampling from fisheries
+
+Here we use `create_fishery_subset` on the numbers output of `run_truth` to create the survey census of age composition (for just our three species in this case). The `sample_fish` applies the median for aggregation and does not apply multinomial sampling if `sample=FALSE` in the function call. 
 
 Because we don't want to wait 24 hours for this, we will look at only the first 112 time steps.
 
-```{r catchage-len-wt-3spp, echo=TRUE}
+```{r catchage-len-wt-3spp, echo=TRUE, warning=FALSE, message=FALSE}
 
 # get survey nums with full (no) selectivity
 catch_testNss <- create_fishery_subset(dat = truth$catch,
@@ -214,6 +218,48 @@ catch_resnss <-  sample_fish(catch_aggresnss, effNhigh, sample = FALSE)
 
 ```
 
+This is true catch at age(class) for cod:
+
+```{r catage1}
+
+catchage <- catch_numssshigh %>%
+  filter(species == "North_atl_cod")
+  
+catageplot <- ggplot(catchage, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchage$species))
+
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+This is true catch at age(class) for herring:
+
+```{r catage2}
+
+catchage <- catch_numssshigh %>%
+  filter(species == "Norwegian_ssh")
+  
+catageplot <- ggplot(catchage, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchage$species))
+
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+Both of these species will need `calc_stage2age` applied because both have 2 true ages per age class.
+
 Length sample with user specified max length bin (200 cm):
 
 ```{r userset-maxlen, echo=TRUE}
@@ -228,11 +274,51 @@ catch_length_census_ss <- calc_age2length(structn = catch_structnss,
 
 ```
 
-We should get the upper end of Greenland halibut with a 200cm max length bin. That shouldnt matter for weight at age. This is all timesteps for each species by agecl.
+We should get the upper end of Greenland halibut with a 200cm max length bin.
 
-```{r vis-wtageclass-test}
+Cod catch lengths:
 
-wageplot <- ggplot(length_census$muweight, aes(agecl, atoutput)) +
+```{r vis-fishery-lf-test-1}
+
+catchlen <- catch_length_census_ss$natlength %>%
+  filter(species == "North_atl_cod")
+
+lfplot <- ggplot(catchlen, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchlen$species))
+
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
+
+```
+
+Herring catch lengths:
+
+```{r vis-fishery-lf-test-2}
+
+catchlen <- catch_length_census_ss$natlength %>%
+  filter(species == "Norwegian_ssh")
+
+lfplot <- ggplot(catchlen, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchlen$species))
+
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
+
+```
+
+Fishery weight at (st)age:
+
+```{r vis-fishery-wtageclass-test}
+
+wageplot <- ggplot(catch_length_census_ss$muweight, aes(agecl, atoutput)) +
   geom_point(aes(colour = time)) +
   theme_tufte() +
   theme(legend.position = "bottom") +
@@ -245,73 +331,11 @@ wageplot + facet_wrap(c("species"), scales="free_y")
 
 ```
 
-How much does weight at age class vary over time? Here are a couple of annual cycles:
-
-```{r vis-wtageclass-test2}
-
-wtageyr1 <- length_census$muweight %>%
-  filter(time<5)
-
-wageplot <- ggplot(wtageyr1, aes(agecl, atoutput)) +
-  geom_line(aes(colour = factor(time))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  scale_x_discrete(limits=c(1:10)) +
-  xlab("age class") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " initial year"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-
-```
-
-```{r vis-wtageclass-test3}
-
-wtageyrmid <- length_census$muweight %>%
-  filter(between(time, 50,54))
-
-wageplot <- ggplot(wtageyrmid, aes(agecl, atoutput)) +
-  geom_line(aes(colour = factor(time))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  scale_x_discrete(limits=c(1:10)) +
-  xlab("age class") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " year 10"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-
-```
-
-```{r vis-wtageclass-test4}
-
-wtageyr20 <- length_census$muweight %>%
-  filter(between(time, 100,104))
-
-wageplot <- ggplot(wtageyr20, aes(agecl, atoutput)) +
-  geom_line(aes(colour = factor(time))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  scale_x_discrete(limits=c(1:10)) +
-  xlab("age class") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " year 20"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-
-```
-
-There are some interesting jumps between age classes. Most pronounced for herring. All of these species would be split into two true ages per age class. Interpolation could be interesting.
-
-Change in wt at age over time for age classes using an annual mid-year snapshot (survey) (first 22+ years of NOBA model run):
+Change in wt at (st)age in the fishery over time for age classes using an annual mid-year snapshot (first 22+ years of NOBA model run):
 
 ```{r aggwtcomp}
 
-# from std survey code and model step info read in above
-midptyr <- round(median(seq(1,stepperyr)))
-annualmidyear <- seq(midptyr, noutsteps, stepperyr)
-
-wtage_annsurv <- length_census$muweight %>%
+wtage_annsurv <- catch_length_census_ss$muweight %>%
   filter(time %in% annualmidyear)
 
 # reverse to show agecl time series of wt
@@ -321,123 +345,12 @@ wageplot <- ggplot(wtage_annsurv, aes(time, atoutput)) +
   theme(legend.position = "bottom") +
   xlab("model timestep (5 per year)") +
   ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
+  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
 
 wageplot + facet_wrap(c("species"), scales="free_y")
 
 ```
 
+We will need to interpolate fishery weight at true age using the in-progress function for these species.
 
-## Quick test with saved CCA census output
-
-Here we check the CCA model (Atlantis Summit Common Scenario 1) saved length and weight census output for small species at Isaac's suggestion (all three of the following are true age classes, NumAgeClassSize=1 per Atlantis agecl bin:
-
-```{r loadCCAlengthcomp, echo=TRUE}
-
-source(here("config/CCConfig.R"))
-
-length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length_censussurvsamp.rds")))
-
-```
-
-Sardine:  
-```{r plotCCAsardine}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Pacific_sardine")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-Anchovy:  
-```{r plotCCAanchovy}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Anchovy")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-Herring:  
-```{r plotCCAherring}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Herring")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-How do these three look? Herring had a rough period from model years 15-30 or so.
-
-Now for some CCA groups with multiple true ages per stage.
-
-Pacific hake, 2 true ages per class:  
-```{r plotCCAhake}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Mesopel_M_Fish")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-Bocaccio rockfish, 5 true ages per age class:
-```{r plotCCAbocaccio}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Bocaccio_rockfish")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-Yelloweye rockfish, most extreme at 12 true ages per age class:
-```{r plotCCAYelloweye}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Yelloweye_rockfish")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-I'm not sure any of this helps us decide how to interpolate, but there is clearly contrast in weight at age (class) in both models and example runs.
+Any further info to get?
