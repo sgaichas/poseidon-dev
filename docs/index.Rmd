@@ -109,4 +109,6 @@ Work TBD applying `calc_stage2age` and `calc_Z` to get true ages
 
 Fishery catch problem, older codebase has a bug in output. Test with NOBA...
 
+<a href="https://sgaichas.github.io/poseidon-dev/TestCatchNOBA.html" target="_blank">Suggests a workaround needed for catch in weight - May 21, 2019</a>
+
 ### More to come later!
