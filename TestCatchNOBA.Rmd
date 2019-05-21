@@ -17,7 +17,7 @@ knitr::write_bib(c(
 
 ## Introduction
 
-Fishery sampling functions in atlantisom have not yet been extensively tested. There is also a problem with the CATCH.nc output for models in codebases prior to 2015 (inclucing CCA). Here we first test with NOBA which should not have this output bug, then we will revisit CCA with a fix to `read_truth` to compensate for the catch output problem.
+Fishery sampling functions in atlantisom have not yet been extensively tested. There is also a problem with the CATCH.nc output for models in codebases prior to 2015 (inclucing CCA). Here we first test with NOBA which should not have this output bug, then we will revisit CCA with a fix to `read_truth` to compensate for the catch output problem (see [this](https://sgaichas.github.io/poseidon-dev/Atlantisom2SSworkflowtest.html)). 
 
 For all setup, etc, please see previous files. Full methods are explained [here](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html) and  [here](https://sgaichas.github.io/poseidon-dev/TrueLengthCompTest.html).
 
@@ -97,80 +97,120 @@ To create a census, the user specifies the timing of the survey, which species a
 
 ```{r census-spec, message=FALSE, warning=FALSE}
 
-# should return a perfectly scaled survey 
-effic1 <- data.frame(species=funct.group.names,
-                     efficiency=rep(1.0,length(funct.group.names)))
-
-# should return all lengths fully sampled (Atlantis output is 10 age groups per spp)
-selex1 <- data.frame(species=rep(funct.group.names, each=10),
-                     agecl=rep(c(1:10),length(funct.group.names)),
-                     selex=rep(1.0,length(funct.group.names)*10))
-
-# should return all model areas
-boxpars <- load_box(d.name, box.file)
-boxall <- c(0:(boxpars$nbox - 1))
-
-# generalized timesteps all models
-runpar <- load_runprm(d.name, run.prm.file)
-noutsteps <- runpar$tstop/runpar$outputstep
-stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
-
-timeall <- c(0:noutsteps)
-  
-# define set of species we expect surveys to sample (e.g. fish only? vertebrates?)
-# for ecosystem indicator work test all species, e.g.
-survspp <- funct.group.names 
-
-# for length and age groups lets just do fish and sharks
-# NOBA model has InvertType, changed to GroupType in file, but check Atlantis default
-if(initNOBA) funct.groups <- rename(funct.groups, GroupType = InvertType)
-
-survspp <- funct.groups$Name[funct.groups$IsTurnedOn==1 &
-                           funct.groups$GroupType %in% c("FISH", "SHARK")]
+source(here("config/census_spec.R"))
 
 ```
 
-Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age composition (for just one species in this case). The `sample_fish` applies the median for aggregation and does not apply multinomial sampling if `sample=FALSE` in the function call. 
+# Test fishery functions: compare census with truth
 
-Because we don't want to wait 24 hours for this, we will look at only the first 112 time steps.
+Now for the fishery outputs. We will need total catch in tons for each species, and catch composition data (age and length). First we will test whether the catchbio output in `truth` matches the atlantis output file output[scenario.name]Catch.txt:
 
-```{r stdsurveyNbased-3spp, echo=TRUE}
+```{r testcatchbio1}
+
+#just try the three species for now, hardcoded for NOBA
 
 spp.name <- funct.group.names[funct.group.names %in% c("North_atl_cod",
                                                        "Norwegian_ssh",
                                                        "Green_halibut")]
 
+catchbio_census_ss <- create_fishery_subset(dat = truth$catchbio,
+                                         time = timeall,
+                                         species = spp.name,
+                                         boxes = boxall)
+
+catchbio_census_ss_agg <- aggregate(atoutput ~ species + time,
+                                    data=catchbio_census_ss, sum)
+
+# what does the output look like?
+catchB_outstep <- ggplot() +
+  geom_line(data=catchbio_census_ss_agg, aes(x=time/fstepperyr,y=atoutput, color="catch atlantisom"),
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+catchB_outstep + 
+  facet_wrap(~species, scales="free") 
+
+
+```
+
+
+```{r testcatchbio2}
+
+# should it be aggregated? I just did this above
+catchbio_series <- sample_survey_numbers(catchbio_census_ss, surv_cv)
+
+# if it is the pre-2015 bug mentioned in atlantis wiki, this may get it close
+# should not need for NOBA
+#catchbio_series_adjust <- catchbio_series %>%
+#  mutate(atoutput = atoutput/(86400*4))
+
+#does it match catch.txt (which should be in tons)?
+atCtxt <- read.table(file.path(d.name, catch.file), header=T)
+atCtxt <- atCtxt[, -grep("TsAct", colnames(atCtxt))] #hardcoded for catch.txt output 
+
+fishedlookup <- funct.groups %>%
+  filter(IsFished > 0)
+
+atCtxttidy <- atCtxt %>%
+  rename_(.dots=with(fishedlookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, catchbio, -Time) %>%
+  filter(species %in% levels(catchbio_series$species))
+
+compare_catchB <-ggplot() +
+  geom_line(data=catchbio_series, aes(x=time,y=atoutput, color="catch atlantisom"), 
+            alpha = 10/10) +
+  geom_point(data=atCtxttidy, aes(x=Time/365,y=catchbio, color="txt output catch bio"),
+             alpha = 1/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compare_catchB + 
+  facet_wrap(~species, scales="free") 
+
+```
+
+
+Did it work for NOBA?
+
+Now test catch at age in numbers from truth$catch
+
+## Modify below to test biological sampling from fisheries
+
+Here we use `create_survey` on the numbers output of `run_truth` to create the survey census of age composition (for just one species in this case). The `sample_fish` applies the median for aggregation and does not apply multinomial sampling if `sample=FALSE` in the function call. 
+
+Because we don't want to wait 24 hours for this, we will look at only the first 112 time steps.
+
+```{r catchage-len-wt-3spp, echo=TRUE}
+
 # get survey nums with full (no) selectivity
-survey_testNall <- create_survey(dat = truth$nums,
-                                 time = c(0:111),
-                                 species = spp.name,
-                                 boxes = boxall,
-                                 effic = effic1,
-                                 selex = selex1)
-
-# this one is high but not equal to total for numerous groups
-effNhigh <- data.frame(species=survspp, effN=rep(1e+8, length(survspp)))
-
-# apply default sample fish as before to get numbers
-numsallhigh <- sample_fish(survey_testNall, effNhigh)
-
-
-# aggregate true resn per survey design
-aggresnall <- aggregateDensityData(dat = truth$resn,
+catch_testNss <- create_fishery_subset(dat = truth$catch,
                                  time = c(0:111),
                                  species = spp.name,
                                  boxes = boxall)
 
-# aggregate true structn per survey design
-aggstructnall <- aggregateDensityData(dat = truth$structn,
+# apply default sample fish as before to get numbers
+catch_numssshigh <- sample_fish(catch_testNss, effNhigh)
+
+
+# aggregate true resn per survey or fishery subset design
+catch_aggresnss <- aggregateDensityData(dat = truth$resn,
+                                 time = c(0:111),
+                                 species = spp.name,
+                                 boxes = boxall)
+
+# aggregate true structn per survey or fishery subsetdesign
+catch_aggstructnss <- aggregateDensityData(dat = truth$structn,
                                  time = c(0:111),
                                  species = spp.name,
                                  boxes = boxall)
 
 #dont sample these, just aggregate them using median
-structnall <- sample_fish(aggstructnall, effNhigh, sample = FALSE)
+catch_structnss <- sample_fish(catch_aggstructnss, effNhigh, sample = FALSE)
 
-resnall <-  sample_fish(aggresnall, effNhigh, sample = FALSE)
+catch_resnss <-  sample_fish(catch_aggresnss, effNhigh, sample = FALSE)
 
 ```
 
@@ -178,9 +218,9 @@ Length sample with user specified max length bin (200 cm):
 
 ```{r userset-maxlen, echo=TRUE}
 
-length_census <- calc_age2length(structn = structnall,
-                                 resn = resnall,
-                                 nums = numsallhigh,
+catch_length_census_ss <- calc_age2length(structn = catch_structnss,
+                                 resn = catch_resnss,
+                                 nums = catch_numssshigh,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
                                  maxbin = 200,
                                  CVlenage = 0.1, remove.zeroes=TRUE)
