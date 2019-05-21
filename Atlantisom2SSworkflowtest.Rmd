@@ -396,7 +396,20 @@ Now for the fishery outputs. We will need total catch in tons for each species, 
 
 ```{r testcatchbio}
 
+#just try the three species for now
+catchbio_census_ss <- create_fishery_subset(dat = truth$catchbio,
+                                         time = timeall,
+                                         species = spp.name,
+                                         boxes = boxall)
 
+#does it match catch.txt (which should be in tons)?
+atCtxt <- read.table(file.path(d.name, catch.file), header=T)
+
+atCtxttidy <- atCtxt %>%
+  select(Time:XXX) %>%
+  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, catchbio, -Time) %>%
+  filter(species %in% levels(catchbio_census_ss$species))
 
 ```
 
