@@ -248,7 +248,7 @@ compareB +
 
 After comparing the survey census based on the biomass output of `run_truth`, we now look at a biomass index that is estimated based on numbers in the survey census for assessments that take numbers input directly. We need to skip the average weight part of `sample_survey_biomass` but keep the rest. Hence the new function `sample_survey_numbers`.
 
-```{r surveyNbased, eval=F}
+```{r surveyNbased, eval=FALSE}
 
 # this uses result$nums and a new function to get survey index in numbers (abundance)
 
@@ -329,7 +329,7 @@ resnss <-  sample_fish(aggresnss, effNhigh, sample = FALSE)
 
 ```
 
-Then we calculate lengths with `calc_age2length`. This will probably not work for the full run with all species outputs 5x per year, but should be ok with 3 species. 
+Then we calculate lengths with `calc_age2length`. This will probably not work for the full run with all species outputs 5x per year, but should be ok with 3 species. Still very long runtime! Saved output.
 
 ```{r lengthcomp-wtage, eval=FALSE}
 
@@ -344,21 +344,28 @@ saveRDS(length_census_ss, file.path(d.name, paste0(scenario.name, "length_census
 
 ```
 
-Now we can test the full `sample_survey_biomass` from nums to biomass index with these three species:
+Now we can test the full `sample_survey_biomass` from nums to biomass index with these three species (required a revision of the function to allow time varying weight at age, and a clarification of units):
 
 ```{r compare-surveys}
 # apply the proper weight at age (from saved census calc_age2length) to N survey
 
 length_census_ss <- readRDS(file.path(d.name, paste0(scenario.name, "length_census_sardhakeboca.rds")))
 
+# weight at age output of calc_age2length is in g
+# output of survey should be in t, sample_survey_biomass expects kg wt@age
+# therefore need to divide by 1000 to get wt@age in kg
+
 wtage <- length_census_ss$muweight %>%
-  select(species, agecl, wtAtAge = atoutput)
+  select(species, agecl, time, wtAtAge = atoutput) %>%
+  mutate(wtAtAge = wtAtAge/1000)
 
 surveyB_fromN <- sample_survey_biomass(survey_ssN, surv_cv, wtage)
 
 ```
 
-Now we plot the results of the numbers-based (census) survey against the same Atlantis output file "[modelscenario]BiomIndx.txt" as above. 
+Now we plot the results of the numbers-based (census) survey against the same Atlantis output file "[modelscenario]BiomIndx.txt" as above. We have a match. 
+
+To get back true biomass we need the full detailed time varying weight at age output, which is fairly cumbersome. The fixed weight at age may be a decent approximation but does result in sigificant misses for some species [as seen here](https://sgaichas.github.io/poseidon-dev/CCAExamples.html). 
 
 ```{r matchB_Nsurveys }
 
@@ -380,16 +387,18 @@ compareB_N <-ggplot() +
   labs(colour=scenario.name)
 
 compareB_N + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 1, scales="free") 
-compareB_N + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 2, scales="free") 
-compareB_N + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 3, scales="free") 
-compareB_N + 
-  facet_wrap_paginate(~species, ncol=3, nrow = 3, page = 4, scales="free") 
+  facet_wrap(~species, scales="free") 
+
 
 ```
 
-Start testing fishery outputs next
+Now for the fishery outputs. We will need total catch in tons for each species, and catch composition data (age and length). First we will test whether the catchbio output in `truth` matches the atlantis output file output[scenario.name]Catch.txt:
+
+```{r testcatchbio}
+
+
+
+```
+
 
 ## References
