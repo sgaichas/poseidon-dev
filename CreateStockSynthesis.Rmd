@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 require(here)
+require(reshape2)
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = "C:/Users/chris/Documents/GitHub/atlantisom/")
 ```
@@ -113,6 +114,53 @@ sardine.data <- SS_write_CPUE(ss_data_list = sardine.data,
                              units = "numbers")
 
 sardine.data$CPUE
+```
+
+## Writing age composition data 
+
+```{r}
+#Set effective sample size for age compositions
+effN <- 1000
+highEffN <- data.frame(species=species, effN=rep(effN, length(species)))
+
+#Sample fish for age composition
+age_comp_data <- sample_fish(survey_out, highEffN)
+names(age_comp_data) <- c("species","agecl","polygon", "layer","time","numAtAgesamp")
+
+age_comp_data
+
+#Group age composition data by time
+require(dplyr)
+age_comp_proportion <- age_comp_data %>%
+  group_by(time) %>%
+  mutate(comp = numAtAgesamp/sum(numAtAgesamp))
+
+#Get the age bins
+age_bin_names <- names(sardine.data$agecomp)[10:length(names(sardine.data$agecomp))]
+age_bins <- sub("a","",age_bin_names)
+
+#Change data format into flat structure
+age_comp_proportion$id <- rep(age_bins,
+                              each = nrow(age_comp_proportion)/length(age_bins))
+
+unmelt <- dcast(data = age_comp_proportion,
+                formula = time ~agecl,
+                value.var = "comp")
+age_comp_flat<- cbind(unmelt[order(unmelt$time),],
+                      rep(effN,nrow(unmelt)))
+names(age_comp_flat)[ncol(age_comp_flat)] <- "nsamp"
+
+## Write age composition data
+sardine.data <- SS_write_comps(ss_data_list = sardine.data,
+               comp_matrix = list(age_comp_flat[burnin:(burnin+nyears-1),]),
+               data_rows = list(sardine.data$styr:(sardine.data$styr+nyears-1)),
+               sampling_month = list(rep(7,nyears)),
+               data_type = c("agecomp"),
+               fleet_number = c(1),
+               bins = list(age_bins),
+               caal_bool = c(FALSE))
+sardine.data$agecomp
+
 ```
 
 
