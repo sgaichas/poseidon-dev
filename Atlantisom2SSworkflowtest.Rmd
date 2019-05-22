@@ -492,12 +492,13 @@ catch <- load_nc(dir = d.name,
 
 # initial conditions file has different structure, so drop [,1]
 at_init <- RNetCDF::open.nc(con = file.path(d.name, initial.conditions.file))
-on.exit(RNetCDF::close.nc(at_init))
 
 # Get info from netcdf file! (Filestructure and all variable names)
   var_names_ncdf <- sapply(seq_len(RNetCDF::file.inq.nc(at_init)$nvars - 1),
     function(x) RNetCDF::var.inq.nc(at_init, x)$name)
   numlayers <- RNetCDF::var.get.nc(ncfile = at_init, variable = "numlayers")
+  
+  RNetCDF::close.nc(at_init)
   
   # are these in box order??? if so make a box-numlayer lookup
   layerbox.lookup <- data.frame(polygon=boxall, numlayers)
@@ -515,7 +516,7 @@ on.exit(RNetCDF::close.nc(at_init))
 #save for later use, ar (better) resave truth file
 #saveRDS(catch, file.path(d.name, paste0(scenario.name, "catchnums_corrected.rds")))
   save(truth,
-      file = file.path(dir, paste0("output", scenario, "run_truth.RData")))
+      file = file.path(d.name, paste0("output", scenario.name, "run_truth.RData")))
 ```
 
 Did the correction work? Not sure what to compare this to. First put it back through `calc_biomass_age` even though this won't match either?
