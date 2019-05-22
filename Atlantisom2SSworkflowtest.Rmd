@@ -138,6 +138,7 @@ The following settings should achieve a survey that samples all Atlantis model o
 ```{r census-spec, message=FALSE, warning=FALSE}
 
 # make a function for this
+source(here("config/census_spec.R"))
 
 # should return a perfectly scaled survey 
 effic1 <- data.frame(species=funct.group.names,
@@ -438,7 +439,9 @@ catchB_outstep +
 
 ```
 
-It doesnt. A hack gets it closer, suggesting that the problem is a bug in the output for models using codebases prior to late 2015 (CCA is mid-2015).
+It doesnt. A hack gets it closer, suggesting that the problem is a bug in the output for models using codebases prior to late 2015 (CCA is mid-2015). From Beth Fulton's note in the wiki:
+
+>Note that in CATCH.NC the numbers at age had issues in old versions. For versions pre-dating December 2015 you need to divide the numbers at age by (86400 * number_water_column_layers_in_the_box). New versions post December 2015 are now in numbers without needing further adjustment.
 
 ```{r testcatchbio2}
 
@@ -475,6 +478,70 @@ compare_catchB +
 
 ```
 
-Test this with NOBA model, which may be in the codebase that doesn't have this problem with the CATCH.nc file. 
+Test this with NOBA model, which is in a newer codebase that doesn't have this problem with the CATCH.nc file. 
+
+Update: NOBA has correct catch at age but the derived total catch biomass [still doesnt match catch.txt](https://sgaichas.github.io/poseidon-dev/TestCatchNOBA.html). I believe this is because we cannot multiply the correct weight at the layer the fishery catch is taken, which clearly does not match the median structn and resn across all model layers (as applied in `calc_biomass-age`. This may be buried deeply in the atlantis code, initialization, and prm files, but for now we will simply use the total catch weight out of atlantis catch.txt output.
+
+Moving on to correcting catch at age for CCA:
+
+```{r correctcatage}
+
+# new atlantisom function to apply catage correction, or put inside run_truth
+
+# first check that codebase is prior to corrected--to implement in atlantisom
+#   read code version or date from log file
+#   check against update date (Dec 12, 2015)
+
+# read catch in nums output from truth$catch, or
+# read in CATCH.nc (this from run_truth, modified with config files)
+
+nc_catch <- paste0("output", scenario.name, 'CATCH.nc')
+bboxes <- get_boundary(boxpars)
+
+catch <- load_nc(dir = d.name,
+                 file_nc = nc_catch,
+                 bps = boxpars, #defined in census_spec.R
+                 fgs = funct.groups,
+                 select_groups = survspp,
+                 select_variable = "Catch",
+                 check_acronyms = TRUE,
+                 bboxes = bboxes)
+
+# find number of layers in each box
+# The number of water column layers per box is in the initial conditions NC file:
+# DIVinit_CalCurrentV3_Biol.nc : numlayers =
+
+# read in initial conditions NC file
+# this is already done for the other variables, modify from existing
+# line 152 of load_nc
+# num_layers <- RNetCDF::var.get.nc(ncfile = at_out, variable = "numlayers")[, 1]
+
+# initial conditions file has different structure, so drop [,1]
+at_init <- RNetCDF::open.nc(con = file.path(d.name, initial.conditions.file))
+on.exit(RNetCDF::close.nc(at_init))
+
+# Get info from netcdf file! (Filestructure and all variable names)
+  var_names_ncdf <- sapply(seq_len(RNetCDF::file.inq.nc(at_init)$nvars - 1),
+    function(x) RNetCDF::var.inq.nc(at_init, x)$name)
+  numlayers <- RNetCDF::var.get.nc(ncfile = at_init, variable = "numlayers")
+  
+  # are these in box order??? if so make a box-numlayer lookup
+  layerbox.lookup <- data.frame(polygon=boxall, numlayers)
+  
+  catch.tmp <- merge(catch, layerbox.lookup)
+
+# divide the numbers at age by (86400 * number_water_column_layers_in_the_box)
+  
+  catch <- catch.tmp %>%
+    mutate(atoutput = atoutput * 86400 * numlayers) %>%
+    
+  
+
+# replace truth$catch atoutput with correction
+
+
+
+```
+
 
 ## References
