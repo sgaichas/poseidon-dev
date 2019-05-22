@@ -6,7 +6,7 @@ output: html_document
  <!-- ADD LINKS BELOW, note, using the RMD link syntax will open the presentation in the same tab, which is annoying. Use the html with the "_blank" to fix that behavior -->
 
 These pages document initial testing of the atlantisom package in development at https://github.com/r4atlantis/atlantisom using three different [Atlantis](https://research.csiro.au/atlantis/) output datasets. Development of atlantisom began at the [2015 Atlantis Summit](https://research.csiro.au/atlantis/atlantis-summit/) in Honolulu, Hawaii, USA. 
- 
+
 ### Read this first on overall workflow
 
 <a href="https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html" target="_blank">Big picture and new functions needed - May 10, 2019, updated May 16, 2019</a>
@@ -99,5 +99,16 @@ May 16: Isaac says CCA fish look reasonable. NOBA Greenland halibut growth param
 
 <a href="https://sgaichas.github.io/poseidon-dev/TestWeightAtStage.html" target="_blank">How much variability in weight at stage? - May 16, 2019</a>
 
+Work in progress on interpolating weight at age in InterpolateWeightAtAge.Rmd
+
+Work TBD applying `calc_stage2age` and `calc_Z` to get true ages
+
+### Testing a full workflow through fisheries (sardine, agecl = true age)
+
+<a href="https://sgaichas.github.io/poseidon-dev/Atlantisom2SSworkflowtest.html" target="_blank">Try for true datasets new CC model with climate - May 21, 2019</a>
+
+Fishery catch problem, older codebase has a bug in output. Test with NOBA...
+
+<a href="https://sgaichas.github.io/poseidon-dev/TestCatchNOBA.html" target="_blank">Suggests a workaround needed for catch in weight - May 21, 2019</a>
 
 ### More to come later!

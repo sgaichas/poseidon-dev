@@ -1,0 +1,356 @@
+---
+title: "Testing atlantisom: fishery catch data tests, NOBA"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+bibliography: "packages.bib"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# automatically create a bib database for R packages
+knitr::write_bib(c(
+  .packages(), 'knitr', 'rmarkdown', 'tidyr', 'dplyr', 'ggplot2',
+  'data.table', 'here', 'ggforce', 'ggthemes'
+), 'packages.bib')
+```
+
+## Introduction
+
+Fishery sampling functions in atlantisom have not yet been extensively tested. There is also a problem with the CATCH.nc output for models in codebases prior to 2015 (inclucing CCA). Here we first test with NOBA which should not have this output bug, then we will revisit CCA with a fix to `read_truth` to compensate for the catch output problem (see [this](https://sgaichas.github.io/poseidon-dev/Atlantisom2SSworkflowtest.html)). 
+
+For all setup, etc, please see previous files. Full methods are explained [here](https://sgaichas.github.io/poseidon-dev/TrueBioTest.html) and  [here](https://sgaichas.github.io/poseidon-dev/TrueLengthCompTest.html).
+
+This page has visualizations for the NOBA model example, CERES Global Sustainability. At the end of the file we also review saved outputs from the CCA model example, Atlantis Summit Common Scenario 1.  
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+library(ggforce)
+library(ggthemes)
+library(atlantisom)
+```
+
+```{r initialize}
+
+initCCA <- FALSE
+initNEUS <- FALSE
+initNOBA <- TRUE
+
+if(initCCA) source(here("config/CCConfig.R"))
+
+if(initNEUS) source(here("config/NEUSConfig.R"))
+
+if(initNOBA) source(here("config/NOBAConfig.R"))
+
+```
+
+```{r get_names, message=FALSE, warning=FALSE}
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+```
+
+We need to re-`run_truth` for NOBA to include the catchbio component:
+
+```{r load_Rdata, message=FALSE, warning=FALSE}
+
+# default run_truth setup will save the file, so check for that first
+
+if(!file.exists(file.path(d.name, 
+                          paste0("output", scenario.name, "run_truth.RData")))){
+  #Store all loaded results into an R object
+  truth <- run_truth(scenario = scenario.name,
+                     dir = d.name,
+                     file_fgs = functional.groups.file,
+                     file_bgm = box.file,
+                     select_groups = funct.group.names,
+                     file_init = initial.conditions.file,
+                     file_biolprm = biol.prm.file,
+                     file_runprm = run.prm.file
+  )
+} else{
+  truth <- get(load(file.path(d.name,
+                              paste0("output", scenario.name, "run_truth.RData"))))
+}
+
+```
+
+## Testing fisheries functions
+
+We will apply examples here to just a few NOBA species to speed things up:
+    - Cod "North_atl_cod", likely a test assessment species
+    - Herring "Norwegian_ssh", likely a test assessment species
+    - Greenland halibut "Green_halibut", which grows to a large size.
+
+To create a census, the user specifies the timing of the survey, which species are captured, the spatial coverage of the survey, the species-specific survey efficiency ("q"), and the selectivity at age for each species. The following settings should achieve a survey that samples all Atlantis model output timesteps, all fish and shark species, and all model polygons, with perfect efficiency and full selectivity for all ages.
+
+
+```{r census-spec, message=FALSE, warning=FALSE}
+
+source(here("config/census_spec.R"))
+
+```
+
+# Test fishery functions: compare census with truth
+
+Now for the fishery outputs. We will need total catch in tons for each species, and catch composition data (age and length). First we will test whether the catchbio output in `truth` matches the atlantis output file output[scenario.name]Catch.txt:
+
+```{r testcatchbio1}
+
+#just try the three species for now, hardcoded for NOBA
+
+spp.name <- funct.group.names[funct.group.names %in% c("North_atl_cod",
+                                                       "Norwegian_ssh",
+                                                       "Green_halibut")]
+
+catchbio_census_ss <- create_fishery_subset(dat = truth$catchbio,
+                                         time = timeall,
+                                         species = spp.name,
+                                         boxes = boxall)
+
+catchbio_census_ss_agg <- aggregate(atoutput ~ species + time,
+                                    data=catchbio_census_ss, sum)
+
+# what does the output look like?
+catchB_outstep <- ggplot() +
+  geom_line(data=catchbio_census_ss_agg, aes(x=time/fstepperyr,y=atoutput, color="catch atlantisom"),
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+catchB_outstep + 
+  facet_wrap(~species, scales="free") 
+
+
+```
+
+
+```{r testcatchbio2}
+
+# should it be aggregated? I just did this above
+catchbio_series <- sample_survey_numbers(catchbio_census_ss, surv_cv)
+
+# if it is the pre-2015 bug mentioned in atlantis wiki, this may get it close
+# should not need for NOBA
+#catchbio_series_adjust <- catchbio_series %>%
+#  mutate(atoutput = atoutput/(86400*4))
+
+#does it match catch.txt (which should be in tons)?
+atCtxt <- read.table(file.path(d.name, catch.file), header=T)
+atCtxt <- atCtxt[, -grep("TsAct", colnames(atCtxt))] #hardcoded for catch.txt output 
+
+fishedlookup <- funct.groups %>%
+  filter((isFished) > 0)  # WARNING NOBA has isFished while CCA has IsFished
+
+atCtxttidy <- atCtxt %>%
+  rename_(.dots=with(fishedlookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, catchbio, -Time) %>%
+  filter(species %in% levels(catchbio_series$species))
+
+compare_catchB <-ggplot() +
+  geom_line(data=catchbio_series, aes(x=time/fstepperyr,y=atoutput, color="catch1 atlantisom"), 
+            alpha = 10/10) +
+  geom_point(data=atCtxttidy, aes(x=Time/365,y=catchbio, color="txt output catch bio"),
+             alpha = 1/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compare_catchB + 
+  facet_wrap(~species, scales="free") 
+
+```
+
+
+No, it does not match. It seems the problem is in calculating catch biomass at age; the CATCH.nc output file does not include a layer, so the aggregation of structn and resn over layers (using medians) in lines 58-67 in `calc_biomass_age` may be resulting in this mismatch. If catch happened in a particular layer, it is aggregated in the output CATCH.nc file, so we don't know which layer has the appropriate weight info. The `calc_biomass_age` function works on the truth$nums output because no aggregation of structn and resn is necessary, all have a layer field. 
+
+This does make me worry about the aggregation we apply to get weight at age for sampled fish. However, it appeared to recover the total biomass time series, so maybe it is ok. There may be something else wrong with the portion of the calc_biomass_age function that only applies to catch.
+
+One workaround is to assume the total catch in the catch.txt output file is correct and use that directly as catch biomass for atlantisom. We will have only annual total catch and no way to break it into seasons, but maybe that is ok.
+
+Then we would take catch at age in numbers from truth$catch (directly from CATCH.nc file) as below. California current will still need a correction to this due to the fishery output writing bug in the older atlantis codebase.
+
+## Test biological sampling from fisheries
+
+Here we use `create_fishery_subset` on the numbers output of `run_truth` to create the survey census of age composition (for just our three species in this case). The `sample_fish` applies the median for aggregation and does not apply multinomial sampling if `sample=FALSE` in the function call. 
+
+Because we don't want to wait 24 hours for this, we will look at only the first 112 time steps.
+
+```{r catchage-len-wt-3spp, echo=TRUE, warning=FALSE, message=FALSE}
+
+# get survey nums with full (no) selectivity
+catch_testNss <- create_fishery_subset(dat = truth$catch,
+                                 time = c(0:111),
+                                 species = spp.name,
+                                 boxes = boxall)
+
+# apply default sample fish as before to get numbers
+catch_numssshigh <- sample_fish(catch_testNss, effNhigh)
+
+
+# aggregate true resn per survey or fishery subset design
+catch_aggresnss <- aggregateDensityData(dat = truth$resn,
+                                 time = c(0:111),
+                                 species = spp.name,
+                                 boxes = boxall)
+
+# aggregate true structn per survey or fishery subsetdesign
+catch_aggstructnss <- aggregateDensityData(dat = truth$structn,
+                                 time = c(0:111),
+                                 species = spp.name,
+                                 boxes = boxall)
+
+#dont sample these, just aggregate them using median
+catch_structnss <- sample_fish(catch_aggstructnss, effNhigh, sample = FALSE)
+
+catch_resnss <-  sample_fish(catch_aggresnss, effNhigh, sample = FALSE)
+
+```
+
+This is true catch at age(class) for cod:
+
+```{r catage1}
+
+catchage <- catch_numssshigh %>%
+  filter(species == "North_atl_cod")
+  
+catageplot <- ggplot(catchage, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchage$species))
+
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+This is true catch at age(class) for herring:
+
+```{r catage2}
+
+catchage <- catch_numssshigh %>%
+  filter(species == "Norwegian_ssh")
+  
+catageplot <- ggplot(catchage, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchage$species))
+
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+Both of these species will need `calc_stage2age` applied because both have 2 true ages per age class.
+
+Length sample with user specified max length bin (200 cm):
+
+```{r userset-maxlen, echo=TRUE}
+
+catch_length_census_ss <- calc_age2length(structn = catch_structnss,
+                                 resn = catch_resnss,
+                                 nums = catch_numssshigh,
+                                 biolprm = truth$biolprm, fgs = truth$fgs,
+                                 maxbin = 200,
+                                 CVlenage = 0.1, remove.zeroes=TRUE)
+
+
+```
+
+We should get the upper end of Greenland halibut with a 200cm max length bin.
+
+Cod catch lengths:
+
+```{r vis-fishery-lf-test-1}
+
+catchlen <- catch_length_census_ss$natlength %>%
+  filter(species == "North_atl_cod")
+
+lfplot <- ggplot(catchlen, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchlen$species))
+
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
+
+```
+
+Herring catch lengths:
+
+```{r vis-fishery-lf-test-2}
+
+catchlen <- catch_length_census_ss$natlength %>%
+  filter(species == "Norwegian_ssh")
+
+lfplot <- ggplot(catchlen, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchlen$species))
+
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
+
+```
+
+Fishery weight at (st)age:
+
+```{r vis-fishery-wtageclass-test}
+
+wageplot <- ggplot(catch_length_census_ss$muweight, aes(agecl, atoutput)) +
+  geom_point(aes(colour = time)) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  scale_x_discrete(limits=c(1:10)) +
+  xlab("age class") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste(scenario.name))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
+
+```
+
+Change in wt at (st)age in the fishery over time for age classes using an annual mid-year snapshot (first 22+ years of NOBA model run):
+
+```{r aggwtcomp}
+
+wtage_annsurv <- catch_length_census_ss$muweight %>%
+  filter(time %in% annualmidyear)
+
+# reverse to show agecl time series of wt
+wageplot <- ggplot(wtage_annsurv, aes(time, atoutput)) +
+  geom_line(aes(colour = factor(agecl))) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  xlab("model timestep (5 per year)") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
+
+```
+
+We will need to interpolate fishery weight at true age using the in-progress function for these species.
+
+Any further info to get?
