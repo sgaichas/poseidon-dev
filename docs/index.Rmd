@@ -105,7 +105,7 @@ Work TBD applying `calc_stage2age` and `calc_Z` to get true ages
 
 ### Testing a full workflow through fisheries (sardine, agecl = true age)
 
-<a href="https://sgaichas.github.io/poseidon-dev/Atlantisom2SSworkflowtest.html" target="_blank">Try for true datasets new CC model with climate - May 21, 2019</a>
+<a href="https://sgaichas.github.io/poseidon-dev/Atlantisom2SSworkflowtest.html" target="_blank">Try for true datasets new CC model with climate - May 21, 2019, updated May 22, 2019 with catch correction</a>
 
 Fishery catch problem, older codebase has a bug in output. Test with NOBA...
 
