@@ -84,46 +84,6 @@ sel<- data.frame(species=rep(species,10),
 #Sample survey - 3rd timestep simulates a summer survey
 survey_out <- create_survey(dat=results$nums, time=seq(3,495,by=5), species=species, boxes=boxes, effic=effic, selex=sel)
 
-#Need to replace with interp function
-wtAtAge <- data.frame(species=rep("Pacific_sardine",10),
-                agecl=1:10,
-                wtAtAge=c(0.0542, 0.0837,	0.1103,	0.1323,	0.1497,	0.163,	0.1729,	0.1801,	0.1854,	0.1941))
-cv <- data.frame(species="Pacific_sardine", cv=c(0.2))
-
-#Sample survey biomass
-survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
-
-sardine.catch <-  create_fishery_subset(dat = results$catch,
-                                         time = seq(3,495,by=5),
-                                         species = species,
-                                         boxes = boxes)
-
-#Sample catch in numbers
-sardine.catch.total <- sardine.catch %>%
-  group_by(time) %>%
-  summarise(catch=sum(atoutput))
-
-nyears <- 50
-burnin <- 30
-
-#Test writing CPUE in biomass
-  sardine.data <- SS_write_ts(ss_data_list = sardine.data,
-                ts_data = list(survObsBiom$atoutput[burnin:(burnin+nyears-1)],
-                  sardine.catch.total$catch),
-                CVs = c(0.2,0.2),
-                data_years = list((survObsBiom$time[burnin:(burnin+nyears-1)]-3)/5+1, 
-                            (sardine.catch.total$time-3)/5+1),
-                sampling_month = list(rep(7,nyears),
-                                      rep(1,20)),
-                units = c("biomass","numbers"),
-                data_type=c("CPUE","catch"),
-                fleets = c(2,1))
-
-```
-
-## Writing age composition data 
-
-```{r}
 #Set effective sample size for age compositions
 effN <- 1000
 highEffN <- data.frame(species=species, effN=rep(effN, length(species)))
@@ -131,47 +91,6 @@ highEffN <- data.frame(species=species, effN=rep(effN, length(species)))
 #Sample fish for age composition
 age_comp_data <- sample_fish(survey_out, highEffN)
 
-age_comp_data
-
-#Group age composition data by time
-require(dplyr)
-age_comp_proportion <- age_comp_data %>%
-  group_by(time) %>%
-  mutate(comp = atoutput/sum(atoutput))
-
-#Get the age bins
-age_bin_names <- names(sardine.data$agecomp)[10:length(names(sardine.data$agecomp))]
-age_bins <- sub("a","",age_bin_names)
-
-#Change data format into flat structure
-age_comp_proportion$id <- rep(age_bins,
-                              each = nrow(age_comp_proportion)/length(age_bins))
-
-unmelt <- dcast(data = age_comp_proportion,
-                formula = time ~agecl,
-                value.var = "comp")
-age_comp_flat<- cbind(unmelt[order(unmelt$time),],
-                      rep(effN,nrow(unmelt)))
-names(age_comp_flat)[ncol(age_comp_flat)] <- "nsamp"
-
-## Write age composition data
-sardine.data <- SS_write_comps(ss_data_list = sardine.data,
-               comp_matrix = list(age_comp_flat[burnin:(burnin+nyears-1),]),
-               data_rows = list(sardine.data$styr:(sardine.data$styr+nyears-1)),
-               sampling_month = list(rep(7,nyears)),
-               data_type = c("agecomp"),
-               fleet_number = c(1),
-               bins = list(age_bins),
-               caal_bool = c(FALSE))
-sardine.data$agecomp
-
-```
-
-
-## Setting up sardine EM
-For the sardine EM, we want conditional age-at-length (CAAL) and length composition data only. So we use the same function with our matrices of length and CAAL comp data to write to the data file.
-
-```{r}
 # aggregate true resn per survey design
 survey_aggresnstd <- aggregateDensityData(dat = results$resn,
                                           time = unique(results$nums$time),
@@ -198,12 +117,125 @@ ss_length_stdsurv <- calc_age2length(structn = ss_structnstd,
                                      biolprm = results$biolprm, fgs = results$fgs,
                                      CVlenage = 0.1, remove.zeroes=TRUE)
 
+#Need to replace with interp function
+wtAtAge <- ss_length_stdsurv$muweight %>%
+  select(species, agecl, time, wtAtAge = atoutput) %>%
+  mutate(wtAtAge = wtAtAge/1000)
+
+# CV function
+cv <- data.frame(species="Pacific_sardine", cv=0.1)
+
+#Sample survey biomass
+survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
+
+
+
+```
+
+
+## Catch data
+
+```{r}
+sardine.catch <-  create_fishery_subset(dat = results$catch,
+                                         time = seq(1,99,by=1),
+                                         species = species,
+                                         boxes = boxes)
+
+#Sample catch in numbers
+sardine.catch.total <- sardine.catch %>%
+  group_by(time) %>%
+  summarise(catch=sum(atoutput))
+
+nyears <- 50
+burnin <- 30
+fish_years <- burnin:(burnin+nyears-1)
+survey_years <- seq(3,495,by=5)[burnin:(burnin+nyears-1)]
+
+#Test writing CPUE in biomass
+  sardine.data <- SS_write_ts(ss_data_list = sardine.data,
+                ts_data = list(survObsBiom$atoutput[fish_years],
+                  sardine.catch.total$catch[fish_years]),
+                CVs = c(0.1,0.1),
+                data_years = list((survObsBiom$time[fish_years]-3)/5+1,             sardine.catch.total$time[fish_years]),
+            sampling_month = list(rep(7,nyears),
+                                rep(1,nyears)),
+                units = c("biomass","numbers"),
+                data_type=c("CPUE","catch"),
+                fleets = c(2,1))
+
+```
+
+## Writing age composition data 
+
+```{r}
+age_comp_data
+
+#Get the age bins
+age_bin_names <- names(sardine.data$agecomp)[10:length(names(sardine.data$agecomp))]
+age_bins <- sub("a","",age_bin_names)
+
+age_comp_flat <- reformat_compositions(age_comp_data,
+                     round.places = 4,
+                     comp_type = "agecomp")
+
+## Write age composition data for survey
+sardine.data <- SS_write_comps(ss_data_list = sardine.data,
+               comp_matrix = list(age_comp_flat[burnin:(burnin+nyears-1),]),
+               data_rows = list(sardine.data$styr:(sardine.data$styr+nyears-1)),
+               sampling_month = list(rep(7,nyears)),
+               data_type = c("agecomp"),
+               fleet_number = c(1),
+               bins = list(age_bins),
+               caal_bool = c(FALSE))
+sardine.data$agecomp
+
+#We end up using CAAL for the survey below, so let's generate fishery age comps instead
+effN <- data.frame(species="Pacific_sardine", effN=effN)
+
+catch_numssshigh <- sample_fish(sardine.catch, effN)
+
+#Get weights
+# aggregate true resn per survey or fishery subset design
+catch_aggresnss <- aggregateDensityData(dat = results$resn,
+                                 time = c(0:111),
+                                 species = species,
+                                 boxes = boxes)
+
+# aggregate true structn per survey or fishery subsetdesign
+catch_aggstructnss <- aggregateDensityData(dat = results$structn,
+                                 time = c(0:111),
+                                 species = species,
+                                 boxes = boxes)
+
+#dont sample these, just aggregate them using median
+catch_structnss <- sample_fish(catch_aggstructnss, effN, sample = FALSE)
+
+catch_resnss <-  sample_fish(catch_aggresnss, effN, sample = FALSE)
+
+str(catch_numssshigh)
+
+catch_length <- calc_age2length(structn = catch_structnss,
+                                 resn = catch_resnss,
+                                 nums = catch_numssshigh,
+                                 biolprm = results$biolprm, fgs = results$fgs,
+                                 maxbin = 200,
+                                 CVlenage = 0.1, remove.zeroes=TRUE)
+
+```
+
+
+## Setting up sardine EM
+For the sardine EM, we want conditional age-at-length (CAAL) and length composition data only. So we use the same function with our matrices of length and CAAL comp data to write to the data file.
+
+```{r}
+
 #Check length compositions match age compositions
 ss_length_stdsurv$natlength %>%
   group_by(time,agecl) %>%
   summarise(sum(atoutput))
 
 len_comp_data <- ss_length_stdsurv$natlength
+fish_len_comp_data <- catch_length$natlength
 
 ```
 
@@ -212,56 +244,46 @@ Once we have the natlength matrix, we can munge the data into the proper CAAL an
 
 ```{r}
 
-#We want to aggregate the data by year 
-caal_comp_proportion <- len_comp_data %>%
-  group_by(time) %>%
-  mutate(comp = round(atoutput/sum(atoutput),4)) %>%
-  select(agecl, time, atoutput, lower.bins,
-         upper.bins,comp)
+caal_comp_flat <- reformat_compositions(len_comp_data,                                round.places=4,
+                comp_type="caalcomp")
 
-#Use dcast to turn the data from long to wide format
-unmelt_caal <- dcast(data = caal_comp_proportion,formula = time + lower.bins + upper.bins~agecl,value.var = "comp")
-unmelt_caal[is.na(unmelt_caal)] <- 0
-
-#Add nsamp column
-sample_size <- apply(unmelt_caal[,(4:ncol(unmelt_caal))], FUN=sum, MARGIN=1)
-caal_comp_flat<- cbind(unmelt_caal[order(unmelt_caal$time),],sample_size)
-names(caal_comp_flat)[ncol(caal_comp_flat)] <- "nsamp"
 
 #remove burnin
 caal_comp_final <- filter(caal_comp_flat,
-                         time %in% burnin:(burnin+nyears-1))
+                         time %in% survey_years)
 
-len_comp_proportion <- len_comp_data %>%
-  group_by(time, lower.bins, upper.bins) %>%
-  summarise(lencomp = sum(atoutput))
-
-#Do the same for length composition
-unmelt_len <- dcast(data = len_comp_proportion,formula = time ~lower.bins,value.var = "lencomp")
-unmelt_len[is.na(unmelt_len)] <- 0
 
 #Add over age classes to get sample size
-sample_size <- apply(unmelt_len[,(2:ncol(unmelt_len))], FUN=sum, MARGIN=1)
-len_comp_flat<- cbind(unmelt_len[order(unmelt_len$time),],sample_size)
-names(len_comp_flat)[ncol(len_comp_flat)] <- "nsamp"
-
+len_comp_flat <- reformat_compositions(len_comp_data,
+                                  round.places = 0,
+                           comp_type="lencomp")
 #remove burnin
 len_comp_final <- filter(len_comp_flat,
-                         time %in% burnin:(burnin+nyears-1))
+                         time %in% survey_years)
 
 length_bins <- as.integer(names(len_comp_final))
 length_bins <- length_bins[!is.na(length_bins)]
 
+fish_len_comp_flat <- reformat_compositions(catch_length$natlength,
+                                  round.places = 0,
+                           comp_type="lencomp")
+#remove burnin
+fish_len_comp_final <- filter(fish_len_comp_flat,
+                         time %in% fish_years)
+
+fish_age_comp_flat <- reformat_compositions(catch_numssshigh,
+                           comp_type="agecomp")
+#remove burnin
+fish_age_comp_final <- filter(fish_age_comp_flat,
+                         time %in% fish_years)
+
+comp_list <- list(caal_comp_final,len_comp_final,          fish_age_comp_final, fish_len_comp_final)
+
+apply_month <- list(rep(7, nrow(comp_list[[1]])), rep(7, nrow(comp_list[[2]])), rep(1,nrow(comp_list[[3]])),rep(1,nrow(comp_list[[4]])))
+
 # Write CAAL and length composition data
-sardine.data <- SS_write_comps(ss_data_list = sardine.data,
-                               comp_matrix = list(caal_comp_final,len_comp_final),
-                               data_rows = list(caal_comp_final$time,len_comp_final$time),
-                               sampling_month = list(rep(7,nrow(caal_comp_final)),
-               rep(7,nrow(len_comp_final))),
-                               data_type = c("agecomp", "lencomp"),
-                               fleet_number = c(1,1),
-                               bins = list(age_bins, length_bins),
-                               caal_bool = c(TRUE, FALSE))
+sardine.data <- SS_write_comps(ss_data_list = sardine.data, comp_matrix = comp_list, data_rows = list((comp_list[[1]]$time-3)/5 + 1 ,(survey_years-3)/5 + 1,fish_years,fish_years),
+        sampling_month = apply_month, data_type = rep(c("agecomp", "lencomp"),2), fleet_number = c(2,2,1,1),  bins = list(age_bins, length_bins, age_bins, length_bins), caal_bool = c(TRUE, rep(FALSE,3)))
 
 head(sardine.data$lencomp)
 head(sardine.data$agecomp)
@@ -281,5 +303,17 @@ sardine.data$age_info$minsamplesize <- rep(0.001,2)
 
 SS_writedat_3.30(sardine.data, outfile = "./inst/extdata/Sardine_SS_files/sardEM_3_3.dat",
                  overwrite=TRUE)
+```
+
+## Coming up with dynamic life history parameters
+
+Below we get the weight-length relationship parameters from atlantis, calculate h and R0 from Atlantis $\alpha$ and $\beta$ parameters, use the \code{calc_Z} function to back out natural mortality (M) from Atlantis, and use the survey length-at-age from Atlantis to estimate a growth curve.
+```{r}
+#Get biological parameters
+biolprm <- results$biolprm
+fgs <- results$fgs
+li_a_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 2]/1000
+li_b_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 3]
+
 ```
 
