@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # automatically create a bib database for R packages
 knitr::write_bib(c(
   .packages(), 'knitr', 'rmarkdown', 'tidyr', 'dplyr', 'ggplot2',
-  'data.table', 'here', 'ggforce', 'ggthemes'
+  'data.table', 'here', 'ggforce', 'ggthemes', 'r4ss'
 ), 'packages.bib')
 ```
 
@@ -21,7 +21,7 @@ This page documents initial testing of the atlantisom package in development at 
 
 The purpose of atlantisom is to use existing Atlantis model output to generate input datasets for a variety of models, so that the performance of these models can be evaluated against known (simulated) ecosystem dynamics. Atlantis models can be run using different climate forcing, fishing, and other scenarios. Users of atlantisom will be able to specify fishery independent and fishery dependent sampling in space and time, as well as species-specific catchability, selectivty, and other observation processes for any Atlantis scenario. Internally consistent multispecies and ecosystem datasets with known observation error characteristics will be the atlantisom outputs, for use in individual model performance testing, comparing performance of alternative models, and performance testing of model ensembles against "true" Atlantis outputs.
 
-On this page we demonstrate use of atlantisom on the California Current output files to provide inputs for a stock assessment model implemented in Stock Synthesis [insert SSREF]. 
+On this page we demonstrate use of atlantisom on the California Current output files to provide (true) inputs for a stock assessment model implemented in [Stock Synthesis](https://www.sciencedirect.com/science/article/abs/pii/S0165783612003293). Translation of atlantisom outputs to stock synthesis inputs uses the package [r4ss](https://github.com/r4ss) [@R-r4ss] as demonstrated [here](https://sgaichas.github.io/poseidon-dev/CreateStockSynthesis.html). 
 
 ## Setup
 
@@ -143,14 +143,16 @@ This section tests the `atlantisom::create_survey()` and `atlantisom::sample_sur
 
 To create a survey, the user specifies the timing of the survey, which species are captured, the spatial coverage of the survey, the species-specific survey efficiency ("q"), and the selectivity at age for each species. 
 
-The following settings should achieve a survey that samples all Atlantis model output timesteps, all species, and all model polygons, with perfect efficiency and full selectivity for all ages: 
-
 ```{r census-spec, message=FALSE, warning=FALSE}
 
 # make a function for this
 source(here("config/census_spec.R"))
 
 ```
+
+Output timesteps and the duration of the model run can be found in the run parameter file [scenario]_run.xml which is read in with `atlantisom::load_runprm`. This is already run in our census_spec.R file. Output timestep toutinc is `r runpar$toutinc `, so steps per year is `r stepperyr ` and the number of output steps is `r noutsteps `. 
+
+The settings in `config/census_spec.R` should achieve a survey that samples all Atlantis model output timesteps, all species, and all model polygons, with perfect efficiency and full selectivity for all ages: 
 
 ### True biomass survey I
 
@@ -464,13 +466,15 @@ Now (that catch nums are corrected!) we can sample fishery catch for lengths, ag
 
 Here we use `create_fishery_subset` on the numbers output of `run_truth` to create the survey census of age composition (for just our three species in this case). The `sample_fish` applies the median for aggregation and does not apply multinomial sampling if `sample=FALSE` in the function call. 
 
-Because we don't want to wait 24 hours for this, we will look at only our three speces and the first 112 time steps.
+Timesteps may be different for fishery output than for the population above. The run parameter file will tell us what time units we are dealing with, and this is already specified in the census_spec.R file as fstepperyr: `r fstepperyr `. Further, we can get the total number of years with nyears from the run parameter file: `r runpar$nyears `. 
+
+Now we know the fishery output is annual (365 days), and there will only be 100 years. Because we don't want to wait 24 hours for this, we will look at only our three species.
 
 ```{r catchage-len-wt-3spp, echo=TRUE, warning=FALSE, message=FALSE}
 
 # get survey nums with full (no) selectivity
 catch_testNss <- create_fishery_subset(dat = truth$catch,
-                                 time = c(0:111),
+                                 time = timeall,
                                  species = spp.name,
                                  boxes = boxall)
 
@@ -480,13 +484,13 @@ catch_numssshigh <- sample_fish(catch_testNss, effNhigh)
 
 # aggregate true resn per survey or fishery subset design
 catch_aggresnss <- aggregateDensityData(dat = truth$resn,
-                                 time = c(0:111),
+                                 time = timeall,
                                  species = spp.name,
                                  boxes = boxall)
 
 # aggregate true structn per survey or fishery subsetdesign
 catch_aggstructnss <- aggregateDensityData(dat = truth$structn,
-                                 time = c(0:111),
+                                 time = timeall,
                                  species = spp.name,
                                  boxes = boxall)
 
