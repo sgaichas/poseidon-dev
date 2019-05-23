@@ -208,11 +208,11 @@ atBtxt2tidy <- atBtxt2 %>%
   #select(Time, FPL:DIN) %>%
   rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
   gather(species, biomass, -Time) %>%
-  filter(species %in% levels(surveyB_frombio_sardine$species))
+  filter(species %in% c("Pacific_sardine"))
 
 #all species comparison, time intervals hardcoded for 5 steps per year
 compareB <-ggplot() +
-  geom_line(data=surveyB_frombio, aes(x=time/5,y=atoutput, color="survey census B"), 
+  geom_line(data=surveyB_frombio_sardine, aes(x=time/5,y=atoutput, color="survey census B"), 
             alpha = 10/10) +
   geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
              alpha = 1/10) + 
