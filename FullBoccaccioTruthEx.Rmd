@@ -334,7 +334,22 @@ trueNatage <- readRDS(file.path(d.name, paste0(scenario.name, "Nattrueagecensus.
 
 # run survey  and sample fish on this for completeness?
 
-# plot it
+
+# plot it--first few timesteps for bocaccio
+
+trueNatage_ss <- trueagesall[trueagesall$species == "Bocaccio_rockfish",]
+
+Natageplot <- ggplot(trueNatage_ss, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        trueNatage_ss$species))
+
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
 
 
 ```
