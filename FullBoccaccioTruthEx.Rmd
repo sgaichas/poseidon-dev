@@ -284,6 +284,8 @@ saveRDS(numsallhigh, file.path(d.name, paste0(scenario.name, "Natageclcensus.rds
 
 ```
 
+This is Bocaccio true age class output. However, the 10 standard atlantis age classes aggregate 5 true ages each for Bocaccio.
+
 ```{r Natage-plot}
 
 Natage <- readRDS(file.path(d.name, paste0(scenario.name, "Natageclcensus.rds")))
@@ -307,21 +309,35 @@ Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free
 
 Bocaccio is one of many species in CCA with multiple true ages per age class. To get true ages for input into stock assessment, we need to separate the age classes. The atlantisom function `calc_stage2age` calls the `calc_Z` function, applying a total mortality rate to estimate the numbers at true age within an age class:
 
-```{r testagecl}
+```{r testagecl, eval=FALSE}
 # add YOY file to the config files
 YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
 
 # load biolprm in some initialize file?
 biol <- load_biolprm(d.name, biol.prm.file)
 
-trueagesall_ss <- calc_stage2age(nums_data = Natage_ss,
+trueagesall <- calc_stage2age(nums_data = truth$nums,
                                  biolprm = biol, 
                                  yoy = YOY,
                                  fgs = funct.groups, 
                                  runprm = runpar)
 
+saveRDS(trueagesall, file.path(d.name, paste0(scenario.name, "Nattrueagecensus.rds")) )
+
 ```
 
+These should be true age comps for Bocaccio in annual ages:
+
+```{r plotannage}
+
+trueNatage <- readRDS(file.path(d.name, paste0(scenario.name, "Nattrueagecensus.rds")))
+
+# run survey  and sample fish on this for completeness?
+
+# plot it
+
+
+```
 
 ### Biological sampling: setup
 
