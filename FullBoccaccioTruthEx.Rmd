@@ -326,20 +326,32 @@ saveRDS(trueagesall, file.path(d.name, paste0(scenario.name, "Nattrueagecensus.r
 
 ```
 
-These should be true age comps for Bocaccio in annual ages:
+These should be true age comps for Bocaccio in annual ages: 
 
-```{r plotannage}
+**NOPE! Giving constant output or none. Back to the drawing board on true ages.** 
+
+See new file TestCalcZ.Rmd testing `calc_Z` separately and then I will do another separate one testing `calc_stage2age`. Once they work I will update this.
+
+```{r plotannage, eval=FALSE}
 
 trueNatage <- readRDS(file.path(d.name, paste0(scenario.name, "Nattrueagecensus.rds")))
 
-# run survey  and sample fish on this for completeness?
+# test with one species--this is still full polygon and layer output
+trueNatage_ss <- trueNatage[trueNatage$species == "Bocaccio_rockfish",]
 
+# run survey  and sample fish on this for completeness? yes to aggregate
+survey_trueNage_ss <- create_survey(dat = trueNatage_ss,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+trueNagesamp_ss <- sample_fish(survey_trueNage_ss, effNhigh)
 
 # plot it--first few timesteps for bocaccio
 
-trueNatage_ss <- trueagesall[trueagesall$species == "Bocaccio_rockfish",]
-
-Natageplot <- ggplot(trueNatage_ss, aes(x=agecl, y=atoutput)) +
+Natageplot <- ggplot(trueNagesamp_ss, aes(x=agecl, y=atoutput)) +
   geom_point() +
   theme_tufte() +
   labs(subtitle = paste(scenario.name,
