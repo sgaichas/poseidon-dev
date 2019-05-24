@@ -15,7 +15,7 @@ knitr::opts_knit$set(root.dir = "C:/Users/chris/Documents/GitHub/atlantisom/")
 
 ## Introduction
 
-This page discusses reading in an existing stock assessment file and replacing the data values with those from the `atlantisom` package. To read in the Stock Synthesis files, first ensure you have the latest version of `r4ss`
+This page discusses reading in an existing stock assessment file and replacing the data values with those from the `atlantisom` package. To read in the Stock Synthesis files, first ensure you have the latest version of `r4ss`. You will need to ensure the relevant Stock Synthesis files are stored in the inst/extdata/ folder, with each species example in its own folder. 
 
 ```{r packages, eval=FALSE}
 devtools::install_github("r4ss/r4ss", dependencies = FALSE)
@@ -23,42 +23,45 @@ devtools::install_github("r4ss/r4ss", dependencies = FALSE)
 
 ## Sardine example
 
-Dummy files are in the package directory; use `r4ss` to load the dummy data file
+Dummy files are in the package directory; use `r4ss` to load the dummy data file. Use the relevant species config file to load the configuration variables for each run. Note: this script will extract conditional age-at-length data, length composition data, and a CPUE in biomass for one survey during the specified time interval, and age composition data, length composition data, and catch in numbers from a single fishery. The timing and duration of the survey and fishery should be set in the config file. Unless otherwise stated, numbers going into Stock Synthesis are in thousands of fish. Weight of a single fish is in grams or kilograms, and weight of biomass is in metric tons. We assume a single sex model with a sex ratio fixed at 0.5 - different assumptions require modifying the Stock Synthesis control file. This script only runs with Stock Synthesis 3.30.   
 
 ```{r readdata, echo=FALSE}
 require(r4ss)
-#Read in sardine data file
-sardine.data <- r4ss::SS_readdat_3.30("./inst/extdata/Sardine_SS_files/sardEM_3_3.dat")
+source("./config/sardine_config.R")
+
+stocksynthesis.data <- r4ss::SS_readdat_3.30(paste0("./inst/extdata/",
+model_dir,
+datfile_name))
 ```
 
 Below, we can see the structure of the catch and CPUE data
 ```{r}
-names(sardine.data$catch) <- names(sardine.data$CPUE)
+names(stocksynthesis.data$catch) <- names(stocksynthesis.data$CPUE)
 
-sardine.data$CPUE
+stocksynthesis.data$CPUE
 ```
 
 We can next look at age composition data
 ```{r}
-sardine.data$agecomp
+stocksynthesis.data$agecomp
 
-sardine.data$lencomp
+stocksynthesis.data$lencomp
 ```
 
 We may also need to access or modify the setup variables before the data matrices.
 
 ```{r}
 #CPUE units, SD and error structure
-sardine.data$CPUEinfo
+stocksynthesis.data$CPUEinfo
 
 #Number of length bins
-sardine.data$N_lbins
+stocksynthesis.data$N_lbins
 
 #Length bin method
-sardine.data$Lbin_method
+stocksynthesis.data$Lbin_method
 
 #Vector of age bins
-sardine.data$agebin_vector
+stocksynthesis.data$agebin_vector
 
 ```
 
@@ -66,26 +69,26 @@ sardine.data$agebin_vector
 To edit index data, use the `atlantisom` sampling functions to extract survey biomass and numbers. These can then be written using the `SS_write_CPUE` function.
 
 ```{r}
-results <- get(load("outputCCV3run_truth.RData"))
+results <- get(load(atlantis_output_name))
 devtools::load_all()
-species=c("Pacific_sardine")
+species=c(species)
 
 #Sample all boxes
 boxes <- unique(results$nums$polygon)
 
 #Efficiency of the survey
-effic <- data.frame(species=species, efficiency=0.5)
+effic <- data.frame(species=species, efficiency=eff_case)
 
 # Assume uniform selectivity
-sel<- data.frame(species=rep(species,10),
-               agecl=c(1:10),
-              selex=rep(1,10))
+sel<- data.frame(species=rep(species,length(age_classes)),
+               agecl=age_classes,
+              selex=sel_by_age)
 
 #Sample survey - 3rd timestep simulates a summer survey
-survey_out <- create_survey(dat=results$nums, time=seq(3,495,by=5), species=species, boxes=boxes, effic=effic, selex=sel)
+survey_out <- create_survey(dat=results$nums, time=survey_sample_full, species=species, boxes=boxes, effic=effic, selex=sel)
 
 #Set effective sample size for age compositions
-effN <- 1000
+effN <- surveyEffN
 highEffN <- data.frame(species=species, effN=rep(effN, length(species)))
 
 #Sample fish for age composition
@@ -115,7 +118,7 @@ ss_length_stdsurv <- calc_age2length(structn = ss_structnstd,
                                      resn = ss_resnstd,
                                      nums = age_comp_data,
                                      biolprm = results$biolprm, fgs = results$fgs,
-                                     CVlenage = 0.1, remove.zeroes=TRUE)
+                                     CVlenage = CVs$lenage, remove.zeroes=TRUE)
 
 #Need to replace with interp function
 wtAtAge <- ss_length_stdsurv$muweight %>%
@@ -123,7 +126,7 @@ wtAtAge <- ss_length_stdsurv$muweight %>%
   mutate(wtAtAge = wtAtAge/1000)
 
 # CV function
-cv <- data.frame(species="Pacific_sardine", cv=0.1)
+cv <- data.frame(species="Pacific_sardine", cv=CVs$survey)
 
 #Sample survey biomass
 survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
@@ -136,29 +139,25 @@ survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
 ## Catch data
 
 ```{r}
-sardine.catch <-  create_fishery_subset(dat = results$catch,
-                                         time = seq(1,99,by=1),
+catch_numbers <-  create_fishery_subset(dat = results$catch,
+                                         time = fish_years,
                                          species = species,
                                          boxes = boxes)
 
 #Sample catch in numbers
-sardine.catch.total <- sardine.catch %>%
+catch_total <- catch_numbers %>%
   group_by(time) %>%
   summarise(catch=sum(atoutput))
 
-nyears <- 50
-burnin <- 30
-fish_years <- burnin:(burnin+nyears-1)
-survey_years <- seq(3,495,by=5)[burnin:(burnin+nyears-1)]
-
 #Test writing CPUE in biomass
-  sardine.data <- SS_write_ts(ss_data_list = sardine.data,
+  stocksynthesis.data <- SS_write_ts(ss_data_list = stocksynthesis.data,
                 ts_data = list(survObsBiom$atoutput[fish_years],
-                  sardine.catch.total$catch[fish_years]),
-                CVs = c(0.1,0.1),
-                data_years = list((survObsBiom$time[fish_years]-3)/5+1,             sardine.catch.total$time[fish_years]),
-            sampling_month = list(rep(7,nyears),
-                                rep(1,nyears)),
+                  catch_total$catch[fish_years]),
+                CVs = c(CVs$survey,
+                        CVs$fishery),
+                data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             catch_total$time[fish_years]),
+            sampling_month = list(rep(survey_month,nyears),
+                                rep(fishing_month,nyears)),
                 units = c("biomass","numbers"),
                 data_type=c("CPUE","catch"),
                 fleets = c(2,1))
@@ -171,7 +170,7 @@ survey_years <- seq(3,495,by=5)[burnin:(burnin+nyears-1)]
 age_comp_data
 
 #Get the age bins
-age_bin_names <- names(sardine.data$agecomp)[10:length(names(sardine.data$agecomp))]
+age_bin_names <- names(stocksynthesis.data$agecomp)[10:length(names(stocksynthesis.data$agecomp))]
 age_bins <- sub("a","",age_bin_names)
 
 age_comp_flat <- reformat_compositions(age_comp_data,
@@ -179,20 +178,20 @@ age_comp_flat <- reformat_compositions(age_comp_data,
                      comp_type = "agecomp")
 
 ## Write age composition data for survey
-sardine.data <- SS_write_comps(ss_data_list = sardine.data,
+stocksynthesis.data <- SS_write_comps(ss_data_list = stocksynthesis.data,
                comp_matrix = list(age_comp_flat[burnin:(burnin+nyears-1),]),
-               data_rows = list(sardine.data$styr:(sardine.data$styr+nyears-1)),
-               sampling_month = list(rep(7,nyears)),
+               data_rows = list(stocksynthesis.data$styr:(stocksynthesis.data$styr+nyears-1)),
+               sampling_month = list(rep(survey_month,nyears)),
                data_type = c("agecomp"),
                fleet_number = c(1),
                bins = list(age_bins),
                caal_bool = c(FALSE))
-sardine.data$agecomp
+stocksynthesis.data$agecomp
 
 #We end up using CAAL for the survey below, so let's generate fishery age comps instead
-effN <- data.frame(species="Pacific_sardine", effN=effN)
+effN <- data.frame(species=species, effN=effN)
 
-catch_numssshigh <- sample_fish(sardine.catch, effN)
+catch_numssshigh <- sample_fish(catch_numbers, effN)
 
 #Get weights
 # aggregate true resn per survey or fishery subset design
@@ -218,14 +217,14 @@ catch_length <- calc_age2length(structn = catch_structnss,
                                  resn = catch_resnss,
                                  nums = catch_numssshigh,
                                  biolprm = results$biolprm, fgs = results$fgs,
-                                 maxbin = 200,
-                                 CVlenage = 0.1, remove.zeroes=TRUE)
+                                 maxbin = maxbin,
+                                 CVlenage = CVs$lenage, remove.zeroes=TRUE)
 
 ```
 
 
-## Setting up sardine EM
-For the sardine EM, we want conditional age-at-length (CAAL) and length composition data only. So we use the same function with our matrices of length and CAAL comp data to write to the data file.
+## Setting up EM
+For the EM, we want conditional age-at-length (CAAL) and length composition data only. So we use the same function with our matrices of length and CAAL comp data to write to the data file.
 
 ```{r}
 
@@ -279,29 +278,30 @@ fish_age_comp_final <- filter(fish_age_comp_flat,
 
 comp_list <- list(caal_comp_final,len_comp_final,          fish_age_comp_final, fish_len_comp_final)
 
-apply_month <- list(rep(7, nrow(comp_list[[1]])), rep(7, nrow(comp_list[[2]])), rep(1,nrow(comp_list[[3]])),rep(1,nrow(comp_list[[4]])))
+apply_month <- list(rep(survey_month, nrow(comp_list[[1]])), rep(survey_month, nrow(comp_list[[2]])), rep(fishing_month,nrow(comp_list[[3]])),rep(fishing_month,nrow(comp_list[[4]])))
 
 # Write CAAL and length composition data
-sardine.data <- SS_write_comps(ss_data_list = sardine.data, comp_matrix = comp_list, data_rows = list((comp_list[[1]]$time-3)/5 + 1 ,(survey_years-3)/5 + 1,fish_years,fish_years),
+stocksynthesis.data <- SS_write_comps(ss_data_list = stocksynthesis.data, comp_matrix = comp_list, data_rows = list((comp_list[[1]]$time-survey_sample_time)/timestep + 1 ,(survey_years-survey_sample_time)/timestep + 1,fish_years,fish_years),
         sampling_month = apply_month, data_type = rep(c("agecomp", "lencomp"),2), fleet_number = c(2,2,1,1),  bins = list(age_bins, length_bins, age_bins, length_bins), caal_bool = c(TRUE, rep(FALSE,3)))
 
-head(sardine.data$lencomp)
-head(sardine.data$agecomp)
+head(stocksynthesis.data$lencomp)
+head(stocksynthesis.data$agecomp)
 
 #Change length bin structure to match atlantis data
-sardine.data$lbin_vector <- length_bins
+stocksynthesis.data$lbin_vector <- length_bins
 
 #Set lbin_method to 1 - this makes the population length bins match the data bins 
 #When lbin_method==1, we just comment out the binwidth, minimum, and maximum size arguments since they aren't used
-sardine.data$lbin_method <- 1
-sardine.data$binwidth <- "#"
-sardine.data$minimum_size <- "#"
-sardine.data$maximum_size <- "#"
+stocksynthesis.data$lbin_method <- 1
+stocksynthesis.data$binwidth <- "#"
+stocksynthesis.data$minimum_size <- "#"
+stocksynthesis.data$maximum_size <- "#"
 
 #Change minimum sample size to 0.001 for CAAL data (SS won't let it go lower than this)
-sardine.data$age_info$minsamplesize <- rep(0.001,2)
+stocksynthesis.data$age_info$minsamplesize <- rep(0.001,2)
 
-SS_writedat_3.30(sardine.data, outfile = "./inst/extdata/Sardine_SS_files/sardEM_3_3.dat",
+SS_writedat_3.30(stocksynthesis.data, outfile = paste0("./inst/extdata/",model_dir,
+datfile_name),
                  overwrite=TRUE)
 ```
 
@@ -314,6 +314,27 @@ biolprm <- results$biolprm
 fgs <- results$fgs
 li_a_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 2]/1000
 li_b_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 3]
+
+
+len_nonburn <- ss_length_stdsurv$mulen %>%
+  filter(time > burnin*timestep)
+plot(len_nonburn$atoutput~len_nonburn$agecl, col=len_nonburn$time)
+
+length.data <- data.frame("Year"=(len_nonburn$time-survey_sample_time)/timestep+1, length=len_nonburn$atoutput, Weight=NA, Sex="Female", age=as.integer(len_nonburn$agecl))
+
+#require(bbmle)
+#vb_estimates <-sample_fit_vbgf(length.data, 25, 45, 0.4,
+#  0.1, 0.1, 20, 40, 0.05, 0.01, 0.01,
+#  30, 50, 0.6, 0.3, 0.3, 0.5, 10)
+
+```
+
+## Running stock synthesis
+After the data and control file modifications, ensure you copy the local SS 3.3 executable into the folder containing the model files. Then run the following chunk.
+
+```{r}
+#Run stock synthesis model
+run_stocksynthesis(species = species, model_dir = model_dir, show_output = TRUE)
 
 ```
 
