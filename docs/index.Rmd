@@ -13,6 +13,7 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/CreateStockSynthesis.html" target="_blank">Sardines in the CalCurrent, input to SS functions, May 22, 2019</a>
 
+May 24: Sardines have a full dataset, but still working on converting to true ages for species with multiple ages per age class. See below under [True age compositions]. 
 
 ### Read this first on overall workflow
 
@@ -119,5 +120,9 @@ Work TBD applying `calc_stage2age` and `calc_Z` to get true ages
 Fishery catch problem, older codebase has a bug in output. Test with NOBA...
 
 <a href="https://sgaichas.github.io/poseidon-dev/TestCatchNOBA.html" target="_blank">Suggests a workaround needed for catch in weight - May 21, 2019</a>
+
+### True age compositions
+
+<a href="https://sgaichas.github.io/poseidon-dev/FullBoccaccioTruthEx.html" target="_blank">Initial testing of true age functions, now running but output wrong - May 24, 2019</a>
 
 ### More to come later!
