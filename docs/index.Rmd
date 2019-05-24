@@ -111,8 +111,6 @@ May 16: Isaac says CCA fish look reasonable. NOBA Greenland halibut growth param
 
 Work in progress on interpolating weight at age in InterpolateWeightAtAge.Rmd
 
-Work TBD applying `calc_stage2age` and `calc_Z` to get true ages
-
 ### Testing a full workflow through fisheries (sardine, agecl = true age)
 
 <a href="https://sgaichas.github.io/poseidon-dev/Atlantisom2SSworkflowtest.html" target="_blank">Try for true datasets new CC model with climate - May 21, 2019, updated May 22, 2019 with catch correction</a>
@@ -124,5 +122,9 @@ Fishery catch problem, older codebase has a bug in output. Test with NOBA...
 ### True age compositions
 
 <a href="https://sgaichas.github.io/poseidon-dev/FullBoccaccioTruthEx.html" target="_blank">Initial testing of true age functions, now running but output wrong - May 24, 2019</a>
+
+<a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ.html" target="_blank">Test Z calc and compare with true annage NOBA - May 24, 2019</a>
+
+May 24: Either `calc_Z` or `calc_stage2age` or both are incorrect if we expect them to exactly match atlantis annual age ouput where it is available. We match in timestep 0, then diverge. 
 
 ### More to come later!
