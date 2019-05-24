@@ -69,7 +69,9 @@ h6 {
 </style>
 
 
+</head>
 
+<body>
 
 <style type="text/css">
 .main-container {
@@ -94,92 +96,22 @@ img {
 button.code-folding-btn:focus {
   outline: none;
 }
-summary {
-  display: list-item;
-}
 </style>
 
 
+
+<div class="container-fluid main-container">
 
 <!-- tabsets -->
-
-<style type="text/css">
-.tabset-dropdown > .nav-tabs {
-  display: inline-table;
-  max-height: 500px;
-  min-height: 44px;
-  overflow-y: auto;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.tabset-dropdown > .nav-tabs > li.active:before {
-  content: "";
-  font-family: 'Glyphicons Halflings';
-  display: inline-block;
-  padding: 10px;
-  border-right: 1px solid #ddd;
-}
-
-.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
-  content: "";
-  border: none;
-}
-
-.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
-  content: "";
-  font-family: 'Glyphicons Halflings';
-  display: inline-block;
-  padding: 10px;
-  border-right: 1px solid #ddd;
-}
-
-.tabset-dropdown > .nav-tabs > li.active {
-  display: block;
-}
-
-.tabset-dropdown > .nav-tabs > li > a,
-.tabset-dropdown > .nav-tabs > li > a:focus,
-.tabset-dropdown > .nav-tabs > li > a:hover {
-  border: none;
-  display: inline-block;
-  border-radius: 4px;
-}
-
-.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
-  display: block;
-  float: none;
-}
-
-.tabset-dropdown > .nav-tabs > li {
-  display: none;
-}
-</style>
-
 <script>
 $(document).ready(function () {
   window.buildTabsets("TOC");
-});
-
-$(document).ready(function () {
-  $('.tabset-dropdown > .nav-tabs > li').click(function () {
-    $(this).parent().toggleClass('nav-tabs-open')
-  });
 });
 </script>
 
 <!-- code folding -->
 
 
-
-
-</head>
-
-<body>
-
-
-<div class="container-fluid main-container">
 
 
 
@@ -198,7 +130,7 @@ $(document).ready(function () {
 <div id="an-example-workflow-for-a-single-species-in-progress" class="section level3">
 <h3>An example workflow for a single species (in progress)</h3>
 <p><a href="https://sgaichas.github.io/poseidon-dev/FullSardineTruthEx.html" target="_blank">Sardines in the CalCurrent, all true data, May 22, 2019, updated May 23, 2019</a></p>
-<p><a href="https://sgaichas.github.io/poseidon-dev/CreateStockSynthesis.html" target="_blank">Sardines in the CalCurrent, input to SS functions, May 22, 2019</a></p>
+<p><a href="https://sgaichas.github.io/poseidon-dev/CreateStockSynthesis.html" target="_blank">Sardines in the CalCurrent, input to SS functions: May 24, 2019</a> - now generalized to run for any species in the cal current with a unique species config file</p>
 <p>May 24: Sardines have a full dataset, but still working on converting to true ages for species with multiple ages per age class. See below under <a href="#true-age-compositions">True age compositions</a>.</p>
 </div>
 <div id="read-this-first-on-overall-workflow" class="section level3">

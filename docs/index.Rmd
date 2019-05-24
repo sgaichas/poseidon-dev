@@ -11,7 +11,7 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/FullSardineTruthEx.html" target="_blank">Sardines in the CalCurrent, all true data, May 22, 2019, updated May 23, 2019</a>
 
-<a href="https://sgaichas.github.io/poseidon-dev/CreateStockSynthesis.html" target="_blank">Sardines in the CalCurrent, input to SS functions, May 22, 2019</a>
+<a href="https://sgaichas.github.io/poseidon-dev/CreateStockSynthesis.html" target="_blank">Sardines in the CalCurrent, input to SS functions: May 24, 2019</a> - now generalized to run for any species in the cal current with a unique species config file
 
 May 24: Sardines have a full dataset, but still working on converting to true ages for species with multiple ages per age class. See below under [True age compositions]. 
 
