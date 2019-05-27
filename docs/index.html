@@ -69,9 +69,7 @@ h6 {
 </style>
 
 
-</head>
 
-<body>
 
 <style type="text/css">
 .main-container {
@@ -96,22 +94,92 @@ img {
 button.code-folding-btn:focus {
   outline: none;
 }
+summary {
+  display: list-item;
+}
 </style>
 
 
 
-<div class="container-fluid main-container">
-
 <!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
 <script>
 $(document).ready(function () {
   window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
 });
 </script>
 
 <!-- code folding -->
 
 
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
 
 
 
@@ -201,9 +269,9 @@ $(document).ready(function () {
 </div>
 <div id="true-age-compositions" class="section level3">
 <h3>True age compositions</h3>
-<p><a href="https://sgaichas.github.io/poseidon-dev/FullBoccaccioTruthEx.html" target="_blank">Initial testing of true age functions, now running but output wrong - May 24, 2019</a></p>
+<p><a href="https://sgaichas.github.io/poseidon-dev/FullBoccaccioTruthEx.html" target="_blank">Initial testing of true age functions, now running but output still wrong - May 24, 2019, updated May 27, 2019</a></p>
 <p><a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ.html" target="_blank">Test Z calc and compare with true annage NOBA - May 24, 2019</a></p>
-<p>May 24: Either <code>calc_Z</code> or <code>calc_stage2age</code> or both are incorrect if we expect them to exactly match atlantis annual age ouput where it is available. We match in timestep 0, then diverge.</p>
+<p>May 24: Either <code>calc_Z</code> or <code>calc_stage2age</code> or both are incorrect if we expect them to exactly match atlantis annual age ouput where it is available. We match in timestep 0, then diverge. May 27 update: also true for Bocaccio in CCA, the interim numbers at age drop to 0.</p>
 </div>
 <div id="more-to-come-later" class="section level3">
 <h3>More to come later!</h3>

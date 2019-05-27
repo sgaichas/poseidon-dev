@@ -121,10 +121,10 @@ Fishery catch problem, older codebase has a bug in output. Test with NOBA...
 
 ### True age compositions
 
-<a href="https://sgaichas.github.io/poseidon-dev/FullBoccaccioTruthEx.html" target="_blank">Initial testing of true age functions, now running but output wrong - May 24, 2019</a>
+<a href="https://sgaichas.github.io/poseidon-dev/FullBoccaccioTruthEx.html" target="_blank">Initial testing of true age functions, now running but output still wrong - May 24, 2019, updated May 27, 2019</a>
 
 <a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ.html" target="_blank">Test Z calc and compare with true annage NOBA - May 24, 2019</a>
 
-May 24: Either `calc_Z` or `calc_stage2age` or both are incorrect if we expect them to exactly match atlantis annual age ouput where it is available. We match in timestep 0, then diverge. 
+May 24: Either `calc_Z` or `calc_stage2age` or both are incorrect if we expect them to exactly match atlantis annual age ouput where it is available. We match in timestep 0, then diverge. May 27 update: also true for Bocaccio in CCA, the interim numbers at age drop to 0.
 
 ### More to come later!
