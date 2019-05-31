@@ -1,0 +1,228 @@
+---
+title: "Sardines only end-to-end atlantisom test"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+library(ggforce)
+library(ggthemes)
+library(atlantisom)
+```
+
+## Introduction
+
+Now we test the `atlantisom` to SS workflow with a new California Current run that includes climate forcing, recruitment variability, and the fishing scenario outlined for our project in Norway: "output_CC_2063_run11".
+
+We will go from atlantis model output to SS input in this page for a single species, "sardine", that doesn't require any age class splitting.
+
+As of 31 May 2019, the `run_truth` function has been modified to do the catch numbers fix for legacy models.
+
+```{r initialize}
+
+initCCA <- TRUE
+initNEUS <- FALSE
+initNOBA <- FALSE
+
+species_ss <- c("Pacific_sardine")
+
+#function to make a config file? need one for each atlantis run
+
+if(initCCA) source(here("config/CC2Config.R"))
+
+if(initNEUS) source(here("config/NEUSConfig.R"))
+
+if(initNOBA) source(here("config/NOBAConfig.R"))
+
+```
+
+```{r get_names, message=FALSE, warning=FALSE}
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+```
+
+This can be run with `species_ss` in select_groups to get results only for that species. Here I'm running with all species; took about 50 minutes to return.
+
+```{r get_truth_ss}
+
+# default run_truth setup will save the file, so check for that first
+
+if(!file.exists(file.path(d.name, 
+                          paste0("output", scenario.name, "run_truth.RData")))){
+  #Store all loaded results into an R object
+  truth <- run_truth(scenario = scenario.name,
+                     dir = d.name,
+                     file_fgs = functional.groups.file,
+                     file_bgm = box.file,
+                     select_groups = funct.group.names,
+                     file_init = initial.conditions.file,
+                     file_biolprm = biol.prm.file,
+                     file_runprm = run.prm.file,
+                     verbose = TRUE
+  )
+} else {
+  truth <- get(load(file.path(d.name,
+                              paste0("output", scenario.name, "run_truth.RData"))))
+}
+```
+
+In this block, `test` was a vector of 0s, meaning the correction run separately and the new correction implemented in `run_truth` are producing the same results:
+
+```{r catchnums-check, eval=FALSE}
+
+# this was run with results in CalCurrent2013_OA_off folder and run_truth_sardines
+
+catchnumfull <- readRDS(file.path(d.name, paste0(scenario.name, "catchnums_corrected.rds")))
+
+catchnum_ss <- catchnumfull %>%
+  filter(species == species_ss) %>%
+  arrange(time, polygon, agecl)
+  
+new_catage <- truth$catch %>%
+  arrange(time, polygon, agecl)
+
+test <- catchnum_ss$atoutput - new_catage$atoutput
+
+# test is all 0 so this worked the same way
+
+```
+
+In the big picture, we will have the true population dynamics from Atlantis which we need for reference to compare with estimated population dynamics from the stock assessment estimation models. 
+
+Ideally we will have a function that gets the whole truth (and nothing but the truth) from Atlantis and stores it in a sensible way for later comparison and calculation of performance metrics.
+
+Then we will have a function that implements the "survey" that produces the stock assessment inputs and sends those to the SS file writing functions.
+
+## Truth from OM
+
+The following settings should achieve a survey that samples all Atlantis model output timesteps, all species, and all model polygons, with perfect efficiency and full selectivity for all ages: 
+
+```{r census-spec, message=FALSE, warning=FALSE}
+
+# make a function for this
+source(here("config/census_spec.R"))
+
+```
+
+Get true total biomass, total numbers. This code gets results for all species and saves the output true B and N.
+
+```{r trueB-N}
+
+# this uses result$biomass_ages to sample biomass directly, no need for wt@age est
+
+survey_testBall <- create_survey(dat = truth$biomass_ages,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+# call sample_survey_biomass with a bunch of 1s for weight at age
+# in the code it multiplies atoutput by wtatage so this allows us to use
+# biomass directly
+wtage <- data.frame(species=rep(survspp, each=10),
+                    agecl=rep(c(1:10),length(survspp)),
+                    wtAtAge=rep(1.0,length(survspp)*10))
+
+surveyB_frombio <- sample_survey_biomass(survey_testBall, surv_cv, wtage)
+
+#save for later use, takes a long time to generate
+saveRDS(surveyB_frombio, file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+
+# this uses result$nums and a new function to get survey index in numbers (abundance)
+
+survey_testNall <- create_survey(dat = truth$nums,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# as above, make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+surveyN <- sample_survey_numbers(survey_testNall, surv_cv)
+
+#save for later use, takes a long time to generate
+saveRDS(surveyN, file.path(d.name, paste0(scenario.name, "surveyNcensus.rds")))
+
+
+```
+
+Get true population age composition. Now we go to single species to speed things up.
+
+```{r true-B-N}
+
+```
+
+Get true population length comp and weight at age
+
+```{r true-comps}
+
+```
+
+Get true population parameters (M in progress, S-R, growth)
+
+```{r true-poppars}
+
+```
+
+Get true catch (may not be different from input for our project)
+
+```{r true-catchtot}
+
+```
+
+Get true catch at age and other comps (may not be different from input for our project)
+
+```{r true-catage-lf-wtage}
+
+```
+
+
+## "Data" from OM for EMs
+
+Specify our survey sampling. This could come from other information such as the overlap of actual survey stations with OM polygons, experiments evaluating survey selectivity and efficiency, actual sample-based survey cv, etc.
+
+```{r survey-spec}
+
+```
+
+Get input survey biomass and catch biomass for SS (these have q, selectivity, cv)
+
+```{r toSS-surveyfisheryts}
+
+```
+
+Get composition inputs for SS (survey and fishery catch at age, survey and fishery lengths, survey and fishey weight at age)
+
+```{r toSS-surveyfisherycomps}
+
+```
+
+Get population parameters for SS
+
+```{r toSS-poppars}
+
+```
+
