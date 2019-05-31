@@ -15,6 +15,8 @@ These pages document initial testing of the atlantisom package in development at
 
 May 24: Sardines have a full dataset, but still working on converting to true ages for species with multiple ages per age class. See below under [True age compositions]. 
 
+<a href="https://sgaichas.github.io/poseidon-dev/SardinesOnlyatlantisom2SStest.html" target="_blank">Start on Sardines in the CalCurrent, all true and SS data, May 31, 2019</a>
+
 ### Read this first on overall workflow
 
 <a href="https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html" target="_blank">Big picture and new functions needed - May 10, 2019, updated May 16, 2019</a>
