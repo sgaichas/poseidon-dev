@@ -338,7 +338,7 @@ plotcatch +
 
 Get true catch at age and other comps (may not be different from input for our project)
 
-```{r true-catage-lf-wtage}
+```{r true-catage-lf-wtage, eval=FALSE}
 
 # get survey nums with full (no) selectivity
 catchN_ss <- create_fishery_subset(dat = truth$catch,
@@ -464,6 +464,10 @@ burnin <- 30
 #Maximum size of a fish in cm
 maxbin <- 150
 
+######    CHECK fish_years   ####### get in right units  #######
+# fishery output timestep
+fstepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutfinc
+
 #Years to fish, assuming fishing output is annual
 fish_years <- burnin:(burnin+nyears-1)
 
@@ -504,14 +508,14 @@ highEffN <- data.frame(species=species, effN=rep(effN, length(species)))
 age_comp_data <- sample_fish(survey_out, highEffN)
 
 # aggregate true resn per survey design
-survey_aggresnstd <- aggregateDensityData(dat = results$resn,
-                                          time = unique(results$nums$time),
+survey_aggresnstd <- aggregateDensityData(dat = truth$resn,
+                                          time = survey_sample_full,
                                           species = species,
                                           boxes = boxall)
 
 # aggregate true structn per survey design
-survey_aggstructnstd <- aggregateDensityData(dat = results$structn,
-                                             time = unique(results$nums$time),
+survey_aggstructnstd <- aggregateDensityData(dat =truth$structn,
+                                             time = survey_sample_full,
                                              species = species,
                                              boxes = boxall)
 
@@ -526,7 +530,7 @@ ss_resnstd <- sample_fish(survey_aggresnstd,
 ss_length_stdsurv <- calc_age2length(structn = ss_structnstd,
                                      resn = ss_resnstd,
                                      nums = age_comp_data,
-                                     biolprm = results$biolprm, fgs = results$fgs,
+                                     biolprm = truth$biolprm, fgs = truth$fgs,
                                      CVlenage = CVs$lenage, remove.zeroes=TRUE)
 
 #Need to replace with interp function
@@ -552,7 +556,8 @@ Get input total catch for SS (here using numbers). SS takes a fishery cv which c
 
 # catch at age by area
 catch_numbers <-  create_fishery_subset(dat = truth$catch,
-                                         time = fish_years,
+                                         #time = fish_years,
+                                         time = survey_sample_full,
                                          species = species,
                                          boxes = boxall)
 
@@ -565,7 +570,7 @@ catch_total <- catch_numbers %>%
 # CV function
 cv <- data.frame(species="Pacific_sardine", cv=CVs$fishery)
 
-catchObsNum <- sample_survey_numbers(catch_numbers, cv=cv)
+catchObsNum <- sample_survey_numbers(dat=catch_numbers, cv=cv)
 
 ```
 
@@ -590,15 +595,17 @@ catch_numssshigh <- sample_fish(catch_numbers, effN)
 #Get weights
 # aggregate true resn per survey or fishery subset design
 catch_aggresnss <- aggregateDensityData(dat = truth$resn,
-                                 time = fish_years,
+                                 #time = fish_years,
+                                 time = survey_sample_full,
                                  species = species,
-                                 boxes = boxes)
+                                 boxes = boxall)
 
 # aggregate true structn per survey or fishery subsetdesign
 catch_aggstructnss <- aggregateDensityData(dat = truth$structn,
-                                 time = fish_years,
+                                 #time = fish_years,
+                                 time = survey_sample_full,
                                  species = species,
-                                 boxes = boxes)
+                                 boxes = boxall)
 
 #dont sample these, just aggregate them using median
 catch_structnss <- sample_fish(catch_aggstructnss, effN, sample = FALSE)
@@ -608,7 +615,7 @@ catch_resnss <-  sample_fish(catch_aggresnss, effN, sample = FALSE)
 catch_length <- calc_age2length(structn = catch_structnss,
                                  resn = catch_resnss,
                                  nums = catch_numssshigh,
-                                 biolprm = results$biolprm, fgs = results$fgs,
+                                 biolprm = truth$biolprm, fgs = truth$fgs,
                                  maxbin = maxbin,
                                  CVlenage = CVs$lenage, remove.zeroes=TRUE)
 
@@ -626,6 +633,7 @@ Get population parameters for SS from Atlantis
 To read in the Stock Synthesis files, first ensure you have the latest version of `r4ss`. You will need to ensure the relevant Stock Synthesis files are stored in the inst/extdata/ folder, with each species example in its own folder. 
 
 ```{r readdata}
+#devtools::install_github("r4ss/r4ss", dependencies = FALSE)
 require(r4ss)
 #source("./config/sardine_config.R") this is above for illustration
 
@@ -687,7 +695,10 @@ fish_len_comp_data <- catch_length$natlength
 
 Once we have the natlength matrix, we can munge the data into the proper CAAL and length bin format for SS
 
-```{r SS-comps-formatting}
+```{r SS-comps-formatting, eval=FALSE}
+
+#getting an error in here, I think it is the definition of fish_years
+#Error in x[[jj]][iseq] <- vjj : replacement has length zero
 
 caal_comp_flat <- reformat_compositions(len_comp_data,                                round.places=4,
                 comp_type="caalcomp")
