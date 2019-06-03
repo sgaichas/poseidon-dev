@@ -173,6 +173,13 @@ Get true population age composition. Now we go to single species to speed things
 
 ```{r true-B-N}
 
+survey_N_ss <- create_survey(dat = truth$nums,
+                                 time = timeall,
+                                 species = species_ss,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
 ```
 
 Get true population length comp and weight at age
