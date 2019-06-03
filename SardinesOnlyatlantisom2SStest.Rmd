@@ -398,13 +398,6 @@ catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free
 catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
 catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
 
-
-## "Data" from OM for EMs
-
-Specify our survey sampling. This could come from other information such as the overlap of actual survey stations with OM polygons, experiments evaluating survey selectivity and efficiency, actual sample-based survey cv, etc.
-
-```{r survey-spec}
-
 ```
 
 ## “Data” from OM for EMs
@@ -415,7 +408,7 @@ Specify our survey sampling. This could come from other information such as the 
 # from atlantisom/config/sardine_config.R, to be generalized here
 
 #Set species name
-species <- "Pacific_sardine" #change to species_ss to match 
+species <- species_ss #"Pacific_sardine" #change to species_ss to match 
 
 #Directory with SS files
 model_dir <- "Sardine_SS_files/"
@@ -476,7 +469,6 @@ fishing_month <- 1
 
 
 ```
-
 
 Get input survey biomass and catch biomass for SS (these have q, selectivity, cv)
 
