@@ -424,7 +424,7 @@ model_dir <- "Sardine_SS_files/"
 datfile_name <- "sardEM_3_3.dat"
 
 #Name of atlantis model output - this is an RData object from the runtruth() function
-atlantis_output_name <- "outputCCV3run_truth.RData"
+#atlantis_output_name <- "outputCCV3run_truth.RData"
 
 #Efficiency
 eff_case <- 0.5
@@ -625,7 +625,7 @@ Get population parameters for SS from Atlantis
 
 To read in the Stock Synthesis files, first ensure you have the latest version of `r4ss`. You will need to ensure the relevant Stock Synthesis files are stored in the inst/extdata/ folder, with each species example in its own folder. 
 
-```{r readdata, echo=FALSE}
+```{r readdata}
 require(r4ss)
 #source("./config/sardine_config.R") this is above for illustration
 
@@ -676,9 +676,9 @@ stocksynthesis.data <- SS_write_comps(ss_data_list = stocksynthesis.data,
 stocksynthesis.data$agecomp
 
 #Check length compositions match age compositions
-ss_length_stdsurv$natlength %>%
-  group_by(time,agecl) %>%
-  summarise(sum(atoutput))
+#ss_length_stdsurv$natlength %>%
+#  group_by(time,agecl) %>%
+#  summarise(sum(atoutput))
 
 len_comp_data <- ss_length_stdsurv$natlength
 fish_len_comp_data <- catch_length$natlength
