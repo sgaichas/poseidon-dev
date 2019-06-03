@@ -83,7 +83,7 @@ if(!file.exists(file.path(d.name,
 }
 ```
 
-In this block, `test` was a vector of 0s, meaning the correction run separately and the new correction implemented in `run_truth` are producing the same results:
+<!--In this block, `test` was a vector of 0s, meaning the correction run separately and the new correction implemented in `run_truth` are producing the same results:
 
 ```{r catchnums-check, eval=FALSE}
 
@@ -103,6 +103,7 @@ test <- catchnum_ss$atoutput - new_catage$atoutput
 # test is all 0 so this worked the same way
 
 ```
+-->
 
 In the big picture, we will have the true population dynamics from Atlantis which we need for reference to compare with estimated population dynamics from the stock assessment estimation models. 
 
@@ -208,7 +209,7 @@ plotN +
 
 Get true population age comp, length comp, and weight at age. Now we go to single species to speed things up.
 
-```{r true-comps, warning=FALSE, message=FALSE}
+```{r true-comps, warning=FALSE, message=FALSE, eval=FALSE}
 
 # wrap these individual calls into a function
 survey_N_ss <- create_survey(dat = truth$nums,
@@ -293,14 +294,17 @@ lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
 
 ```{r wtage-plot}
 
-wageplot <- ggplot(lengthwt_census_ss$muweight, aes(agecl, atoutput)) +
-  geom_point(aes(colour = time)) +
+wtage_ann <- lengthwt_census_ss$muweight %>%
+  filter(time %in% annualmidyear)
+
+# reverse to show agecl time series of wt
+wageplot <- ggplot(wtage_ann, aes(time, atoutput)) +
+  geom_line(aes(colour = factor(agecl))) +
   theme_tufte() +
   theme(legend.position = "bottom") +
-  scale_x_discrete(limits=c(1:10)) +
-  xlab("age class") +
+  xlab("model timestep (5 per year)") +
   ylab("average individual weight (g)") +
-  labs(subtitle = paste(scenario.name))
+  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
 
 wageplot + facet_wrap(c("species"), scales="free_y")
 
@@ -316,13 +320,83 @@ Get true catch (may not be different from input for our project)
 
 ```{r true-catchtot}
 
+truecatchbio <- load_catch(d.name, file_catch = catch.file, fgs = funct.groups)
+
+truecatchbio_ss <- truecatchbio[truecatchbio$species == species_ss,]
+
+plotcatch <- ggplot() +
+  geom_line(data=truecatchbio_ss, aes(x=time,y=atoutput, color="true catch bio"),
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotcatch +
+  facet_wrap(~species, scales="free") 
+
 ```
 
 Get true catch at age and other comps (may not be different from input for our project)
 
 ```{r true-catage-lf-wtage}
 
+# get survey nums with full (no) selectivity
+catchN_ss <- create_fishery_subset(dat = truth$catch,
+                                 time = timeall,
+                                 species = species_ss,
+                                 boxes = boxall)
+
+# apply default sample fish as before to get numbers
+catch_numssshigh <- sample_fish(catchN_ss, effNhigh)
+
+
+# aggregate true resn per survey or fishery subset design
+catch_aggresnss <- aggregateDensityData(dat = truth$resn,
+                                 time = timeall,
+                                 species = species_ss,
+                                 boxes = boxall)
+
+# aggregate true structn per survey or fishery subsetdesign
+catch_aggstructnss <- aggregateDensityData(dat = truth$structn,
+                                 time = timeall,
+                                 species = species_ss,
+                                 boxes = boxall)
+
+#dont sample these, just aggregate them using median
+catch_structnss <- sample_fish(catch_aggstructnss, effNhigh, sample = FALSE)
+
+catch_resnss <-  sample_fish(catch_aggresnss, effNhigh, sample = FALSE)
+
+# get catch lengths and wtage
+catch_length_census_ss <- calc_age2length(structn = catch_structnss,
+                                 resn = catch_resnss,
+                                 nums = catch_numssshigh,
+                                 biolprm = truth$biolprm, fgs = truth$fgs,
+                                 maxbin = 150,
+                                 CVlenage = 0.1, remove.zeroes=TRUE)
+
+#save for later use, takes a long time to generate
+saveRDS(catch_length_census_ss, file.path(d.name, paste0(scenario.name, "catchlengthwt_census_sard.rds")))
+
 ```
+
+This is true catch at age for sardine:
+
+```{r catage1}
+
+catchage <- catch_numssshigh %>%
+  filter(species == "Pacific_sardine")
+  
+catageplot <- ggplot(catchage, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchage$species))
+
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
 
 
 ## "Data" from OM for EMs
@@ -332,6 +406,12 @@ Specify our survey sampling. This could come from other information such as the 
 ```{r survey-spec}
 
 ```
+
+## “Data” from OM for EMs
+
+Specify our survey sampling. This could come from other information such as the overlap of actual survey stations with OM polygons, experiments evaluating survey selectivity and efficiency, actual sample-based survey cv, etc. Here we guess using Christine's specifications:
+
+
 
 Get input survey biomass and catch biomass for SS (these have q, selectivity, cv)
 
