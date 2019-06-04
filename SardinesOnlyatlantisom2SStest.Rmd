@@ -180,7 +180,7 @@ trueB_ss <- trueB %>%
   filter(species==species_ss)
 
 plotB <-ggplot() +
-  geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census N"), 
+  geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
             alpha = 10/10) +
   theme_tufte() +
   theme(legend.position = "top") +
@@ -316,7 +316,7 @@ Get true population parameters (M in progress, S-R, growth)
 
 ```
 
-Get true catch (may not be different from input for our project)
+Get true catch in tons (may not be different from input for our project)
 
 ```{r true-catchtot}
 
@@ -324,8 +324,10 @@ truecatchbio <- load_catch(d.name, file_catch = catch.file, fgs = funct.groups)
 
 truecatchbio_ss <- truecatchbio[truecatchbio$species == species_ss,]
 
+# note: time output of this file is in days
+# what model timestep is this output matching?
 plotcatch <- ggplot() +
-  geom_line(data=truecatchbio_ss, aes(x=time,y=atoutput, color="true catch bio"),
+  geom_line(data=truecatchbio_ss, aes(x=time/365,y=atoutput, color="true catch bio"),
             alpha = 10/10) +
   theme_tufte() +
   theme(legend.position = "top") +
@@ -336,7 +338,8 @@ plotcatch +
 
 ```
 
-Get true catch at age and other comps (may not be different from input for our project)
+Get true catch at age and other comps (may not be different from input for our project). First see if catch output is at same timescale as population by checking toutfinc: `r fstepperyr`
+
 
 ```{r true-catage-lf-wtage, eval=FALSE}
 
@@ -458,20 +461,33 @@ CVs <- list("lenage"=0.1, "fishery"=0.01, "survey"=0.1)
 #Number of years of data to pull
 nyears <- 50
 
-#Atlantis initialization period
+#Atlantis initialization period in years
 burnin <- 30
 
 #Maximum size of a fish in cm
 maxbin <- 150
 
-######    CHECK fish_years   ####### get in right units  #######
-# fishery output timestep
-fstepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutfinc
-
 #Years to fish, assuming fishing output is annual
-fish_years <- burnin:(burnin+nyears-1)
+#fish_years <- burnin:(burnin+nyears-1)
+# fishery output timestep (fstepperyr in census_spec.R) for this run is 5 per year
 
-#Years to survey
+# here we are summing the catch in numbers for input in to SS.
+# To use the total catch biomass output from catch.txt the above would work 
+# because the output is annual but in units of DAYS so needs time/365
+
+#The last timestep to sample
+total_sample <- noutsteps #495
+
+#Vector of indices of catch in numbers to pull
+fish_sample_full <- c(0:total_sample)
+fish_burnin <- burnin*fstepperyr
+fish_nyears <- nyears*fstepperyr
+fish_times <- fish_sample_full[fish_burnin:(fish_burnin+fish_nyears-1)]
+fish_years <- seq(fish_times[1], max(fish_times), by=fstepperyr) #last timestep
+
+# potential problem: fish_years dont match survey_years timesteps below
+
+#Years to survey, assuming survey is once per year
 survey_years <- survey_sample_full[burnin:(burnin+nyears-1)]
 
 #Month of survey/fishing
@@ -543,6 +559,8 @@ cv <- data.frame(species="Pacific_sardine", cv=CVs$survey)
 
 #Sample survey biomass
 survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
+# check against survey with truth$biomass_ages output
+
 
 # survey numbers, not sure which SS needs?
 survObsNum <- sample_survey_numbers(dat=survey_out,cv=cv)
@@ -556,12 +574,21 @@ Get input total catch for SS (here using numbers). SS takes a fishery cv which c
 
 # catch at age by area
 catch_numbers <-  create_fishery_subset(dat = truth$catch,
-                                         #time = fish_years,
-                                         time = survey_sample_full,
+                                         time = fish_times,
                                          species = species,
                                          boxes = boxall)
 
-# catch in numbers
+
+if (fstepperyr>1){
+  #need to take all output time steps and sum catch over each year
+  #catch_numbers <- for yr in 0:nyears
+  #sum catch_numbers$atoutput for time 0:fstepperyr
+  #call that atoutput at time=yr+fstepperyr
+  #should match fish_years
+  #return the new dataset with same shape but time in endyr increments and sum nums
+}
+
+# catch in numbers summed over polygon after time has been aggregated into 1 yr
 catch_total <- catch_numbers %>%
   group_by(time) %>%
   summarise(catch=sum(atoutput))
@@ -595,15 +622,13 @@ catch_numssshigh <- sample_fish(catch_numbers, effN)
 #Get weights
 # aggregate true resn per survey or fishery subset design
 catch_aggresnss <- aggregateDensityData(dat = truth$resn,
-                                 #time = fish_years,
-                                 time = survey_sample_full,
+                                 time = fish_times,
                                  species = species,
                                  boxes = boxall)
 
 # aggregate true structn per survey or fishery subsetdesign
 catch_aggstructnss <- aggregateDensityData(dat = truth$structn,
-                                 #time = fish_years,
-                                 time = survey_sample_full,
+                                 time = fish_times,
                                  species = species,
                                  boxes = boxall)
 
