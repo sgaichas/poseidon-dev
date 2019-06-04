@@ -1,0 +1,199 @@
+---
+title: "Is Biomass Ages Broken?"
+author: "Sarah Gaichas"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+library(ggforce)
+library(ggthemes)
+library(atlantisom)
+
+```
+
+```{r constants}
+
+initCCA <- TRUE
+initNEUS <- FALSE
+initNOBA <- FALSE
+
+species_ss <- c("Pacific_sardine")
+
+# make up a constant 0 cv for testing
+surv_cv <- data.frame(species=species_ss, cv=rep(0.0,length(species_ss)))
+
+# call sample_survey_biomass with a bunch of 1000s for weight at age
+# in the code it multiplies atoutput by wtatage/1000 so this allows us to use
+# biomass directly
+wtage <- data.frame(species=rep(species_ss, each=10),
+                    agecl=rep(c(1:10),length(species_ss)),
+                    wtAtAge=rep(1000.0,length(species_ss)*10))
+
+```
+
+## This used to work
+
+Before I cleverly changed sample_survey_biomass to have the right units to use weight at age. Now if we want biomass_ages to give a correct survey, the fake wtage we give it needs to be 1000 instead of 1. So much for a shortcut.
+
+Test biomass_ages use in create survey in old CCA run vs new CCA run
+
+```{r truth-oldCCA}
+
+source(here("config/CC1Config.R"))
+
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+source(here("config/census_spec.R"))
+
+sardold <- run_truth(scenario = scenario.name,
+                     dir = d.name,
+                     file_fgs = functional.groups.file,
+                     file_bgm = box.file,
+                     select_groups = species_ss,
+                     file_init = initial.conditions.file,
+                     file_biolprm = biol.prm.file,
+                     file_runprm = run.prm.file,
+                     verbose = TRUE
+)
+
+survey_testBold <- create_survey(dat = sardold$biomass_ages,
+                                 time = timeall,
+                                 species = species_ss,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+surveyB_frombio_old <- sample_survey_biomass(survey_testBold, surv_cv, wtage)
+
+# read Atlantis output files
+atBtxt2old <- read.table(file.path(d.name, paste0("output", scenario.name, "BiomIndx.txt")), header=T)
+  
+# lookup the matching names, put in time, species, biomass column format
+# WARNING hardcoded for output with last species group as DIN
+groupslookup <- funct.groups %>%
+  filter(IsTurnedOn > 0)
+
+atBtxt2tidyold <- atBtxt2old %>%
+  select(Time:DIN) %>%
+  #select(Time, FPL:DIN) %>%
+  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, biomass, -Time) %>%
+  filter(species %in% species_ss)
+
+```
+
+Compare with BiomIndex.txt
+
+```{r compareold}
+
+surveyB_lastweek_old <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+
+surveyB_lastweek <- surveyB_lastweek_old %>%
+  filter(species==species_ss)
+
+compareB <-ggplot() +
+  geom_line(data=surveyB_frombio_old, aes(x=time/5,y=atoutput, color="survey census B"), 
+            alpha = 10/10) +
+  geom_line(data=surveyB_lastweek, aes(x=time/5,y=atoutput, color="survey census B last week"), 
+            alpha = 1/10) +
+  geom_point(data=atBtxt2tidyold, aes(x=Time/365,y=biomass, color="txt output true B"),
+           alpha = 10/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compareB + 
+  facet_wrap(~species, scales="free") 
+
+
+```
+
+
+## Why doesnt it now? It does now.
+
+
+```{r truth-newCCA}
+
+source(here("config/CC2Config.R"))
+
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+source(here("config/census_spec.R"))
+
+sardnew <- run_truth(scenario = scenario.name,
+                     dir = d.name,
+                     file_fgs = functional.groups.file,
+                     file_bgm = box.file,
+                     select_groups = species_ss,
+                     file_init = initial.conditions.file,
+                     file_biolprm = biol.prm.file,
+                     file_runprm = run.prm.file,
+                     verbose = TRUE
+)
+
+survey_testBnew <- create_survey(dat = sardnew$biomass_ages,
+                                 time = timeall,
+                                 species = species_ss,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+surveyB_frombio_new <- sample_survey_biomass(survey_testBnew, surv_cv, wtage)
+
+# read Atlantis output files
+atBtxt2new <- read.table(file.path(d.name, paste0("output", scenario.name, "BiomIndx.txt")), header=T)
+  
+# lookup the matching names, put in time, species, biomass column format
+# WARNING hardcoded for output with last species group as DIN
+groupslookup <- funct.groups %>%
+  filter(IsTurnedOn > 0)
+
+atBtxt2tidynew <- atBtxt2new %>%
+  select(Time:DIN) %>%
+  #select(Time, FPL:DIN) %>%
+  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, biomass, -Time) %>%
+  filter(species %in% species_ss)
+
+```
+
+Compare with BiomIndex.txt
+
+```{r comparenew}
+
+compareB <-ggplot() +
+  geom_line(data=surveyB_frombio_new, aes(x=time/5,y=atoutput, color="survey census B"), 
+            alpha = 10/10) +
+  geom_point(data=atBtxt2tidynew, aes(x=Time/365,y=biomass, color="txt output true B"),
+             alpha = 10/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compareB + 
+  facet_wrap(~species, scales="free") 
+
+
+```
+

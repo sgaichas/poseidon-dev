@@ -124,10 +124,10 @@ source(here("config/census_spec.R"))
 
 Get true total biomass, total numbers. This code gets results for all species and saves the output true B and N.
 
-```{r trueB-N, eval=FALSE}
+```{r trueB-N}
 
 # this uses result$biomass_ages to sample biomass directly, no need for wt@age est
-
+# this used to work and is now wrong!
 survey_testBall <- create_survey(dat = truth$biomass_ages,
                                  time = timeall,
                                  species = survspp,
@@ -138,12 +138,12 @@ survey_testBall <- create_survey(dat = truth$biomass_ages,
 # make up a constant 0 cv for testing
 surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
 
-# call sample_survey_biomass with a bunch of 1s for weight at age
-# in the code it multiplies atoutput by wtatage so this allows us to use
+# call sample_survey_biomass with a bunch of 1000s for weight at age
+# in the code it multiplies atoutput by wtatage/1000 so this allows us to use
 # biomass directly
 wtage <- data.frame(species=rep(survspp, each=10),
                     agecl=rep(c(1:10),length(survspp)),
-                    wtAtAge=rep(1.0,length(survspp)*10))
+                    wtAtAge=rep(1000.0,length(survspp)*10))
 
 surveyB_frombio <- sample_survey_biomass(survey_testBall, surv_cv, wtage)
 
@@ -179,9 +179,24 @@ trueB <- readRDS(file.path(d.name, paste0(scenario.name,"surveyBcensus.rds")))
 trueB_ss <- trueB %>%
   filter(species==species_ss)
 
+# read Atlantis output files
+atBtxt2 <- read.table(file.path(d.name, paste0("output", scenario.name, "BiomIndx.txt")), header=T)
+groupslookup <- funct.groups %>%
+  filter(IsTurnedOn > 0)
+
+atBtxt2tidy <- atBtxt2 %>%
+  select(Time:DIN) %>%
+  #select(Time, FPL:DIN) %>%
+  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, biomass, -Time) %>%
+  filter(species %in% c("Pacific_sardine"))
+
+
 plotB <-ggplot() +
   geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
             alpha = 10/10) +
+  geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
+             alpha = 1/10) + 
   theme_tufte() +
   theme(legend.position = "top") +
   labs(colour=scenario.name)
@@ -523,11 +538,11 @@ survey_out <- create_survey(dat=truth$nums,
                             selex=sel)
 
 #Try a biomass based survey for comparison
-survey_outB <- create_survey(dat=truth$biomass_ages, 
-                            time=survey_sample_full, 
-                            species=species, 
-                            boxes=boxall, 
-                            effic=effic, 
+survey_outB <- create_survey(dat=truth$biomass_ages,
+                            time=survey_sample_full,
+                            species=species,
+                            boxes=boxall,
+                            effic=effic,
                             selex=sel)
 
 
@@ -578,7 +593,7 @@ survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
 # check against survey with truth$biomass_ages output
 wtage1 <- data.frame(species=rep(species_ss, each=10),
                     agecl=rep(c(1:10),length(species_ss)),
-                    wtAtAge=rep(1.0,length(species_ss)*10))
+                    wtAtAge=rep(1000.0,length(species_ss)*10))
 
 survObsBiomB <- sample_survey_biomass(dat=survey_outB,cv=cv,wtage1)
 
@@ -588,11 +603,13 @@ survObsNum <- sample_survey_numbers(dat=survey_out,cv=cv)
 
 ```
 
-Do some comparisons of biomass surveys with truth. Something is going way wrong in the calculation of survey biomass based on numbers times weight at age, looks like division by 1000 could fix it?.
+Do some comparisons of biomass surveys with truth. Something is going way wrong in the calculation of survey biomass based on numbers times weight at age, looks like division by 1000 could fix it? Actually no the true biomass based on survey is wrong.
 
 ```{r plotBseries}
 
 plotB <-ggplot() +
+    geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
+             alpha = 1/10) + 
   geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
             alpha = 10/10) +
   geom_point(data=survObsBiomB, aes(x=time/stepperyr,y=atoutput, color="survey sample B from biomass_ages"), 
@@ -605,9 +622,11 @@ plotB +
   facet_wrap(~species, scales="free") 
 
 plotB <-ggplot() +
-  geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
+    geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
+             alpha = 10/10) + 
+    geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
             alpha = 10/10) +
-  geom_point(data=survObsBiom, aes(x=time/stepperyr,y=atoutput/1000, color="survey sample B from nums * wtAtAge"), 
+  geom_point(data=survObsBiom, aes(x=time/stepperyr,y=atoutput, color="survey sample B from nums * wtAtAge"), 
             alpha = 10/10) +
   theme_tufte() +
   theme(legend.position = "top") +
@@ -740,6 +759,10 @@ Write time series biomass (tons) and catch (numbers) data for SS using `SS_write
                 units = c("biomass","numbers"),
                 data_type=c("CPUE","catch"),
                 fleets = c(2,1))
+
+stocksynthesis.data$CPUE
+
+stocksynthesis.data$catch
 ```
 
 Writing age composition data 
@@ -778,7 +801,7 @@ fish_len_comp_data <- catch_length$natlength
 
 Once we have the natlength matrix, we can munge the data into the proper CAAL and length bin format for SS
 
-```{r SS-comps-formatting}
+```{r SS-comps-formatting, eval=FALSE}
 
 #getting an error in here, I think it is the definition of fish_years
 #Error in x[[jj]][iseq] <- vjj : replacement has length zero
