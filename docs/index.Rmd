@@ -129,4 +129,8 @@ Fishery catch problem, older codebase has a bug in output. Test with NOBA...
 
 May 24: Either `calc_Z` or `calc_stage2age` or both are incorrect if we expect them to exactly match atlantis annual age ouput where it is available. We match in timestep 0, then diverge. May 27 update: also true for Bocaccio in CCA, the interim numbers at age drop to 0.
 
+### Rabbit holes that turned out ok
+
+<a href="https://sgaichas.github.io/poseidon-dev/CheckBiomassAges.html" target="_blank">In which I broke the very first thing that worked, then fixed it - June 4, 2019</a>
+
 ### More to come later!
