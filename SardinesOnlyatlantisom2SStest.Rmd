@@ -442,7 +442,10 @@ sel_by_age <- rep(1,length(age_classes))
 timestep <- stepperyr #5
 
 #Which atlantis timestep does the survey run in?--now from census_spec.R
-survey_sample_time <- midptyr #3
+# with 5 output steps per year, 0 is Jan-Feb-midMar, 1 is midMar-Apr-May, 
+# 2 is June-July-midAug, 3 is midAug-Sept-Oct, 4 is Nov-Dec (ish)
+
+survey_sample_time <- midptyr #3 this is more late summer-fall, changed to 2
 
 #The last timestep to sample
 total_sample <- noutsteps #495
@@ -467,8 +470,8 @@ burnin <- 30
 #Maximum size of a fish in cm
 maxbin <- 150
 
-#Years to fish, assuming fishing output is annual
-#fish_years <- burnin:(burnin+nyears-1)
+#Years to fish, assuming fishing output is annual and years index 1,2,3 etc
+fish_years <- burnin:(burnin+nyears-1)
 # fishery output timestep (fstepperyr in census_spec.R) for this run is 5 per year
 
 # here we are summing the catch in numbers for input in to SS.
@@ -476,16 +479,19 @@ maxbin <- 150
 # because the output is annual but in units of DAYS so needs time/365
 
 #The last timestep to sample
-total_sample <- noutsteps #495
+total_sample <- noutsteps-1 #495
 
-#Vector of indices of catch in numbers to pull
+#Vector of indices of catch in numbers to pull (by timestep to sum)
 fish_sample_full <- c(0:total_sample)
-fish_burnin <- burnin*fstepperyr
+fish_burnin <- burnin*fstepperyr+1
 fish_nyears <- nyears*fstepperyr
 fish_times <- fish_sample_full[fish_burnin:(fish_burnin+fish_nyears-1)]
-fish_years <- seq(fish_times[1], max(fish_times), by=fstepperyr) #last timestep
+#fish_timesteps <- seq(fish_times[1], max(fish_times), by=fstepperyr) #last timestep
+#fish_years <- unique(floor(fish_times/fstepperyr))
 
-# potential problem: fish_years dont match survey_years timesteps below
+# potential problem: while they are from the same model year,
+# fish_years dont match survey_years timesteps (survey mid year, fishery end)
+# so when matching use the index, not the value itself
 
 #Years to survey, assuming survey is once per year
 survey_years <- survey_sample_full[burnin:(burnin+nyears-1)]
@@ -515,6 +521,15 @@ survey_out <- create_survey(dat=truth$nums,
                             boxes=boxall, 
                             effic=effic, 
                             selex=sel)
+
+#Try a biomass based survey for comparison
+survey_outB <- create_survey(dat=truth$biomass_ages, 
+                            time=survey_sample_full, 
+                            species=species, 
+                            boxes=boxall, 
+                            effic=effic, 
+                            selex=sel)
+
 
 #Set effective sample size for age compositions
 effN <- surveyEffN
@@ -559,8 +574,13 @@ cv <- data.frame(species="Pacific_sardine", cv=CVs$survey)
 
 #Sample survey biomass
 survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
-# check against survey with truth$biomass_ages output
 
+# check against survey with truth$biomass_ages output
+wtage1 <- data.frame(species=rep(species_ss, each=10),
+                    agecl=rep(c(1:10),length(species_ss)),
+                    wtAtAge=rep(1.0,length(species_ss)*10))
+
+survObsBiomB <- sample_survey_biomass(dat=survey_outB,cv=cv,wtage1)
 
 # survey numbers, not sure which SS needs?
 survObsNum <- sample_survey_numbers(dat=survey_out,cv=cv)
@@ -568,36 +588,72 @@ survObsNum <- sample_survey_numbers(dat=survey_out,cv=cv)
 
 ```
 
+Do some comparisons of biomass surveys with truth. Something is going way wrong in the calculation of survey biomass based on numbers times weight at age, looks like division by 1000 could fix it?.
+
+```{r plotBseries}
+
+plotB <-ggplot() +
+  geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
+            alpha = 10/10) +
+  geom_point(data=survObsBiomB, aes(x=time/stepperyr,y=atoutput, color="survey sample B from biomass_ages"), 
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotB +
+  facet_wrap(~species, scales="free") 
+
+plotB <-ggplot() +
+  geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
+            alpha = 10/10) +
+  geom_point(data=survObsBiom, aes(x=time/stepperyr,y=atoutput/1000, color="survey sample B from nums * wtAtAge"), 
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotB +
+  facet_wrap(~species, scales="free") 
+```
+
 Get input total catch for SS (here using numbers). SS takes a fishery cv which can be applied here to get a catch time series, or we can input true catch.
 
 ```{r toSS-fisheryts}
 
-# catch at age by area
+# catch at age by area and timestep
 catch_numbers <-  create_fishery_subset(dat = truth$catch,
                                          time = fish_times,
                                          species = species,
                                          boxes = boxall)
 
-
 if (fstepperyr>1){
   #need to take all output time steps and sum catch over each year
-  #catch_numbers <- for yr in 0:nyears
-  #sum catch_numbers$atoutput for time 0:fstepperyr
-  #call that atoutput at time=yr+fstepperyr
-  #should match fish_years
-  #return the new dataset with same shape but time in endyr increments and sum nums
+  catch_numbers_area <- catch_numbers %>%
+    #assign a temporary year column, aggregate nums over this year
+    mutate(yr = floor(time/fstepperyr)) %>%
+    group_by(species, agecl, polygon, yr) %>%
+    summarise(anncatch_area=sum(atoutput))
+  
+  # catch in numbers summed over polygon 
+  # and agecl after time has been aggregated into 1 yr
+  catch_total <- catch_numbers_area %>%
+    group_by(yr) %>%
+    summarise(catch=sum(anncatch_area))
 }
 
-# catch in numbers summed over polygon after time has been aggregated into 1 yr
-catch_total <- catch_numbers %>%
-  group_by(time) %>%
-  summarise(catch=sum(atoutput))
+# catch in numbers summed over polygon and agecl if output is annual
+if (fstepperyr==1){
+  catch_total <- catch_numbers %>%
+    group_by(time) %>%
+    summarise(catch=sum(atoutput))
+}
 
-# the above can be done with sample_survey_numbers and the fishery cv can be applied
-# CV function
-cv <- data.frame(species="Pacific_sardine", cv=CVs$fishery)
+# if we want to apply the CV to this we need to write sample_total_catch
 
-catchObsNum <- sample_survey_numbers(dat=catch_numbers, cv=cv)
+#cv <- data.frame(species="Pacific_sardine", cv=CVs$fishery)
+
+#catchObsNum <- sample_total_catch(dat=catch_numbers, cv=cv)
 
 ```
 
@@ -617,16 +673,17 @@ age_comp_data <- sample_fish(survey_out, highEffN)
 #We end up using CAAL for the survey below, so let's generate fishery age comps instead
 effN <- data.frame(species=species, effN=effN)
 
+#catch at age each timestep summed over polygons
 catch_numssshigh <- sample_fish(catch_numbers, effN)
 
 #Get weights
-# aggregate true resn per survey or fishery subset design
+# aggregate true resn per fishery subset design
 catch_aggresnss <- aggregateDensityData(dat = truth$resn,
                                  time = fish_times,
                                  species = species,
                                  boxes = boxall)
 
-# aggregate true structn per survey or fishery subsetdesign
+# aggregate true structn fishery subsetdesign
 catch_aggstructnss <- aggregateDensityData(dat = truth$structn,
                                  time = fish_times,
                                  species = species,
@@ -637,6 +694,7 @@ catch_structnss <- sample_fish(catch_aggstructnss, effN, sample = FALSE)
 
 catch_resnss <-  sample_fish(catch_aggresnss, effN, sample = FALSE)
 
+# these fishery lengths and weight at age are each output timestep
 catch_length <- calc_age2length(structn = catch_structnss,
                                  resn = catch_resnss,
                                  nums = catch_numssshigh,
@@ -672,7 +730,7 @@ Write time series biomass (tons) and catch (numbers) data for SS using `SS_write
 ```{r SS-write-ts}
 #Test writing CPUE in biomass
   stocksynthesis.data <- SS_write_ts(ss_data_list = stocksynthesis.data,
-                ts_data = list(survObsBiom$atoutput[fish_years],
+                ts_data = list(survObsBiomB$atoutput[fish_years],
                   catch_total$catch[fish_years]),
                 CVs = c(CVs$survey,
                         CVs$fishery),
@@ -720,7 +778,7 @@ fish_len_comp_data <- catch_length$natlength
 
 Once we have the natlength matrix, we can munge the data into the proper CAAL and length bin format for SS
 
-```{r SS-comps-formatting, eval=FALSE}
+```{r SS-comps-formatting}
 
 #getting an error in here, I think it is the definition of fish_years
 #Error in x[[jj]][iseq] <- vjj : replacement has length zero
