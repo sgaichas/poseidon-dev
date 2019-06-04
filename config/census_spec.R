@@ -15,7 +15,7 @@ boxall <- c(0:(boxpars$nbox - 1))
 runpar <- load_runprm(d.name, run.prm.file)
 noutsteps <- runpar$tstop/runpar$outputstep
 stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
-midptyr <- round(median(seq(1,stepperyr)))
+midptyr <- round(median(seq(0,stepperyr)))
 
 # a survey that takes place once per year mid year
 annualmidyear <- seq(midptyr, noutsteps, stepperyr)
