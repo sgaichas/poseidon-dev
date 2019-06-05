@@ -539,13 +539,13 @@ timestep <- stepperyr #5
 survey_sample_time <- midptyr #3 this is more late summer-fall, changed to 2
 
 #The last timestep to sample
-total_sample <- noutsteps #495
+total_sample <- noutsteps-1 #495
 
 #Vector of indices of survey times to pull
 survey_sample_full <- seq(survey_sample_time,
                           total_sample, by=timestep)
 
-#Effective sample size for composition data
+#Effective sample size for composition data (annual total samples)
 surveyEffN <- 1000
 fisheryEffN <- 1000
 
@@ -562,7 +562,7 @@ burnin <- 30
 maxbin <- 150
 
 #Years to fish, assuming fishing output is annual and years index 1,2,3 etc
-fish_years <- burnin:(burnin+nyears-1)
+#fish_years <- burnin:(burnin+nyears-1)
 # fishery output timestep (fstepperyr in census_spec.R) for this run is 5 per year
 
 # here we are summing the catch in numbers for input in to SS.
@@ -578,7 +578,7 @@ fish_burnin <- burnin*fstepperyr+1
 fish_nyears <- nyears*fstepperyr
 fish_times <- fish_sample_full[fish_burnin:(fish_burnin+fish_nyears-1)]
 fish_timesteps <- seq(fish_times[5], max(fish_times), by=fstepperyr) #last timestep
-#fish_years <- unique(floor(fish_times/fstepperyr))
+fish_years <- unique(floor(fish_times/fstepperyr)+1)
 
 # potential problem: while they are from the same model year,
 # fish_years dont match survey_years timesteps (survey mid year, fishery end)
@@ -603,7 +603,7 @@ sel<- data.frame(species=rep(species,length(age_classes)),
 
 Get input survey biomass for SS (these have q, selectivity, cv)
 
-```{r toSS-surveyts}
+```{r toSS-surveyts-comps}
 
 #Sample survey - 3rd timestep simulates a summer survey
 survey_out <- create_survey(dat=truth$nums, 
@@ -772,22 +772,16 @@ compareC +
 
 Get composition inputs for SS (survey and fishery catch at age, survey and fishery lengths, survey and fishey weight at age)
 
-```{r toSS-surveyfisherycomps}
-
-#Set effective sample size for age compositions
-effN <- surveyEffN
-highEffN <- data.frame(species=species, effN=rep(effN, length(species)))
-
-#Sample fish for age composition from survey
-age_comp_data <- sample_fish(survey_out, highEffN)
+```{r toSS-fisherycomps}
 
 # Survey length comps and wtage done above to get survey ts using nums*wtage approach
 
 #We end up using CAAL for the survey below, so let's generate fishery age comps instead
+effN <- fisheryEffN/fstepperyr
 effN <- data.frame(species=species, effN=effN)
 
 #catch at age each timestep summed over polygons
-catch_numssshigh <- sample_fish(catch_numbers, effN)
+catch_numsss_samp <- sample_fish(catch_numbers, effN)
 
 #Get weights
 # aggregate true resn per fishery subset design
@@ -803,14 +797,14 @@ catch_aggstructnss <- aggregateDensityData(dat = truth$structn,
                                  boxes = boxall)
 
 #dont sample these, just aggregate them using median
-catch_structnss <- sample_fish(catch_aggstructnss, effN, sample = FALSE)
+catch_structnss_samp <- sample_fish(catch_aggstructnss, effN, sample = FALSE)
 
-catch_resnss <-  sample_fish(catch_aggresnss, effN, sample = FALSE)
+catch_resnss_samp <-  sample_fish(catch_aggresnss, effN, sample = FALSE)
 
 # these fishery lengths and weight at age are each output timestep
-catch_length <- calc_age2length(structn = catch_structnss,
-                                 resn = catch_resnss,
-                                 nums = catch_numssshigh,
+catch_lengthwt_samp <- calc_age2length(structn = catch_structnss_samp,
+                                 resn = catch_resnss_samp,
+                                 nums = catch_numsss_samp,
                                  biolprm = truth$biolprm, fgs = truth$fgs,
                                  maxbin = maxbin,
                                  CVlenage = CVs$lenage, remove.zeroes=TRUE)
@@ -818,12 +812,24 @@ catch_length <- calc_age2length(structn = catch_structnss,
 
 ```
 
-Can we match catch in weight from catch.txt? No, see above.
+<!--Can we match catch in weight from catch.txt? No, numbers sampled are 1e-6 compared with actual catch numbers.
 
 ```{r compareC-wt, eval=FALSE}
 
+CswtAtAge <- catch_lengthwt_samp$muweight %>%
+  select(species, agecl, time, wtAtAge = atoutput) %>%
+  mutate(wtAtAge = wtAtAge/1000)
+
+catchsampbio_ss <- merge(catch_numsss_samp,CswtAtAge,by=c("species","agecl", "time"),all.x=T) %>%
+  mutate(biomass = atoutput*wtAtAge/1000) %>%
+  mutate(yr = floor(time/fstepperyr)+1) %>%
+  group_by(species, yr) %>%
+  summarise(anncatchBsamp = sum(biomass))
+
 plotcatch <- ggplot() +
-  geom_line(data=truecatchbio_ss, aes(x=time/365,y=atoutput, color="true catch bio"),
+  geom_line(data=truecatchbio_ss, aes(x=time/365,y=atoutput/1000000, color="true catch bio"),
+            alpha = 10/10) +
+  geom_point(data=catchsampbio_ss, aes(x=yr,y=anncatchBsamp, color="sample catch B"), 
             alpha = 10/10) +
   theme_tufte() +
   theme(legend.position = "top") +
@@ -833,7 +839,7 @@ plotcatch +
   facet_wrap(~species, scales="free") 
 
 ```
-
+-->
 
 Get population parameters for SS from Atlantis
 
@@ -857,17 +863,15 @@ datfile_name))
 
 Write time series biomass (tons) and catch (numbers) data for SS using `SS_write_ts`:
 
-```{r SS-write-ts, eval=FALSE}
-
-# Error in `*tmp*`[[jj]] : subscript out of bounds
+```{r SS-write-ts}
 
 #Test writing CPUE in biomass
   stocksynthesis.data <- SS_write_ts(ss_data_list = stocksynthesis.data,
-                ts_data = list(survObsBiomB$atoutput[fish_years],
-                  catch_total$catch[fish_years]),
+                ts_data = list(survObsBiom$atoutput[fish_years],
+                  catch_total$catch[catch_total$yr %in% fish_years]),
                 CVs = c(CVs$survey,
                         CVs$fishery),
-                data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             catch_total$time[fish_years]),
+                data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             fish_years),
             sampling_month = list(rep(survey_month,nyears),
                                 rep(fishing_month,nyears)),
                 units = c("biomass","numbers"),
@@ -903,13 +907,6 @@ stocksynthesis.data <- SS_write_comps(ss_data_list = stocksynthesis.data,
                caal_bool = c(FALSE))
 stocksynthesis.data$agecomp
 
-#Check length compositions match age compositions
-#ss_length_stdsurv$natlength %>%
-#  group_by(time,agecl) %>%
-#  summarise(sum(atoutput))
-
-len_comp_data <- ss_length_stdsurv$natlength
-fish_len_comp_data <- catch_length$natlength
 
 ```
 
@@ -917,8 +914,23 @@ Once we have the natlength matrix, we can munge the data into the proper CAAL an
 
 ```{r SS-comps-formatting, eval=FALSE}
 
-#getting an error in here, I think it is the definition of fish_years
-#Error in x[[jj]][iseq] <- vjj : replacement has length zero
+#Check length compositions match age compositions
+#ss_length_stdsurv$natlength %>%
+#  group_by(time,agecl) %>%
+#  summarise(sum(atoutput))
+
+len_comp_data <- ss_length_stdsurv$natlength
+fish_len_comp_data <- catch_lengthwt_samp$natlength
+
+if(fstepperyr>1){
+  fish_len_comp_anndata <- fish_len_comp_data %>%
+    mutate(yr = floor(time/fstepperyr)) %>%
+    group_by(species, agecl, lower.bins, upper.bins, time=as.integer(yr)) %>%
+    summarise(annnatlength=sum(atoutput)) %>%
+    rename(atoutput = annnatlength)
+} else {
+  fish_len_comp_anndata <- fish_len_comp_data
+}
 
 caal_comp_flat <- reformat_compositions(len_comp_data,                                round.places=4,
                 comp_type="caalcomp")
@@ -940,22 +952,49 @@ len_comp_final <- filter(len_comp_flat,
 length_bins <- as.integer(names(len_comp_final))
 length_bins <- length_bins[!is.na(length_bins)]
 
-fish_len_comp_flat <- reformat_compositions(catch_length$natlength,
+# fishery length comps are still 5 timesteps per year
+# need to aggregate to annual (done above)
+# also,  make effN annual goal/fstepsperyr (done above)
+fish_len_comp_flat <- reformat_compositions(fish_len_comp_anndata,
                                   round.places = 0,
                            comp_type="lencomp")
-#remove burnin
+
+#remove burnin works after adjustment above
 fish_len_comp_final <- filter(fish_len_comp_flat,
                          time %in% fish_years)
 
-fish_age_comp_flat <- reformat_compositions(catch_numssshigh,
+# fishery age comps also 5 timesteps per year
+if(fstepperyr>1){
+  fish_age_comp_anndata <- catch_numsss_samp %>%
+    mutate(yr = floor(time/fstepperyr)) %>%
+    group_by(species, agecl, time=as.integer(yr)) %>%
+    summarise(annnatage=sum(atoutput)) %>%
+    rename(atoutput = annnatage)
+} else {
+  fish_age_comp_anndata <- catch_numsss_samp
+}
+
+fish_age_comp_flat <- reformat_compositions(fish_age_comp_anndata,
                            comp_type="agecomp")
-#remove burnin
+
+#remove burnin (not necessary?fish comps made with fish_years only) 
 fish_age_comp_final <- filter(fish_age_comp_flat,
                          time %in% fish_years)
 
-comp_list <- list(caal_comp_final,len_comp_final,          fish_age_comp_final, fish_len_comp_final)
+comp_list <- list(caal_comp_final,len_comp_final, fish_age_comp_final, fish_len_comp_final)
 
-apply_month <- list(rep(survey_month, nrow(comp_list[[1]])), rep(survey_month, nrow(comp_list[[2]])), rep(fishing_month,nrow(comp_list[[3]])),rep(fishing_month,nrow(comp_list[[4]])))
+apply_month <- list(rep(survey_month, nrow(comp_list[[1]])), 
+                    rep(survey_month, nrow(comp_list[[2]])),
+                    rep(fishing_month,nrow(comp_list[[3]])),
+                    rep(fishing_month,nrow(comp_list[[4]])))
+
+
+# below fails for fishery data if I keep timestep aligned with year 31
+# Error in `[.data.frame`(comp_matrix[[i]], , as.character(bins[[i]])) : undefined columns selected
+
+# assigning fishery comps to year 30 start (remove +1 after floors above) 
+# I get a different error
+# Error in `[<-.data.frame`(`*tmp*`, indices, "Seas", value = c(1, 1, 1, : replacement has 49 rows, data has 2045
 
 # Write CAAL and length composition data
 stocksynthesis.data <- SS_write_comps(ss_data_list = stocksynthesis.data, 
