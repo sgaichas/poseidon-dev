@@ -152,10 +152,10 @@ catch_total <- catch_numbers %>%
 #Test writing CPUE in biomass
   stocksynthesis.data <- SS_write_ts(ss_data_list = stocksynthesis.data,
                 ts_data = list(survObsBiom$atoutput[fish_years],
-                  catch_total$catch[fish_years]),
+                  catch_total$catch[catch_total$time==fish_years]),
                 CVs = c(CVs$survey,
                         CVs$fishery),
-                data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             catch_total$time[fish_years]),
+                data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             fish_years),
             sampling_month = list(rep(survey_month,nyears),
                                 rep(fishing_month,nyears)),
                 units = c("biomass","numbers"),
@@ -300,7 +300,7 @@ stocksynthesis.data$maximum_size <- "#"
 #Change minimum sample size to 0.001 for CAAL data (SS won't let it go lower than this)
 stocksynthesis.data$age_info$minsamplesize <- rep(0.001,2)
 
-SS_writedat_3.30(stocksynthesis.data, outfile = paste0("./inst/extdata/",model_dir,
+SS_writedat(stocksynthesis.data, outfile = paste0("./inst/extdata/",model_dir,
 datfile_name),
                  overwrite=TRUE)
 ```
