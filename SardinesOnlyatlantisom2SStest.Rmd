@@ -124,10 +124,9 @@ source(here("config/census_spec.R"))
 
 Get true total biomass, total numbers. This code gets results for all species and saves the output true B and N.
 
-```{r trueB-N}
+```{r trueB-N, eval=FALSE}
 
 # this uses result$biomass_ages to sample biomass directly, no need for wt@age est
-# this used to work and is now wrong!
 survey_testBall <- create_survey(dat = truth$biomass_ages,
                                  time = timeall,
                                  species = survspp,
@@ -196,7 +195,7 @@ plotB <-ggplot() +
   geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
             alpha = 10/10) +
   geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
-             alpha = 1/10) + 
+             alpha = 10/10) + 
   theme_tufte() +
   theme(legend.position = "top") +
   labs(colour=scenario.name)
@@ -364,8 +363,26 @@ catchN_ss <- create_fishery_subset(dat = truth$catch,
                                  species = species_ss,
                                  boxes = boxall)
 
+# try summing this to get true catch in nums by timestep with surv_cv = 0
+totcatchN <- sample_survey_numbers(catchN_ss, surv_cv)
+
+# save true total catch in numbers by timestep, need to sum to year
+saveRDS(totcatchN, file.path(d.name, paste0(scenario.name, "catchN_census_sard.rds")))
+
 # apply default sample fish as before to get numbers
-catch_numssshigh <- sample_fish(catchN_ss, effNhigh)
+# no, dont apply sample, effN isnt high enough and can't be made high enough
+#catch_numssshigh <- sample_fish(catchN_ss, effNhigh)
+
+# just aggregte true numbers over layer and polygon
+catch_numsss <- aggregate(catchN_ss$atoutput,list(catchN_ss$species,catchN_ss$agecl,catchN_ss$time),sum)
+names(catch_numsss) <- c("species","agecl","time","atoutput")
+catch_numssshigh <- data.frame(species = catch_numsss$species,
+					  agecl = catch_numsss$agecl,
+					  polygon = NA,
+					  layer = NA,
+					  time = catch_numsss$time,
+					  atoutput = catch_numsss$atoutput)
+
 
 # save true catch at age
 saveRDS(catch_numssshigh, file.path(d.name, paste0(scenario.name, "catchage_census_sard.rds")))
@@ -405,10 +422,29 @@ This is true catch at age for sardine:
 
 ```{r catage1}
 
+totcatchN <- readRDS(file.path(d.name, paste0(scenario.name, "catchN_census_sard.rds")))
+
 catch_numssshigh <- readRDS(file.path(d.name, paste0(scenario.name, "catchage_census_sard.rds")))
 
 catchage <- catch_numssshigh %>%
   filter(species == "Pacific_sardine")
+
+totcatchann <- totcatchN %>%
+  mutate(yr = floor(time/fstepperyr)) %>%
+  group_by(species, yr) %>%
+  summarise(anncatchage = sum(atoutput))
+# 
+# totcatch <- totcatchage %>%   
+#   group_by(species, yr) %>%
+#   summarise(truecatch = sum(anncatchage))
+# 
+plottotC <- ggplot(totcatchann, aes(x=yr, y=anncatchage)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchage$species))
+
+plottotC
   
 catageplot <- ggplot(catchage, aes(x=agecl, y=atoutput)) +
   geom_point() +
@@ -501,7 +537,7 @@ fish_sample_full <- c(0:total_sample)
 fish_burnin <- burnin*fstepperyr+1
 fish_nyears <- nyears*fstepperyr
 fish_times <- fish_sample_full[fish_burnin:(fish_burnin+fish_nyears-1)]
-#fish_timesteps <- seq(fish_times[1], max(fish_times), by=fstepperyr) #last timestep
+fish_timesteps <- seq(fish_times[5], max(fish_times), by=fstepperyr) #last timestep
 #fish_years <- unique(floor(fish_times/fstepperyr))
 
 # potential problem: while they are from the same model year,
@@ -609,7 +645,7 @@ Do some comparisons of biomass surveys with truth. Something is going way wrong 
 
 plotB <-ggplot() +
     geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
-             alpha = 1/10) + 
+             alpha = 10/10) + 
   geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
             alpha = 10/10) +
   geom_point(data=survObsBiomB, aes(x=time/stepperyr,y=atoutput, color="survey sample B from biomass_ages"), 
@@ -747,6 +783,9 @@ datfile_name))
 Write time series biomass (tons) and catch (numbers) data for SS using `SS_write_ts`:
 
 ```{r SS-write-ts}
+
+# Error in `*tmp*`[[jj]] : subscript out of bounds
+
 #Test writing CPUE in biomass
   stocksynthesis.data <- SS_write_ts(ss_data_list = stocksynthesis.data,
                 ts_data = list(survObsBiomB$atoutput[fish_years],
