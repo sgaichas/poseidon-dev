@@ -234,7 +234,17 @@ survey_N_ss <- create_survey(dat = truth$nums,
                                  selex = selex1)
 
 # apply default sample fish to get numbers, effNhigh samples all, see census_spec
-numssshigh <- sample_fish(survey_N_ss, effNhigh)
+# NOPE! effNhigh is not big enough for census of sardines, bigger breaks function
+#numssshigh <- sample_fish(survey_N_ss, effNhigh)
+
+numsss <- aggregate(survey_N_ss$atoutput,list(survey_N_ss$species,survey_N_ss$agecl,survey_N_ss$time),sum)
+names(numsss) <- c("species","agecl","time","atoutput")
+numssshigh <- data.frame(species = numsss$species,
+					  agecl = numsss$agecl,
+					  polygon = NA,
+					  layer = NA,
+					  time = numsss$time,
+					  atoutput = numsss$atoutput)
 
 # save age comps
 saveRDS(numssshigh, file.path(d.name, paste0(scenario.name, "natage_census_sard.rds")))
@@ -405,7 +415,7 @@ catch_structnss <- sample_fish(catch_aggstructnss, effNhigh, sample = FALSE)
 
 catch_resnss <-  sample_fish(catch_aggresnss, effNhigh, sample = FALSE)
 
-# get catch lengths and wtage
+# get catch lengths and wtage at every timestep
 catch_length_census_ss <- calc_age2length(structn = catch_structnss,
                                  resn = catch_resnss,
                                  nums = catch_numssshigh,
@@ -422,30 +432,11 @@ This is true catch at age for sardine:
 
 ```{r catage1}
 
-totcatchN <- readRDS(file.path(d.name, paste0(scenario.name, "catchN_census_sard.rds")))
-
 catch_numssshigh <- readRDS(file.path(d.name, paste0(scenario.name, "catchage_census_sard.rds")))
 
 catchage <- catch_numssshigh %>%
   filter(species == "Pacific_sardine")
 
-totcatchann <- totcatchN %>%
-  mutate(yr = floor(time/fstepperyr)) %>%
-  group_by(species, yr) %>%
-  summarise(anncatchage = sum(atoutput))
-# 
-# totcatch <- totcatchage %>%   
-#   group_by(species, yr) %>%
-#   summarise(truecatch = sum(anncatchage))
-# 
-plottotC <- ggplot(totcatchann, aes(x=yr, y=anncatchage)) +
-  geom_point() +
-  theme_tufte() +
-  labs(subtitle = paste(scenario.name,
-                        catchage$species))
-
-plottotC
-  
 catageplot <- ggplot(catchage, aes(x=agecl, y=atoutput)) +
   geom_point() +
   theme_tufte() +
@@ -458,6 +449,55 @@ catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free
 catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
 
 ```
+
+Do true catch numbers times weight at age match catch in biomass? No. It is about 16 times too high relative to catch.txt output, and shifted one year back (which is due to the floor function, and an easy fix). 
+
+```{r catchNtoB}
+
+totcatchN <- readRDS(file.path(d.name, paste0(scenario.name, "catchN_census_sard.rds")))
+
+totcatchann <- totcatchN %>%
+  mutate(yr = floor(time/fstepperyr)+1) %>%
+  group_by(species, yr) %>%
+  summarise(anncatchage = sum(atoutput))
+
+plottotC <- ggplot(totcatchann, aes(x=yr, y=anncatchage)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste("Catch in N ", scenario.name,
+                        totcatchann$species))
+
+plottotC
+
+catch_numssshigh <- readRDS(file.path(d.name, paste0(scenario.name, "catchage_census_sard.rds")))
+
+catch_lengthwt_census_ss <- readRDS(file.path(d.name, paste0(scenario.name, "catchlengthwt_census_sard.rds")))
+
+CwtAtAge <- catch_lengthwt_census_ss$muweight %>%
+  select(species, agecl, time, wtAtAge = atoutput) %>%
+  mutate(wtAtAge = wtAtAge/1000)
+
+catchbioN_ss <- merge(catch_numssshigh,CwtAtAge,by=c("species","agecl", "time"),all.x=T) %>%
+  mutate(biomass = atoutput*wtAtAge/1000) %>%
+  mutate(yr = floor(time/fstepperyr)+1) %>%
+  group_by(species, yr) %>%
+  summarise(anncatchB = sum(biomass))
+
+
+plotcatch <- ggplot() +
+  geom_line(data=truecatchbio_ss, aes(x=time/365,y=atoutput, color="true catch bio from txt"),
+            alpha = 10/10) +
+  geom_point(data=catchbioN_ss, aes(x=yr,y=anncatchB/16, color="true catch bio from N/16"),
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotcatch +
+  facet_wrap(~species, scales="free") 
+
+```
+
 
 ## “Data” from OM for EMs
 
@@ -639,12 +679,12 @@ survObsNum <- sample_survey_numbers(dat=survey_out,cv=cv)
 
 ```
 
-Do some comparisons of biomass surveys with truth. Something is going way wrong in the calculation of survey biomass based on numbers times weight at age, looks like division by 1000 could fix it? Actually no the true biomass based on survey is wrong.
+Do some comparisons of biomass surveys with truth. 
 
 ```{r plotBseries}
 
 plotB <-ggplot() +
-    geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
+  geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
              alpha = 10/10) + 
   geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
             alpha = 10/10) +
@@ -686,7 +726,7 @@ if (fstepperyr>1){
   #need to take all output time steps and sum catch over each year
   catch_numbers_area <- catch_numbers %>%
     #assign a temporary year column, aggregate nums over this year
-    mutate(yr = floor(time/fstepperyr)) %>%
+    mutate(yr = floor(time/fstepperyr)+1) %>%
     group_by(species, agecl, polygon, yr) %>%
     summarise(anncatch_area=sum(atoutput))
   
@@ -712,6 +752,24 @@ if (fstepperyr==1){
 
 ```
 
+Check this against true total catch numbers above. Should be the same.
+
+```{r compare-totcatch}
+
+compareC <- ggplot() +
+  geom_line(data=totcatchann, aes(x=yr, y=anncatchage, color="census catch N"), 
+            alpha = 10/10) +
+  geom_point(data=catch_total, aes(x=yr,y=catch, color="sample catch N"), 
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compareC +
+  facet_wrap(~species, scales="free") 
+
+```
+
 Get composition inputs for SS (survey and fishery catch at age, survey and fishery lengths, survey and fishey weight at age)
 
 ```{r toSS-surveyfisherycomps}
@@ -720,7 +778,7 @@ Get composition inputs for SS (survey and fishery catch at age, survey and fishe
 effN <- surveyEffN
 highEffN <- data.frame(species=species, effN=rep(effN, length(species)))
 
-#Sample fish for age composition
+#Sample fish for age composition from survey
 age_comp_data <- sample_fish(survey_out, highEffN)
 
 # Survey length comps and wtage done above to get survey ts using nums*wtage approach
@@ -760,6 +818,23 @@ catch_length <- calc_age2length(structn = catch_structnss,
 
 ```
 
+Can we match catch in weight from catch.txt? No, see above.
+
+```{r compareC-wt, eval=FALSE}
+
+plotcatch <- ggplot() +
+  geom_line(data=truecatchbio_ss, aes(x=time/365,y=atoutput, color="true catch bio"),
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotcatch +
+  facet_wrap(~species, scales="free") 
+
+```
+
+
 Get population parameters for SS from Atlantis
 
 ```{r toSS-poppars}
@@ -782,7 +857,7 @@ datfile_name))
 
 Write time series biomass (tons) and catch (numbers) data for SS using `SS_write_ts`:
 
-```{r SS-write-ts}
+```{r SS-write-ts, eval=FALSE}
 
 # Error in `*tmp*`[[jj]] : subscript out of bounds
 
