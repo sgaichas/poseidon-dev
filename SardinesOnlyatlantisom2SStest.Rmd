@@ -365,7 +365,7 @@ plotcatch +
 Get true catch at age and other comps (may not be different from input for our project). First see if catch output is at same timescale as population by checking toutfinc: `r fstepperyr`
 
 
-```{r true-catage-lf-wtage, eval=FALSE}
+```{r true-catage-lf-wtage}
 
 # get survey nums with full (no) selectivity
 catchN_ss <- create_fishery_subset(dat = truth$catch,
@@ -450,7 +450,9 @@ catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free
 
 ```
 
-Do true catch numbers times weight at age match catch in biomass? No. It is about 16 times too high relative to catch.txt output, and shifted one year back (which is due to the floor function, and an easy fix). 
+Do true catch numbers times weight at age match catch in biomass? It was about 16 times too high relative to catch.txt output, and shifted one year back (which is due to the floor function, and an easy fix). 
+
+June 6: just corrected the catch nums correction in `run_truth` and I hope it matches now.  
 
 ```{r catchNtoB}
 
@@ -487,7 +489,7 @@ catchbioN_ss <- merge(catch_numssshigh,CwtAtAge,by=c("species","agecl", "time"),
 plotcatch <- ggplot() +
   geom_line(data=truecatchbio_ss, aes(x=time/365,y=atoutput, color="true catch bio from txt"),
             alpha = 10/10) +
-  geom_point(data=catchbioN_ss, aes(x=yr,y=anncatchB/16, color="true catch bio from N/16"),
+  geom_point(data=catchbioN_ss, aes(x=yr,y=anncatchB, color="true catch bio from N"),
             alpha = 10/10) +
   theme_tufte() +
   theme(legend.position = "top") +
