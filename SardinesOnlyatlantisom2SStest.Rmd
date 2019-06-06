@@ -602,7 +602,7 @@ fish_years <- unique(floor(fish_times/fstepperyr)+1)
 # so when matching use the index, not the value itself
 
 #Years to survey, assuming survey is once per year
-survey_years <- survey_sample_full[burnin:(burnin+nyears-1)]
+survey_years <- survey_sample_full[(burnin+1):(burnin+nyears)]
 
 #Month of survey/fishing
 survey_month <- 7
@@ -1006,12 +1006,14 @@ apply_month <- list(rep(survey_month, nrow(comp_list[[1]])),
                     rep(fishing_month,nrow(comp_list[[4]])))
 
 
-# below fails for fishery data if I keep timestep aligned with year 31
+# below fails with two errors (only gets to first when running)
+
+# Error in `[<-.data.frame`(`*tmp*`, indices, "Seas", value = c(1, 1, 1, : replacement has 49 rows, data has 2045
+
 # Error in `[.data.frame`(comp_matrix[[i]], , as.character(bins[[i]])) : undefined columns selected
 
-# assigning fishery comps to year 30 start (remove +1 after floors above) 
-# I get a different error
-# Error in `[<-.data.frame`(`*tmp*`, indices, "Seas", value = c(1, 1, 1, : replacement has 49 rows, data has 2045
+# both these errors come from the fishery age and length comps when I step
+# through the function, survey caal and lengths read in fine
 
 # Write CAAL and length composition data
 stocksynthesis.data <- SS_write_comps(ss_data_list = stocksynthesis.data, 
