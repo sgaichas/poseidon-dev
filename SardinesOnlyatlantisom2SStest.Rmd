@@ -365,7 +365,7 @@ plotcatch +
 Get true catch at age and other comps (may not be different from input for our project). First see if catch output is at same timescale as population by checking toutfinc: `r fstepperyr`
 
 
-```{r true-catage-lf-wtage}
+```{r true-catage-lf-wtage, eval=FALSE}
 
 # get survey nums with full (no) selectivity
 catchN_ss <- create_fishery_subset(dat = truth$catch,
@@ -497,6 +497,21 @@ plotcatch <- ggplot() +
 
 plotcatch +
   facet_wrap(~species, scales="free") 
+
+```
+
+Sadly, still a problem with the catch correction if it should match catch.txt when comverted to biomass. We are now off by about a factor of 2 (catch nums * wtAtAge is half true catch bio from the txt file):
+
+```{r catchoff}
+sardcatchB <- truecatchbio_ss %>%
+  mutate(yr = as.integer(time/365))
+
+sardcatchBcomp <- merge(sardcatchB, catchbioN_ss)
+sardcatchBcomp <- mutate(sardcatchBcomp, mult=atoutput/anncatchB)
+
+mean(sardcatchBcomp$mult)
+
+summary(sardcatchBcomp$mult)
 
 ```
 
