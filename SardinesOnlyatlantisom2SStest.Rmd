@@ -83,28 +83,6 @@ if(!file.exists(file.path(d.name,
 }
 ```
 
-<!--In this block, `test` was a vector of 0s, meaning the correction run separately and the new correction implemented in `run_truth` are producing the same results:
-
-```{r catchnums-check, eval=FALSE}
-
-# this was run with results in CalCurrent2013_OA_off folder and run_truth_sardines
-
-catchnumfull <- readRDS(file.path(d.name, paste0(scenario.name, "catchnums_corrected.rds")))
-
-catchnum_ss <- catchnumfull %>%
-  filter(species == species_ss) %>%
-  arrange(time, polygon, agecl)
-  
-new_catage <- truth$catch %>%
-  arrange(time, polygon, agecl)
-
-test <- catchnum_ss$atoutput - new_catage$atoutput
-
-# test is all 0 so this worked the same way
-
-```
--->
-
 In the big picture, we will have the true population dynamics from Atlantis which we need for reference to compare with estimated population dynamics from the stock assessment estimation models. 
 
 Ideally we will have a function that gets the whole truth (and nothing but the truth) from Atlantis and stores it in a sensible way for later comparison and calculation of performance metrics.
@@ -350,8 +328,11 @@ truecatchbio_ss <- truecatchbio[truecatchbio$species == species_ss,]
 
 # note: time output of this file is in days
 # what model timestep is this output matching?
+# rescale catch in biomass time from days to years
+truecatchbio_ss$time <- as.integer(truecatchbio_ss$time/365)
+
 plotcatch <- ggplot() +
-  geom_line(data=truecatchbio_ss, aes(x=time/365,y=atoutput, color="true catch bio"),
+  geom_line(data=truecatchbio_ss, aes(x=time,y=atoutput, color="true catch bio"),
             alpha = 10/10) +
   theme_tufte() +
   theme(legend.position = "top") +
@@ -487,7 +468,7 @@ catchbioN_ss <- merge(catch_numssshigh,CwtAtAge,by=c("species","agecl", "time"),
 
 
 plotcatch <- ggplot() +
-  geom_line(data=truecatchbio_ss, aes(x=time/365,y=atoutput, color="true catch bio from txt"),
+  geom_line(data=truecatchbio_ss, aes(x=time,y=atoutput, color="true catch bio from txt"),
             alpha = 10/10) +
   geom_point(data=catchbioN_ss, aes(x=yr,y=anncatchB, color="true catch bio from N"),
             alpha = 10/10) +
@@ -503,8 +484,10 @@ plotcatch +
 Sadly, still a problem with the catch correction if it should match catch.txt when comverted to biomass. We are now off by about a factor of 2 (catch nums * wtAtAge is half true catch bio from the txt file):
 
 ```{r catchoff}
-sardcatchB <- truecatchbio_ss %>%
-  mutate(yr = as.integer(time/365))
+
+ sardcatchB <- truecatchbio_ss #%>%
+# now done above
+#   mutate(yr = as.integer(time/365))
 
 sardcatchBcomp <- merge(sardcatchB, catchbioN_ss)
 sardcatchBcomp <- mutate(sardcatchBcomp, mult=atoutput/anncatchB)
@@ -731,6 +714,8 @@ plotB +
 
 Get input total catch for SS (here using numbers). SS takes a fishery cv which can be applied here to get a catch time series, or we can input true catch.
 
+PLEASE DON'T USE THIS FOR CCA. We have determined above that catch in numbers from legacy atlantis code, even corrected, is still off by a factor of 2. We leave the info here because this code can be used for atlantis codebases after December 2015. 
+
 ```{r toSS-fisheryts}
 
 # catch at age by area and timestep
@@ -769,7 +754,7 @@ if (fstepperyr==1){
 
 ```
 
-Check this against true total catch numbers above. Should be the same.
+Check this against true total catch numbers above. Should be the same (and it is, but both are incorrect in the absolute scale due to the CATCH.nc output problem in older codebases).
 
 ```{r compare-totcatch}
 
@@ -787,7 +772,10 @@ compareC +
 
 ```
 
-Get composition inputs for SS (survey and fishery catch at age, survey and fishery lengths, survey and fishey weight at age)
+Get composition inputs for SS (survey and fishery catch at age, survey and fishery lengths, survey and fishey weight at age).
+
+Because catch composition information goes in to the assessment as a proportion, we can use fishery catch at age from this legacy codebase even with absolute catch numbers likely half what they should be overall.
+
 
 ```{r toSS-fisherycomps}
 
@@ -878,20 +866,23 @@ model_dir,
 datfile_name))
 ```
 
-Write time series biomass (tons) and catch (numbers) data for SS using `SS_write_ts`:
+*Now changing catch units to tons!*
+
+Write time series biomass (tons) and catch (tons) data for SS using `SS_write_ts`:
 
 ```{r SS-write-ts}
+
 
 #Test writing CPUE in biomass
   stocksynthesis.data <- SS_write_ts(ss_data_list = stocksynthesis.data,
                 ts_data = list(survObsBiom$atoutput[fish_years],
-                  catch_total$catch[catch_total$yr %in% fish_years]),
+                  truecatchbio_ss$atoutput[truecatchbio_ss$time %in% fish_years]),
                 CVs = c(CVs$survey,
                         CVs$fishery),
                 data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             fish_years),
             sampling_month = list(rep(survey_month,nyears),
                                 rep(fishing_month,nyears)),
-                units = c("biomass","numbers"),
+                units = c("biomass","biomass"),
                 data_type=c("CPUE","catch"),
                 fleets = c(2,1))
 
