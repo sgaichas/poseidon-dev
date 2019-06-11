@@ -347,24 +347,50 @@ toutinc <- runpar$toutinc
   #perhaps due to averaging of survival over toutinc days
   nyrs <- ceiling(max(yoy$Time)/365)
   times <- unique(yoy$Time)
-  recstart_temp <- biolprm$recruit_time
+  
+  # SKG June 2019
+  # need to match codes below, this mismatches when biolprm not in same order!!
+  #recstart_temp <- biolprm$recruit_time
   #recstart_temp[,2] <- biolprm$time_spawn[-(grep('#',
   #                     biolprm$time_spawn[,1])),2] + biolprm$recruit_time[,2]
   # was this grep to get rid of a species with #XXX? breaks when there are none
-  recstart_temp[,2] <- biolprm$time_spawn[,2] + biolprm$recruit_time[,2]
+  #recstart_temp[,2] <- biolprm$time_spawn[,2] + biolprm$recruit_time[,2]
   
   #recstart_temp <- recstart_temp[recstart_temp[,1]%in%turnedon$Code,] #bug added codes with no YOY output
-  recstart_temp <- recstart_temp[recstart_temp[,1]%in%recruits$group,]
+  #recstart_temp <- recstart_temp[recstart_temp[,1]%in%recruits$group,]
+
+  # need spawn_period?? if so read out in load_biolprm and merge it here too
+  
+  # rectiming is a dataframe with species code, time_spawn (day of year), 
+  # recruit_time (number of days), and recruit period (number of days). 
+  # we use these to calculate recstart (day of year) and recend (day of year)
+  rectiming <- merge(biolprm$time_spawn, biolprm$recruit_time, by = 1)
+  rectiming <- merge(rectiming, biolprm$recruit_period, by = 1)
+  names(rectiming) <- c("Code", "time_spawn", "recruit_time", "recruit_period")
+  rectiming <- rectiming %>%
+    mutate(recstart = time_spawn + recruit_time) %>% # possibly + spawn_period
+    mutate(recend = recstart + recruit_period)
+  
+  recstart_temp <- rectiming[rectiming$Code %in% recruits$group,]
+  
+  # do we need this fraction calculation if YOY is annual snapshot?
+  # (check output timing of YOY file with tsumout, available in run.prm)
+  # can we not just allocate the full YOY to the timestep where they come in?
+  # if recstart to recend spans multiple toutinc timesteps then need fraction
+  
   recruits$frac_recruit <- 0
   for (irow in 1:nrow(recstart_temp)) {
-    group <- recstart_temp[irow,1]
+    group <- recstart_temp$Code[irow]
     pick <- which(recruits$group == group)
 
-    recstart <- seq(recstart_temp[irow,2],by=365,length.out=nyrs)
+    recstart <- seq(recstart_temp$recstart[irow],by=365,length.out=nyrs)
     recstart <- recstart[recstart<max(recruits$Time[pick])]
-    recend <- recstart + biolprm$recruit_period[irow,2]
+    recend <- recstart + recstart_temp$recend[irow]
     #rec_times <- rbind(rec_times,cbind(group,recstart,recend))
 
+    # this part still returns a constant fraction
+    # and does not alter Time to change from annual to actual recruitment time
+    # still not understanding what this is meant to do
     for (i_rec in 1:length(recstart)) {
       i_tstart <- which(pick==min(pick[recruits$Time[pick]>=recstart[i_rec]]))
       i_tstop <- which(pick==min(pick[recruits$Time[pick]>=recend[i_rec]]))
@@ -387,14 +413,18 @@ toutinc <- runpar$toutinc
     }
   }
 
-
+# Time in YOY does not match recstart-recend period still after this loop
+  
   # match "Time" of the young of the year with the time-step periodicity
   # listed in the run.prm or run.xml file
   recruits$Time <- recruits$Time / toutinc
 
+# SKG did this above already in the following line?
+  # Get recruits in numbers rather than biomass
+  #recruits$recruits <- recruits$recruitsbio / recruits$sum
   #G.Fay 1/6/16, expand to num of recruits
   # Recruit / mg C converted to wet weight in tonnes / redfield ratio of C:N
-  recruits$recruits <- recruits$recruits/k_wetdry/biolprm$redfieldcn
+  #recruits$recruits <- recruits$recruits/k_wetdry/biolprm$redfieldcn
 
   # Sum over all boxes/depth/cohorts
   totnums <- aggregate(atoutput ~ species + time, data = nums, sum)
