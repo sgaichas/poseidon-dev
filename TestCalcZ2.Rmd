@@ -276,11 +276,7 @@ plotZ
 
 Nope. We have a constant value punctuated by occassional variation. Seems wrong. Variation doesn't look anything like the txt file either. Perhaps the 5x yr timesteps are messing this up?
 
-### How to turn timestep Z into annual Z for comparison?
-
-
-
-Time to step through line by line again.
+Time to step through line by line again. Revised as below. Better (apportions annual recruitment to timesteps), but not sure this is fully correct?
 
 ```{r calczsnippet, eval=FALSE}
 
@@ -338,7 +334,10 @@ toutinc <- runpar$toutinc
     by.x = "group", by.y = "1", all.x = TRUE, all.y = FALSE)
   colnames(recruits)[which(colnames(recruits) == "recruits")] <- "recruitsbio"
   # Get recruits in numbers rather than biomass
+  # these match rows 2:end of the legacy file, so good
+  # but is this 1000s or numbers? not real numbers, Gavin corrects below
   recruits$recruits <- recruits$recruitsbio / recruits$sum
+  recruits$yr <- as.integer(round(recruits$Time)/365)
 
   # G.Fay 2/21/16
   # UGLY code below tries to align fraction of annual yoy with timing of recruitment
@@ -371,6 +370,7 @@ toutinc <- runpar$toutinc
     mutate(recstart = time_spawn + recruit_time) %>% # possibly + spawn_period
     mutate(recend = recstart + recruit_period)
   
+  #subsets to groups of interest
   recstart_temp <- rectiming[rectiming$Code %in% recruits$group,]
   
   # do we need this fraction calculation if YOY is annual snapshot?
@@ -378,73 +378,84 @@ toutinc <- runpar$toutinc
   # can we not just allocate the full YOY to the timestep where they come in?
   # if recstart to recend spans multiple toutinc timesteps then need fraction
   
-  recruits$frac_recruit <- 0
+  # align model output timesteps (days) with recruitment periods (days)
+  numstime.days <- unique(nums$time)*toutinc
+  # Sum numbers output over all boxes/depth/cohorts
+  totnums <- aggregate(atoutput ~ species + time, data = nums, sum) %>%
+    mutate(time.days = time*toutinc) %>%
+    mutate(yr = floor(time.days/365))
+
+  totnums <- merge(totnums, recruits,
+    by.x = c("yr", "species"), by.y = c("yr", "Name"),
+    all.x = TRUE) %>%
+    arrange(time)
+  
+  totnums$frac_recruit <- 0
+  
   for (irow in 1:nrow(recstart_temp)) {
     group <- recstart_temp$Code[irow]
-    pick <- which(recruits$group == group)
+    pick <- which(totnums$group == group)
 
     recstart <- seq(recstart_temp$recstart[irow],by=365,length.out=nyrs)
-    recstart <- recstart[recstart<max(recruits$Time[pick])]
+    recstart <- recstart[recstart<max(totnums$Time[pick])]
     recend <- recstart + recstart_temp$recend[irow]
     #rec_times <- rbind(rec_times,cbind(group,recstart,recend))
 
-    # this part still returns a constant fraction
-    # and does not alter Time to change from annual to actual recruitment time
-    # still not understanding what this is meant to do
     for (i_rec in 1:length(recstart)) {
-      i_tstart <- which(pick==min(pick[recruits$Time[pick]>=recstart[i_rec]]))
-      i_tstop <- which(pick==min(pick[recruits$Time[pick]>=recend[i_rec]]))
+      i_tstart <- which(pick==min(pick[numstime.days[pick]>=recstart[i_rec]]))
+      i_tstop <- which(pick==min(pick[numstime.days[pick]>=recend[i_rec]]))
       if (i_rec == length(recstart)) i_tstop <- length(pick)
       n_t <- 1+i_tstop-i_tstart
       for (i_t in 1:n_t) {
-        t_temp <- recruits$Time[pick[i_tstart+i_t-1]]
+        t_temp <- numstime.days[pick[i_tstart+i_t-1]]
         num_temp <- t_temp - recstart[i_rec]
         if (i_t>1) {
           if ((recend[i_rec]-t_temp)>toutinc) {
             num_temp <- toutinc
           }
           else {
-            num_temp <- recend[i_rec]-(recruits$Time[pick[i_tstart+i_t-2]])
+            num_temp <- recend[i_rec]-(numstime.days[pick[i_tstart+i_t-2]])
           }
         }
         frac_temp <- max(c(0,num_temp /(recend[i_rec]-recstart[i_rec])))
-        recruits$frac_recruit[pick[i_tstart+i_t-1]] <- frac_temp
+        totnums$frac_recruit[pick[i_tstart+i_t-1]] <- frac_temp
       }
     }
   }
 
-# Time in YOY does not match recstart-recend period still after this loop
+# Time in YOY does not match recstart-recend period still after this loop--fixed
   
   # match "Time" of the young of the year with the time-step periodicity
   # listed in the run.prm or run.xml file
-  recruits$Time <- recruits$Time / toutinc
-
+  #recruits$Time <- recruits$Time / toutinc
+  
 # SKG did this above already in the following line?
   # Get recruits in numbers rather than biomass
   #recruits$recruits <- recruits$recruitsbio / recruits$sum
+  
   #G.Fay 1/6/16, expand to num of recruits
   # Recruit / mg C converted to wet weight in tonnes / redfield ratio of C:N
-  #recruits$recruits <- recruits$recruits/k_wetdry/biolprm$redfieldcn
+  totnums$recruits <- totnums$recruits/k_wetdry/biolprm$redfieldcn
 
-  # Sum over all boxes/depth/cohorts
-  totnums <- aggregate(atoutput ~ species + time, data = nums, sum)
 
   # Combine recruits and numbers
   # Only pull recruits from the yearly time step, where the
   # yearly time step matches the time step
-  totnums <- merge(totnums, recruits,
-    by.x = c("time", "species"), by.y = c("Time", "Name"),
-    all.x = TRUE, all.y = FALSE)
+  # totnums <- merge(totnums, recruits,
+  #   by.x = c("time", "species"), by.y = c("Time", "Name"),
+  #   all.x = TRUE, all.y = FALSE)
   totnums$group <- recruits$group[match(totnums$species, recruits$Name)]
   # For all time increments where there
   totnums$recruits[is.na(totnums$recruits)] <- 0
 
+   # Make sure time is in order, did above
+  #totnums <- totnums[order(totnums$species, totnums$time), ]
+  totnums$annrecruits <- totnums$recruits
+
+  totnums$recruits <- totnums$annrecruits*totnums$frac_recruit
+
   # Calculate survivors for each species group
   totnums$survivors <- totnums$recruits
-  # Make sure time is in order
-  totnums <- totnums[order(totnums$species, totnums$time), ]
-
-  totnums$recruits <- totnums$recruits*totnums$frac_recruit
 
   totnums$survival <- totnums$survivors
   # Calculate survival for each group
@@ -489,6 +500,10 @@ surveyresZ <- finaldata
 
 
 ```
+
+### How to turn timestep Z into annual Z for comparison?
+
+
 
 ### Biological sampling: true numbers at age class
 

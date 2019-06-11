@@ -131,7 +131,9 @@ May 24: Either `calc_Z` or `calc_stage2age` or both are incorrect if we expect t
 
 June 7: `calc_Z` seems incorrect when compared to outputMort.txt; stepping through code needed
 
-<a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA - June 7, 2019</a>
+June 11: fixed matching of recruitment to timestep, still seems off
+
+<a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA - June 7, 2019, updated June 11</a>
 
 
 ### Rabbit holes that turned out ok
