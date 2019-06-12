@@ -338,6 +338,9 @@ toutinc <- runpar$toutinc
   # but is this 1000s or numbers? not real numbers, Gavin corrects below
   recruits$recruits <- recruits$recruitsbio / recruits$sum
   recruits$yr <- as.integer(round(recruits$Time)/365)
+  
+  #Isaac determined that yr 0 (Time 0) in the YOY file is not real, don't use it
+  #below assigns year 1 to times 0:stepperyr, all good output timesteps in truth$nums
 
   # G.Fay 2/21/16
   # UGLY code below tries to align fraction of annual yoy with timing of recruitment
@@ -379,11 +382,12 @@ toutinc <- runpar$toutinc
   # if recstart to recend spans multiple toutinc timesteps then need fraction
   
   # align model output timesteps (days) with recruitment periods (days)
-  numstime.days <- unique(nums$time)*toutinc
+  #numstime.days <- unique(nums$time)*toutinc
   # Sum numbers output over all boxes/depth/cohorts
   totnums <- aggregate(atoutput ~ species + time, data = nums, sum) %>%
-    mutate(time.days = time*toutinc) %>%
-    mutate(yr = floor(time.days/365))
+    mutate(time.days = (time+1)*toutinc) %>% #makes time 0 into days 0->73, etc
+    mutate(yr = ceiling(time.days/365))  # yr 1 is 0:stepsperyr to match recruits yr1
+    #mutate(yr = floor(time.days/365)) # includes 0 value, yr 1 is 
 
   totnums <- merge(totnums, recruits,
     by.x = c("yr", "species"), by.y = c("yr", "Name"),
@@ -402,19 +406,19 @@ toutinc <- runpar$toutinc
     #rec_times <- rbind(rec_times,cbind(group,recstart,recend))
 
     for (i_rec in 1:length(recstart)) {
-      i_tstart <- which(pick==min(pick[numstime.days[pick]>=recstart[i_rec]]))
-      i_tstop <- which(pick==min(pick[numstime.days[pick]>=recend[i_rec]]))
+      i_tstart <- which(pick==min(pick[totnums$time.days[pick]>=recstart[i_rec]]))
+      i_tstop <- which(pick==min(pick[totnums$time.days[pick]>=recend[i_rec]]))
       if (i_rec == length(recstart)) i_tstop <- length(pick)
       n_t <- 1+i_tstop-i_tstart
       for (i_t in 1:n_t) {
-        t_temp <- numstime.days[pick[i_tstart+i_t-1]]
+        t_temp <- totnums$time.days[pick[i_tstart+i_t-1]]
         num_temp <- t_temp - recstart[i_rec]
         if (i_t>1) {
           if ((recend[i_rec]-t_temp)>toutinc) {
             num_temp <- toutinc
           }
           else {
-            num_temp <- recend[i_rec]-(numstime.days[pick[i_tstart+i_t-2]])
+            num_temp <- recend[i_rec]-(totnums$time.days[pick[i_tstart+i_t-2]])
           }
         }
         frac_temp <- max(c(0,num_temp /(recend[i_rec]-recstart[i_rec])))
@@ -503,7 +507,7 @@ surveyresZ <- finaldata
 
 ### How to turn timestep Z into annual Z for comparison?
 
-
+Two approaches: sum nums each year, calculate survival between years (minus annual recruitment), turn into annual Z, or multiply timestep Zs to get annual?
 
 ### Biological sampling: true numbers at age class
 
