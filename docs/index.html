@@ -275,7 +275,8 @@ $(document).ready(function () {
 <p>May 24: Either <code>calc_Z</code> or <code>calc_stage2age</code> or both are incorrect if we expect them to exactly match atlantis annual age ouput where it is available. We match in timestep 0, then diverge. May 27 update: also true for Bocaccio in CCA, the interim numbers at age drop to 0.</p>
 <p>June 7: <code>calc_Z</code> seems incorrect when compared to outputMort.txt; stepping through code needed</p>
 <p>June 11: fixed matching of recruitment to timestep, still seems off</p>
-<p><a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA - June 7, 2019, updated June 11</a></p>
+<p>June 13: I think we have the best <code>calc_Z</code> we are going to get. After discussion with Beth, we should not expect to match output of Mort.txt because M gets rescaled so much. However, the comparison looks reasonable now for sardine and even for NOBA cod.</p>
+<p><a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA and NOBA - June 7, 2019, updated June 13</a></p>
 </div>
 <div id="rabbit-holes-that-turned-out-ok" class="section level3">
 <h3>Rabbit holes that turned out ok</h3>

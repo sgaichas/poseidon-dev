@@ -133,7 +133,9 @@ June 7: `calc_Z` seems incorrect when compared to outputMort.txt; stepping throu
 
 June 11: fixed matching of recruitment to timestep, still seems off
 
-<a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA - June 7, 2019, updated June 11</a>
+June 13: I think we have the best `calc_Z` we are going to get. After discussion with Beth, we should not expect to match output of Mort.txt because M gets rescaled so much. However, the comparison looks reasonable now for sardine and even for NOBA cod.
+
+<a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA and NOBA - June 7, 2019, updated June 13</a>
 
 
 ### Rabbit holes that turned out ok
