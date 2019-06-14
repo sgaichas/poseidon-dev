@@ -137,6 +137,9 @@ June 13: I think we have the best `calc_Z` we are going to get. After discussion
 
 <a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA and NOBA - June 7, 2019, updated June 13</a>
 
+June 14: fixed a bug and `calc_stage2age` works better now that it is using Z, and now that Zs are in the right ballpark. Still not a perfect match to true age outptu.
+
+<a href="https://sgaichas.github.io/poseidon-dev/TestCalcStage2AgeNOBA.html" target="_blank">Test stage to age calculationa and compare true age output NOBA - June 14, 2019</a>
 
 ### Rabbit holes that turned out ok
 

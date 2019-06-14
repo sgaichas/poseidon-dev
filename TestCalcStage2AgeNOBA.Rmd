@@ -1,0 +1,417 @@
+---
+title: "Annual ages from atlantisom: testing calc_stage2age function"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## Introduction
+
+Here we debug and test the functions that split atlantis age classes to true ages using the NOBA model, which has true annual age output for comparison with our results. These files are in the folder NOBAwithAnnAgeOutput (not kept on github due to large filesize).
+
+We need to estiamte true natural mortality (M) from atlantis so that we can compare it with what is used in stock assessment models; however this is an emergent property of atlantis resulting from predation, etc. rather than a model input. [We have already tested, revised, and debugged](https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html) `calc_Z` which estimates total mortality using true output numbers at the end of a given timestep combined with information on recruitment from YOY.txt. We will derive M by subtracting the known F implemented in the atlantis run from this estmiated Z. 
+
+The total mortality estimated by `calc_Z` is used to split age classes in the function `calc_stage2age` which we will debug here.
+
+All model setup and configuration is described [here](https://sgaichas.github.io/poseidon-dev/FullSardineTruthEx.html).
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+library(ggforce)
+library(ggthemes)
+library(atlantisom)
+```
+
+```{r init-NOBA}
+
+initCCA <- FALSE
+initNEUS <- FALSE
+initNOBA <- TRUE
+
+if(initNOBA) source(here("config/NOBAaaConfig.R"))
+
+species_ss <- "North_atl_cod"
+
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+#Get true NOBAaa
+if(!file.exists(file.path(d.name, 
+                          paste0("output", scenario.name, "run_truth.RData")))){
+  #Store all loaded results into an R object
+  truth <- run_truth(scenario = scenario.name,
+                     dir = d.name,
+                     file_fgs = functional.groups.file,
+                     file_bgm = box.file,
+                     select_groups = funct.group.names,
+                     file_init = initial.conditions.file,
+                     file_biolprm = biol.prm.file,
+                     file_runprm = run.prm.file
+  )
+} else{
+  truth <- get(load(file.path(d.name,
+                              paste0("output", scenario.name, "run_truth.RData"))))
+}
+
+source(here("config/census_spec.R"))
+
+```
+
+Reviewing just the Z part for NOBA:
+
+```{r Znoba}
+
+# make a function for this
+# add YOY file to the config files
+YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
+
+# load biolprm in some initialize file?
+biol <- load_biolprm(d.name, biol.prm.file)
+
+# get code matching species name to split YOY file
+code_ss <- funct.groups$Code[which(funct.groups$Name == species_ss)]
+
+# cut to a single species in YOY file
+YOY_ss <- YOY %>%
+  select(Time, paste0(code_ss, ".0"))
+
+# numbers at agecl at full resolution (all polygons and layers)
+truenums_ss <- truth$nums[truth$nums$species == species_ss,]
+
+#calc_Z <- function(yoy, nums, fgs, biolprm, toutinc)
+
+#oops, need to generalize calc_Z for subannual timesteps in YOY!
+#or input YOY only at 0, 365, etc since the numbers repeat for timesteps 
+YOY_ss <- YOY_ss %>%
+  filter(Time %in% seq(0, max(Time), by=365))
+
+fullresZ <- calc_Z(yoy = YOY_ss,
+                   nums = truenums_ss,
+                   fgs = funct.groups,
+                   biolprm = biol,
+                   toutinc = runpar$toutinc)
+
+# compare as above with mort.txt output
+file.mort <- file.path(d.name, paste0("output", scenario.name, "Mort.txt"))
+
+mortish <- read.table(file.mort, header = TRUE)
+
+relF_ss <- mortish %>%
+  select(Time, relF = paste0(code_ss, ".F"))
+
+relM_ss <- mortish %>%
+  select(Time, relM = paste0(code_ss, ".M"))
+
+Zish <- merge(relF_ss,relM_ss) %>%
+  mutate(relZ = relF + relM)
+
+annZ2 <- fullresZ %>%
+  mutate(yr = floor(time/stepperyr)+1) %>%
+  group_by(species, yr) %>%
+  summarise(Z = sum(atoutput))
+
+plotZ <- ggplot() +
+  geom_line(data=Zish, aes(x=Time/365, y=relZ, color="mort.txt Z")) +
+  geom_point(data=fullresZ, aes(x=time/stepperyr, y=atoutput, color="each timestep Z")) +
+  geom_point(data=annZ2, aes(x=yr-1, y=Z, color="sum timestep Z")) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name, species_ss))
+
+plotZ + ylim(-1, 10.0)
+
+```
+
+This Z is a bad match. The Z values in NOBA cod's mort.txt are huge. The above figure is now the best it is going to get though. 
+
+Beth says that the M in mort.txt can really be as far off as we are seeing it here. The green line in the above NOBA Z plot reflects the initial estimate of what dies by predation mortality, which is a gigantic overesimate because many availability parameters are set to 1. After this output step, the predation mortality is rescaled within the model to account for the fact that there really aren't that many to be eaten.
+
+Our estimate of Z is from the actual numbers alive at the end of each timestep and the known input recruitment prior to any mortality, so I think it really is the best estimate we have. 
+
+## Biological sampling: true numbers at age class
+
+Number of true age classes is stored in the [...]groups[...].csv file, which is read in using `load_fgs`. We read this in as funct.groups above. The column NumAgeClassSize stores the number of true ages:
+
+Number of age classes for Cod: `r funct.groups$NumAgeClassSize[funct.groups$Name=="North_atl_cod"] `
+
+```{r Natage-plot}
+
+Natage <- readRDS(file.path(d.name, paste0(scenario.name, "Natageclcensus.rds")))
+
+Natage_ss <- Natage[Natage$species == species_ss,]
+
+Natageplot <- ggplot(Natage_ss, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        Natage_ss$species))
+
+Natageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 4, scales="free")
+
+```
+
+Now we go line by line through `calc_stage2age`:
+
+```{r calcstage2age-snippet, eval=FALSE}
+
+nums_data <- truenums_ss
+yoy <- YOY_ss
+fgs <- funct.groups
+biolprm <- biol
+runprm <- load_runprm(d.name, run.prm.file)
+  
+#full function code below
+#calc_stage2age <- function(nums_data, biolprm, yoy, fgs, runprm) {
+
+  # subset the yoy for those species that are included in the fgs file
+  # that are turned on
+  species.code <- fgs$Code
+  turnedon <- fgs[fgs$IsTurnedOn > 0, ]
+  names <- turnedon$Code
+
+  # Figure out the groups that have multiple ages classes in each stage (or
+  # cohort)
+  multiple_ages <- turnedon[turnedon$NumAgeClassSize>1, c(1,4,10)]
+  num_multi_age <- dim(multiple_ages)[1]
+
+  ntimesteps <- length(unique(nums_data$time))
+
+  # For each species with multiple ages, use the calc_Z function to get time
+  # varying Z values and put that all into one dataframe
+  Z.dataframe <- data.frame()
+  #for(i in 1:num_multi_age) {
+    #temp_nums <- nums_data[nums_data$species==multiple_ages$Name[i],]
+    temp_nums <- nums_data[nums_data$species %in% multiple_ages$Name,]
+    temp_Z <- calc_Z(yoy=yoy, nums=temp_nums, fgs=fgs, biolprm=biolprm, toutinc=runprm$toutinc)
+    #Z.dataframe <- rbind(Z.dataframe, temp_Z)
+    Z.dataframe <- temp_Z
+  #}
+
+  # HACK for now, since some Z values are negative, I am replacing them
+  # with a random number
+  randomZ <- runif(length(which(Z.dataframe$atoutput<0)))
+  Z.dataframe[which(Z.dataframe$atoutput<0),c("atoutput")] <- randomZ
+
+  # rename the "atoutput" column, since it is really just the mortality, and
+  # we want to retain it for the next step of merging
+  colnames(Z.dataframe)[6] <- c("Z")
+
+  # merge together nums_data and the output Z.dataframe:
+  new_nums <- merge(nums_data, Z.dataframe[,c("species", "time", "Z")],
+                    by=c("species", "time"), all.x=TRUE)
+
+
+  # since we have to expand the number of rows for groups with multiple true
+  # age classes, we will loop through species and time, creating a new list
+  # that each element will be a single species in a single time step but
+  # across ages and boxes (these wil all be put together in the end)
+  temp.list <- list()
+  
+  #SKG subset turnedon and only loop through species present in the nums input
+  turnedon_sub <- turnedon[which(turnedon$Name == unique(new_nums$species)),]
+  names <- turnedon_sub$Code
+
+  for(i in 1:length(names)) {
+    # looping all species -- those with or without multiple true ages
+
+    group.i <- turnedon_sub$Name[i]
+    nums_species <- new_nums[new_nums$species==group.i,] # might need to
+    num_ages <- turnedon_sub$NumAgeClassSize[i]
+    sp_times <- sort(unique(nums_species$time))
+    n_sp_tsteps <- length(sp_times)
+    # these last pieces are needed because not all species are present at all times
+
+    # Check if multiple true ages, if not then just save species_nums to list
+    if(num_ages==1) { temp.list[[length(temp.list)+1]] <- nums_species
+    } else if(num_ages>1) {
+      # take out the part of the Z.dataframe for species group i
+      Zvals <- Z.dataframe[Z.dataframe$species==group.i,]
+
+      # create empty list for this species i, each element in the list will be
+      # a different time step
+      list_species <- list()
+
+      for(j in sp_times) { # looping through time
+        # get the Z val for the timestep in question--fixed bug here, was getting time
+        Zval.j <- Zvals$Z[Zvals$time==j]
+
+        # and turn the Z value into a vector of survival values across the
+        # number of true ages for each age class for this species
+        nums_vec <- 1
+        for(k in 1:(num_ages-1)) {
+          nums_vec <- c(nums_vec, exp(-Zval.j*k))
+        }
+        nums_proportion <- nums_vec/sum(nums_vec)
+
+        # take out the species numbers only for time step j
+        nums_sp_subset <- nums_species[nums_species$time==j, ]
+
+        # create an empty list, each element of this list will be a row from
+        # the nums_sp_subset data frame that is split into multiple pieces
+        # to make the atoutput column have the correct dimensions
+        list_ages <- list()
+
+        # loop through all the rows in nums_sp_subset
+        for(l in 1:nrow(nums_sp_subset)) {
+          nums_row <- nums_sp_subset[l,]
+          # create new data frame with same columns, but just more rows to
+          # account for all the true ages
+          new_rows <- data.frame(species=nums_row$species,
+                                 time=nums_row$time,
+                                 agecl=seq((nums_row$agecl*num_ages - num_ages+1),
+                                           nums_row$agecl*num_ages),
+                                 polygon=nums_row$polygon,
+                                 layer=nums_row$layer,
+                                 atoutput=nums_row$atoutput*nums_proportion,
+                                 Z=nums_row$Z
+                                 )
+
+          ### NOTE: the agecl piece is funny -- because now we are making many
+          # more age classes for some... I think this works? But might want
+          # another set of eyes to check my logic
+
+          list_ages[[length(list_ages)+1]] <- new_rows
+        }
+
+        # now combine all the elements of the list for different rows and make
+        # it an element of the list_species (to represent one time step)
+        list_species[[length(list_species)+1]] <- do.call("rbind", list_ages)
+      }
+      temp.list[[length(temp.list)+1]] <- do.call("rbind", list_species)
+    }
+  }
+
+  # Now just create the output
+  finalout_withZ <- do.call("rbind", temp.list)
+
+  ### CHECK:
+  # do we want to remove the column of Z values? I think so
+  finalout <- finalout_withZ[,-7]
+
+
+  #return(finalout)
+
+#}
+
+```
+
+Fixed one bug where Z was not being assigned, that should help. Also subset for only species passed in the numbers file; might speed things up.
+
+Let's try `calc_stage2age` again and if get a result that matches the NOBA output ANNAGEBIO.nc, then we can assume our function is correct.
+
+These are estimated true age comps for Cod in annual ages:
+
+```{r plotannage}
+
+survey_testNall <- readRDS(file.path(d.name, paste0(scenario.name, "survey_testNall.rds")))
+
+# numbers at ageclaggregated over layers, retain polygons (output of create_survey)
+survey_testN_ss <- survey_testNall[survey_testNall$species == species_ss,]
+
+
+# for single species, Z was calculated above as surveyresZ
+trueages_ss <- calc_stage2age(nums_data = survey_testN_ss,
+                                 biolprm = biol, 
+                                 yoy = YOY_ss,
+                                 fgs = funct.groups, 
+                                 runprm = runpar)
+
+# run sample fish on this for completeness? yes to aggregate
+trueNagesamp_ss <- sample_fish(trueages_ss, effNhigh)
+
+# plot it
+
+Natageplot <- ggplot(trueNagesamp_ss, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        trueNagesamp_ss$species))
+
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+This is an improvement now that Z is actually being read in. We can still probably tweak the calculations in `calc_stage2age` to smooth the difference if necessary. The best comparison is with true ages from ANNAGEBIO.nc:
+
+```{r compareages}
+
+annage_nc <- paste0("output", scenario.name, "ANNAGEBIO.nc")
+bboxes <- get_boundary(boxpars)
+
+# need to change load_nc, at line 117 hardcoded for 10 cohorts!
+trueage_atout <- load_nc(dir = d.name,
+                         file_nc = annage_nc,
+                         bps = boxpars,
+                         fgs = funct.groups,
+                         select_groups = survspp,
+                         select_variable = "Nums",
+                         check_acronyms = TRUE,
+                         bboxes = bboxes)
+
+trueage_atout_ss <- trueage_atout[trueage_atout$species == species_ss,]
+
+#survey census to agg over layers
+survey_trueage_atout_ss <- create_survey(dat = trueage_atout_ss,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# sample fish to agg over polygons
+sample_trueage_atout_ss <- sample_fish(survey_trueage_atout_ss, effNhigh)
+
+```
+
+Compare true age output from atlantis with our estimate (and with aggregated age comps):
+
+```{r plot-esttrueage-atltrueage}
+
+compareAge <- ggplot() +
+  geom_point(data=trueNagesamp_ss, aes(x=agecl,y=atoutput, color="atlantisom"), alpha = 10/10) +
+  geom_point(data=sample_trueage_atout_ss, aes(x=agecl,y=atoutput, color="atout true"), alpha = 10/10) + 
+  geom_point(data=Natage_ss, aes(x=agecl*2, y=atoutput, color="cohort true"), alpha = 10/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(subtitle = paste(scenario.name,
+                        trueNagesamp_ss$species))
+
+compareAge + 
+  facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+compareAge + 
+  facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+compareAge + 
+  facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+compareAge + 
+  facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+We only have the first 10 cohorts of true age output due to hardcoding in load_nc. I will write another load function that changes that. 
+
+We have matches for timesteps 0-2 and then divergence. It looks like matches are actually better in the recruitment timesteps. 
+
+Over all timesteps our early ages are closer now and the later ones look on target (because there is less contrast between the split ages).
+
+Slowly improving.
+
