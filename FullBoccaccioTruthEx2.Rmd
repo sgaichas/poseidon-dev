@@ -1,0 +1,1051 @@
+---
+title: "Boccaccio example 2: end to end truth for California Current"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+bibliography: "packages.bib"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# automatically create a bib database for R packages
+knitr::write_bib(c(
+  .packages(), 'knitr', 'rmarkdown', 'tidyr', 'dplyr', 'ggplot2',
+  'data.table', 'here', 'ggforce', 'ggthemes', 'r4ss'
+), 'packages.bib')
+```
+
+## Introduction
+
+This page documents initial testing of the atlantisom package in development at https://github.com/r4atlantis/atlantisom using three different [Atlantis](https://research.csiro.au/atlantis/) output datasets. Development of atlantisom began at the [2015 Atlantis Summit](https://research.csiro.au/atlantis/atlantis-summit/) in Honolulu, Hawaii, USA. 
+
+The purpose of atlantisom is to use existing Atlantis model output to generate input datasets for a variety of models, so that the performance of these models can be evaluated against known (simulated) ecosystem dynamics. Atlantis models can be run using different climate forcing, fishing, and other scenarios. Users of atlantisom will be able to specify fishery independent and fishery dependent sampling in space and time, as well as species-specific catchability, selectivty, and other observation processes for any Atlantis scenario. Internally consistent multispecies and ecosystem datasets with known observation error characteristics will be the atlantisom outputs, for use in individual model performance testing, comparing performance of alternative models, and performance testing of model ensembles against "true" Atlantis outputs.
+
+On this page we demonstrate use of atlantisom on the California Current output files to provide (true) inputs for a stock assessment model implemented in [Stock Synthesis](https://www.sciencedirect.com/science/article/abs/pii/S0165783612003293). Translation of atlantisom outputs to stock synthesis inputs uses the package [r4ss](https://github.com/r4ss) [@R-r4ss] as demonstrated [here](https://sgaichas.github.io/poseidon-dev/CreateStockSynthesis.html). 
+
+## Setup
+
+First, you will want to set up libraries and install atlantisom if you haven't already. This document is written in in R Markdown [@R-rmarkdown], and we use several packages to produce the outputs [@R-tidyr; @R-dplyr; @R-ggplot2; @R-here; @R-ggforce; @R-ggthemes]. 
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+library(ggforce)
+library(ggthemes)
+```
+
+If you want to load the local of the atlantisom R package, use devtools. The R package here is helpful for installing from your local atlantisom directory, as it avoids hardcoding the specific location. The code below is not running from our local atlantisom directory and is not evaluated:
+
+```{r eval=FALSE, message=FALSE, warning=FALSE}
+require(devtools)
+package.dir <- here()
+devtools::load_all(package.dir)
+```
+
+Or you can install directly from the Github repository.
+
+```{r eval=FALSE, message=FALSE, warning=FALSE}
+devtools::install_github("r4atlantis\atlantisom")
+```
+
+Next, load the package. 
+
+```{r message=FALSE, warning=FALSE}
+library(atlantisom)
+```
+
+## Initializing input files and directories
+
+You will first need to tell `atlantisom` to know where to look for the output and input files from your atlantis model run. Here, we will give the directory where the Atlantis inputs and outputs are stored `d.name`, the location of the functional groups file `functional.group.file` (.csv), the biomass pools file `biomass.pools.file` (.nc), the box locations file `box.file` (.bgm), an `initial.conditions.file` (.nc), the biology .prm file `biol.prm.file` (.prm), and the run .prm file `run.prm.file` (.prm). You will also need to specify a scenario name, which will be used to define the output files (i.e. output is stored in a number of netCDF files of the format: output<scenario><value>.nc). All of these files should be stored in `d.name`.
+
+In general, Atlantis model output files that are sufficiently detailed to mimic fishery sampling in space and time are too large to store on GitHub, so are not included as examples with the atlantisom code. 
+
+In this example, we have a local folder "atlantisoutput" and the output of interest in a subdirectory:
+
+  * "CalCurrent2063_run11": California Current Atlantis model output from Isaac Kaplan's google drive \output_CC_2063_run11 using the Hodgson et al. 2018 configuration, and driven with the F time series and recruitment variability we plan to use for our Fragile Ecosystems, Robust Assessments project. Corresponds to CC2Config.R file.
+
+Our directory structure is set up to take advantage of `here()` to allow setup on a different computer.
+
+```{r initialize}
+
+initCCA <- TRUE
+initNEUS <- FALSE
+initNOBA <- FALSE
+
+species_ss <- "Bocaccio_rockfish"
+
+#function to make a config file? need one for each atlantis run
+
+if(initCCA) source(here("config/CC2Config.R"))
+
+if(initNEUS) source(here("config/NEUSConfig.R"))
+
+if(initNOBA) source(here("config/NOBAConfig.R"))
+
+```
+
+## Getting the "true" operating model values
+
+There are a number of functions in the package that begin with the prefix `load` that load various files. See documentation if you'd only like to load one file. The `atlantisom::run_truth()` function uses the above file definitions and calls a number of the `load` functions to read in all of the atlantis output. Note: this call reads in a number of large .nc files, so it will take a few minutes to return.
+
+```{r get_names, message=FALSE, warning=FALSE}
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+```
+
+Catch in numbers has been corrected in the saved and reloaded truth file here. Ignore the catchbio component of this, it is not correct.
+
+```{r get_truth, message=FALSE, warning=FALSE}
+
+# default run_truth setup will save the file, so check for that first
+
+if(!file.exists(file.path(d.name, 
+                          paste0("output", scenario.name, "run_truth.RData")))){
+  #Store all loaded results into an R object
+  truth <- run_truth(scenario = scenario.name,
+                     dir = d.name,
+                     file_fgs = functional.groups.file,
+                     file_bgm = box.file,
+                     select_groups = funct.group.names,
+                     file_init = initial.conditions.file,
+                     file_biolprm = biol.prm.file,
+                     file_runprm = run.prm.file
+  )
+} else{
+  truth <- get(load(file.path(d.name,
+                              paste0("output", scenario.name, "run_truth.RData"))))
+}
+```
+
+Import the true catch biomass from a separate file. True total catch weight is currently available only on an annual and full-model (all polygons) basis:
+
+```{r loadcatchb}
+
+truecatchbio <- load_catch(d.name, file_catch = catch.file, fgs = funct.groups)
+
+```
+
+Now the R object `truth` with the comprehensive results from the Atlantis model has been read in. It is also saved as an .RData file titled "output[scenario.name]run_truth.RData" in the directory with the model output, so that later analyses can use `base::load()` instead of taking the time to rerun `atlantisom::run_truth()`. 
+
+Note: on Sarah's laptop, CCA took ~2.5 hours to return from `run_truth` and NOBA took an hour and 26 minutes to return. Therefore, reading the .RData file in as below is advised after the first run to make the plots comparing systems later in this document.
+
+## Test survey functions: census to compare with truth
+
+This section tests the `atlantisom::create_survey()` and `atlantisom::sample_survey_biomass()` functions by comparing a census (survey sampling everything) with the results generated by `atlantisom::run_truth()` above. 
+
+To create a survey, the user specifies the timing of the survey, which species are captured, the spatial coverage of the survey, the species-specific survey efficiency ("q"), and the selectivity at age for each species. 
+
+```{r census-spec, message=FALSE, warning=FALSE}
+
+# make a function for this
+source(here("config/census_spec.R"))
+
+```
+
+Output timesteps and the duration of the model run can be found in the run parameter file [scenario]_run.xml which is read in with `atlantisom::load_runprm`. This is already run in our census_spec.R file. Output timestep toutinc is `r runpar$toutinc `, so steps per year is `r stepperyr ` and the number of output steps is `r noutsteps `. 
+
+The settings in `config/census_spec.R` should achieve a survey that samples all Atlantis model output timesteps, all species, and all model polygons, with perfect efficiency and full selectivity for all ages: 
+
+### True biomass survey I
+
+Because the results of `run_truth` provide both biomass at age and numbers at age, we can use `create_survey` on both with some modifications. The following uses the biomass output of `run_truth` to create the survey, so the call to `sample_survey_biomass` will require a weight at age argument that is filled with 1's because no conversion from numbers to weight is necessary. Because we are making a census for testing, the survey cv argument is set to 0. 
+
+```{r surveyBbased, eval=F}
+
+# this uses result$biomass_ages to sample biomass directly, no need for wt@age est
+
+survey_testBall <- create_survey(dat = truth$biomass_ages,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+# call sample_survey_biomass with a bunch of 1000s for weight at age
+# in the code it multiplies atoutput by wtatage so this allows us to use
+# biomass directly
+wtage <- data.frame(species=rep(survspp, each=10),
+                    agecl=rep(c(1:10),length(survspp)),
+                    wtAtAge=rep(1000.0,length(survspp)*10))
+
+surveyB_frombio <- sample_survey_biomass(survey_testBall, surv_cv, wtage)
+
+#save for later use, takes a long time to generate
+saveRDS(surveyB_frombio, file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+
+```
+
+Comparing our (census) survey based on true biomass from above with the Atlantis output file "[modelscenario]BiomIndx.txt" should give us a perfect match. Note that the our (census) survey may have more sampling in time than the Atlantis output file.
+
+```{r matchB, fig.cap="Testing whether the survey census gives the same results as the Atlantis output biomass index file; first 36 species.", message=FALSE, warning=FALSE}
+# plot some comparisons with Atlantis output
+
+# read Atlantis output files
+atBtxt2 <- read.table(file.path(d.name, paste0("output", scenario.name, "BiomIndx.txt")), header=T)
+
+surveyB_frombio <- readRDS(file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+
+surveyB_frombio_ss <- surveyB_frombio[surveyB_frombio$species == species_ss,]
+  
+# lookup the matching names, put in time, species, biomass column format
+# WARNING hardcoded for output with last species group as DIN
+groupslookup <- funct.groups %>%
+  filter(IsTurnedOn > 0)
+
+atBtxt2tidy <- atBtxt2 %>%
+  select(Time:DIN) %>%
+  #select(Time, FPL:DIN) %>%
+  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, biomass, -Time) %>%
+  filter(species %in% species_ss)
+
+#all species comparison, time intervals hardcoded for 5 steps per year
+compareB <-ggplot() +
+  geom_line(data=surveyB_frombio_ss, aes(x=time/stepperyr,y=atoutput, color="survey census B"), 
+            alpha = 10/10) +
+  geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
+             alpha = 1/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compareB + 
+  facet_wrap(~species, scales="free") 
+
+```
+
+After comparing the survey census based on the biomass output of `run_truth`, we now look at a biomass index that is estimated based on numbers in the survey census for assessments that take numbers input directly. We need to skip the average weight part of `sample_survey_biomass` but keep the rest. Hence the new function `sample_survey_numbers`.
+
+### True numbers survey
+
+```{r surveyNbased, eval=FALSE}
+
+# this uses result$nums and a new function to get survey index in numbers (abundance)
+
+survey_testNall <- create_survey(dat = truth$nums,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# as above, make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+surveyN <- sample_survey_numbers(survey_testNall, surv_cv)
+
+#save for later use, takes a long time to generate
+saveRDS(surveyN, file.path(d.name, paste0(scenario.name, "surveyNcensus.rds")))
+
+```
+
+```{r survNtrue-plot}
+
+surveyN <- readRDS(file.path(d.name, paste0(scenario.name, "surveyNcensus.rds")))
+
+surveyN_ss <- surveyN[surveyN$species == species_ss,]
+
+plotN <-ggplot() +
+  geom_line(data=surveyN_ss, aes(x=time/stepperyr,y=atoutput, color="survey census N"), 
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotN +
+  facet_wrap(~species, scales="free") 
+
+```
+
+### Biological sampling: true numbers at age class
+
+We get true numbers at age at each output step by appling `sample_fish` to the survey_testNall result if the model group has one true age per output age class:
+
+```{r truenatagecl, eval=FALSE}
+# We need an effective N for the sample fish function, setting equal to actual N
+# this one is high but not equal to total for numerous groups
+survey_testNall <- readRDS(file.path(d.name, paste0(scenario.name, "survey_testNall.rds")))
+
+numsall <- aggregate(survey_testNall$atoutput,list(survey_testNall$species,survey_testNall$agecl,survey_testNall$time),sum)
+names(numsall) <- c("species","agecl","time","atoutput")
+numsallhigh <- data.frame(species = numsall$species,
+					  agecl = numsall$agecl,
+					  polygon = NA,
+					  layer = NA,
+					  time = numsall$time,
+					  atoutput = numsall$atoutput)
+
+# better to do an actual census above, can't make effNhigh high enough for some spp
+#effNhigh <- data.frame(species=survspp, effN=rep(1e+8, length(survspp)))
+#numsallhigh <- sample_fish(survey_testNall, effNhigh)
+
+#save for later use, takes a long time to generate
+saveRDS(numsallhigh, file.path(d.name, paste0(scenario.name, "Natageclcensus.rds")))
+
+```
+
+This is Bocaccio true age class output. However, the 10 standard atlantis age classes aggregate 5 true ages each for Bocaccio.
+
+```{r Natage-plot}
+
+Natage <- readRDS(file.path(d.name, paste0(scenario.name, "Natageclcensus.rds")))
+
+Natage_ss <- Natage[Natage$species == "Bocaccio_rockfish",]
+
+Natageplot <- ggplot(Natage_ss, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        Natage_ss$species))
+
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+### Biological sampling: true ages (split age classes)
+
+Bocaccio is one of many species in CCA with multiple true ages per age class. To get true ages for input into stock assessment, we need to separate the age classes. The atlantisom function `calc_stage2age` calls the `calc_Z` function, applying a total mortality rate to estimate the numbers at true age within an age class:
+
+```{r testagecl, eval=FALSE}
+# add YOY file to the config files
+YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
+
+# load biolprm in some initialize file?
+biol <- load_biolprm(d.name, biol.prm.file)
+
+trueagesall <- calc_stage2age(nums_data = survey_testNall,
+                                 biolprm = biol, 
+                                 yoy = YOY,
+                                 fgs = funct.groups, 
+                                 runprm = runpar)
+
+saveRDS(trueagesall, file.path(d.name, paste0(scenario.name, "Nattrueagecensus.rds")) )
+
+```
+
+Calc Z is breaking for one of the many species; Isaac says something like tuna, sharks, or salmon may not fit this design, so let's check who is having problems:
+
+```{r calcZsnippetagain, eval=FALSE}
+
+yoy <- YOY
+nums <- survey_testNall
+fgs <- funct.groups
+biolprm <- biol
+toutinc <- runpar$toutinc
+
+#calc_Z <- function(yoy, nums, fgs, biolprm, toutinc) {
+  # subset the yoy for species included in the fgs file
+  # that are turned on
+  # colnames of the recruit data are "Time" and a column for each
+  # species where the name is the functional group with an additional .0
+  turnedon <- fgs[fgs$IsTurnedOn > 0, ]
+  recruits <- yoy[, colnames(yoy) %in% c("Time", paste0(turnedon$Code, ".0"))]
+
+  # mg carbon converted to wet weight in tonnes
+  k_wetdry <- biolprm$kgw2d / 1000000000
+  # Sum of structural and reserve nitrogen (KWSR_RN + KWSR_SN)
+  nitro <- merge(biolprm$kswr, biolprm$kwrr, by = "1")
+  nitro$sum <- apply(nitro[, 2:3], 1, sum)
+
+  # legacy: If output is from legacy code there will be an error in the
+  # yoy data, where the first row is in a different unit.
+  # yoy.txt is the biomass in tonnes per spawning event summed over the total
+  # model domain.
+  # The first row (< Nov/Dec 2015) is stored as biomass and the remaining rows
+  # are stored in numbers, must convert the entire matrix to biomass
+  # Check if legacy code and if so convert the numbers to biomass
+
+  # G.Fay 2/21/16 : changed yoy to recruits in below loop.
+  if (abs(recruits[1, 2] / recruits[2, 2]) > 10) {
+    recruits[2:NROW(recruits), 2:NCOL(recruits)] <- recruits[2:NROW(recruits), 2:NCOL(recruits)] *
+    nitro[match(gsub(".0", "", colnames(recruits)[-1]), nitro[, 1]), "sum"]
+  }
+
+
+  # Wide to long
+  recruits <- reshape(data = recruits, direction = "long",
+    varying = colnames(recruits)[-1],
+    v.names = "recruits",
+    times = colnames(recruits)[-1],
+    timevar = "group")
+  rownames(recruits) <- 1:NROW(recruits)
+  recruits <- recruits[, -which(colnames(recruits) == "id")]
+  # Switch from species code to species
+  recruits$group <- gsub("\\.0", "", recruits$group)
+  recruits <- merge(recruits, fgs[, c("Code", "Name")],
+    by.x = "group", by.y = "Code")
+
+  # merge recruits with strucn and resn of recruits from biol.prm file
+  recruits <- merge(recruits, nitro[, c(1, 4)],
+    by.x = "group", by.y = "1", all.x = TRUE, all.y = FALSE)
+  colnames(recruits)[which(colnames(recruits) == "recruits")] <- "recruitsbio"
+  # Get recruits in numbers rather than biomass
+  recruits$recruits <- recruits$recruitsbio / recruits$sum
+  recruits$yr <- as.integer(round(recruits$Time)/365) #needed to merge with totnums
+
+  # June 2019:Isaac determined that yr 0 (Time 0) in the YOY file is not real, don't use it
+  # code below assigns year 1 to times 0:stepperyr, all good output timesteps in truth$nums
+
+
+  # G.Fay 2/21/16
+  # UGLY code below tries to align fraction of annual yoy with timing of recruitment
+  # values in YOY.txt are total YOY that year waiting to recruit.
+  # seems to get rid of most of 'issues' - some v.minor survival >1,
+  #perhaps due to averaging of survival over toutinc days
+  nyrs <- ceiling(max(yoy$Time)/365)
+  times <- unique(yoy$Time)
+
+  # SKG June 2019
+  # need to match codes below, this mismatches when biolprm not in same order!!
+  #recstart_temp <- biolprm$recruit_time
+  #recstart_temp[,2] <- biolprm$time_spawn[-(grep('#',
+  #                     biolprm$time_spawn[,1])),2] + biolprm$recruit_time[,2]
+  # was this grep to get rid of a species with #XXX? breaks when there are none
+  #recstart_temp[,2] <- biolprm$time_spawn[,2] + biolprm$recruit_time[,2]
+
+  #recstart_temp <- recstart_temp[recstart_temp[,1]%in%turnedon$Code,] #bug added codes with no YOY output
+  #recstart_temp <- recstart_temp[recstart_temp[,1]%in%recruits$group,]
+
+  # June 12 2019 Beth determined that we do not need spawn_period
+
+  # rectiming is a dataframe with species code, time_spawn (day of year),
+  # recruit_time (number of days), and recruit period (number of days).
+  # we use these to calculate recstart (day of year) and recend (day of year)
+  rectiming <- merge(biolprm$time_spawn, biolprm$recruit_time, by = 1)
+  rectiming <- merge(rectiming, biolprm$recruit_period, by = 1)
+  names(rectiming) <- c("Code", "time_spawn", "recruit_time", "recruit_period")
+  rectiming <- rectiming %>%
+    mutate(recstart = time_spawn + recruit_time) %>%
+    mutate(recend = recstart + recruit_period)
+
+  # Sum numbers output over all boxes/depth/cohorts
+  # align model output timesteps (days) with recruitment periods (days)
+  totnums <- aggregate(atoutput ~ species + time, data = nums, sum) %>%
+    #mutate(time.days = (time+1)*toutinc) %>% #makes time 0 into days 0->73, etc
+    mutate(time.days = (time)*toutinc) %>% #makes time 1 into days 0->73, etc
+    mutate(yr = ceiling(time.days/365))  # yr 1 is 0:stepsperyr to match recruits yr1
+
+  totnums <- merge(totnums, recruits,
+                   by.x = c("yr", "species"), by.y = c("yr", "Name"),
+                   all.x = TRUE) %>%
+    arrange(time)
+  
+  #subset recpars to groups of interest
+  recstart_temp <- rectiming[rectiming$Code %in% totnums$group,]
+
+  totnums$frac_recruit <- 0
+
+  for (irow in 1:nrow(recstart_temp)) {
+    group <- recstart_temp$Code[irow]
+    pick <- which(totnums$group == group)
+
+    recstart <- seq(recstart_temp$recstart[irow],by=365,length.out=nyrs)
+    recstart <- recstart[recstart<max(totnums$Time[pick])]
+    recend <- recstart + recstart_temp$recruit_period[irow]
+    #rec_times <- rbind(rec_times,cbind(group,recstart,recend))
+
+    for (i_rec in 1:length(recstart)) {
+      i_tstart <- which(pick==min(pick[totnums$time.days[pick]>=recstart[i_rec]]))
+      i_tstop <- which(pick==min(pick[totnums$time.days[pick]>=recend[i_rec]]))
+      if (i_rec == length(recstart)) i_tstop <- length(pick)
+      n_t <- 1+i_tstop-i_tstart
+      for (i_t in 1:n_t) {
+        t_temp <- totnums$time.days[pick[i_tstart+i_t-1]]
+        num_temp <- t_temp - recstart[i_rec]
+        if (i_t>1) {
+          if ((recend[i_rec]-t_temp)>toutinc) {
+            num_temp <- toutinc
+          }
+          else {
+            num_temp <- recend[i_rec]-(totnums$time.days[pick[i_tstart+i_t-2]])
+          }
+        }
+        frac_temp <- max(c(0,num_temp /(recend[i_rec]-recstart[i_rec])))
+        if(frac_temp > 1.0) frac_temp = 1.0
+        totnums$frac_recruit[pick[i_tstart+i_t-1]] <- frac_temp
+      }
+    }
+  }
+
+  #G.Fay 1/6/16, expand to num of recruits
+  # Recruit / mg C converted to wet weight in tonnes / redfield ratio of C:N
+  totnums$recruits <- totnums$recruits/k_wetdry/biolprm$redfieldcn
+
+  totnums$group <- recruits$group[match(totnums$species, recruits$Name)]
+  # For all time increments where there
+  totnums$recruits[is.na(totnums$recruits)] <- 0
+
+  totnums$annrecruits <- totnums$recruits
+
+  totnums$recruits <- totnums$annrecruits*totnums$frac_recruit
+
+  # Calculate survivors for each species group
+  totnums$survivors <- totnums$recruits
+
+  totnums$survival <- totnums$survivors
+  # Calculate survival for each group
+  for (group in unique(totnums$group)) {
+    #if(group == "SHD") browser()
+    pick <- which(totnums$group == group)
+    survival_temp <- c(NA,
+      totnums$survivors[pick[-1]]/totnums$atoutput[pick[-length(pick)]])
+
+    # G.Fay 2/21/16  "think" this is what things should be, recruits don't show up
+    # in numbers at age until time step after the recruitment event.
+     survival_temp <- c(
+       (totnums$atoutput[pick[-1]]-
+          totnums$recruits[pick[-1]])/totnums$atoutput[pick[-length(pick)]],NA)
+
+#     survival_temp <- c(
+#       (totnums$atoutput[pick[-1]])/
+#          (totnums$recruits[pick[-1]]+totnums$atoutput[pick[-length(pick)]]),NA)
+
+    survival_temp[survival_temp < 0] <- NA
+    # Use first positive value to replace the initial year and all negative vals
+    firstgood <- which(!is.na(survival_temp))[1]
+
+    survival_temp[1:firstgood] <- survival_temp[firstgood]
+    for(ii in seq_along(survival_temp)) {
+      if (is.na(survival_temp[ii])) {
+        nonzero <- which(which(survival_temp > 0) > ii)
+        if (length(nonzero) == 0) nonzero <- which(survival_temp > 0)
+        survival_temp[ii] <- survival_temp[which.min(abs(nonzero - ii))]
+      }
+    }
+    totnums$survival[pick] <- survival_temp
+   }
+
+  #Calculate Z
+  totnums$Z <- -1 * log(totnums$survival)
+  finaldata <- data.frame("species" = totnums$species,
+    "agecl" = NA, "polygon" = NA, "layer" = NA,
+    "time" = totnums$time, "atoutput" = totnums$Z)
+
+  #return(finaldata)
+#}
+
+
+```
+
+Modified the `calc_Z` function so it only evaluates species in the input numbers file. This creates Z values for all species. However, the call to `calc_stage2age` returns only a few of the 36 species from calc_Z so lets check the problem here:
+
+```{r calcstage2agesinppetagain, eval=FALSE}
+
+yoy <- YOY
+nums_data <- survey_testNall
+fgs <- funct.groups
+biolprm <- biol
+runprm = runpar
+
+#calc_stage2age <- function(nums_data, biolprm, yoy, fgs, runprm) {
+
+  # subset the yoy for those species that are included in the fgs file
+  # that are turned on
+  species.code <- fgs$Code
+  turnedon <- fgs[fgs$IsTurnedOn > 0, ]
+  names <- turnedon$Code
+
+  # Figure out the groups that have multiple ages classes in each stage (or
+  # cohort)
+  multiple_ages <- turnedon[turnedon$NumAgeClassSize>1, c(1,4,10)]
+  num_multi_age <- dim(multiple_ages)[1]
+
+  ntimesteps <- length(unique(nums_data$time))
+
+  # For each species with multiple ages, use the calc_Z function to get time
+  # varying Z values and put that all into one dataframe
+  Z.dataframe <- data.frame()
+  #for(i in 1:num_multi_age) {
+    #temp_nums <- nums_data[nums_data$species==multiple_ages$Name[i],]
+    temp_nums <- nums_data[nums_data$species %in% multiple_ages$Name,]
+    temp_Z <- calc_Z(yoy=yoy, nums=temp_nums, fgs=fgs, biolprm=biolprm, toutinc=runprm$toutinc)
+    #Z.dataframe <- rbind(Z.dataframe, temp_Z)
+    Z.dataframe <- temp_Z
+  #}
+
+  # HACK for now, since some Z values are negative, I am replacing them
+  # with a random number
+  randomZ <- runif(length(which(Z.dataframe$atoutput<0)))
+  Z.dataframe[which(Z.dataframe$atoutput<0),c("atoutput")] <- randomZ
+
+  # rename the "atoutput" column, since it is really just the mortality, and
+  # we want to retain it for the next step of merging
+  colnames(Z.dataframe)[6] <- c("Z")
+
+  # merge together nums_data and the output Z.dataframe:
+  new_nums <- merge(nums_data, Z.dataframe[,c("species", "time", "Z")],
+                    by=c("species", "time"), all.x=TRUE)
+
+
+  # since we have to expand the number of rows for groups with multiple true
+  # age classes, we will loop through species and time, creating a new list
+  # that each element will be a single species in a single time step but
+  # across ages and boxes (these wil all be put together in the end)
+  temp.list <- list()
+
+  #SKG subset turnedon and only loop through species present in the nums input
+  turnedon_sub <- turnedon %>%
+    filter(Name %in% new_nums$species)
+  names <- turnedon_sub$Code
+
+  for(i in 1:length(names)) {
+    # looping all species -- those with or without multiple true ages
+
+    group.i <- turnedon_sub$Name[i]
+    nums_species <- new_nums[new_nums$species==group.i,] # might need to
+    num_ages <- turnedon_sub$NumAgeClassSize[i]
+    sp_times <- sort(unique(nums_species$time))
+    n_sp_tsteps <- length(sp_times)
+    # these last pieces are needed because not all species are present at all times
+
+    # Check if multiple true ages, if not then just save species_nums to list
+    if(num_ages==1) { temp.list[[length(temp.list)+1]] <- nums_species
+    } else if(num_ages>1) {
+      # take out the part of the Z.dataframe for species group i
+      Zvals <- Z.dataframe[Z.dataframe$species==group.i,]
+
+      # create empty list for this species i, each element in the list will be
+      # a different time step
+      list_species <- list()
+
+      for(j in sp_times) { # looping through time
+        # get the Z val for the timestep in question
+        Zval.j <- Zvals$Z[Zvals$time==j]
+
+        # and turn the Z value into a vector of survival values across the
+        # number of true ages for each age class for this species
+        nums_vec <- 1
+        for(k in 1:(num_ages-1)) {
+          nums_vec <- c(nums_vec, exp(-Zval.j*k))
+        }
+        nums_proportion <- nums_vec/sum(nums_vec)
+
+        # take out the species numbers only for time step j
+        nums_sp_subset <- nums_species[nums_species$time==j, ]
+
+        # create an empty list, each element of this list will be a row from
+        # the nums_sp_subset data frame that is split into multiple pieces
+        # to make the atoutput column have the correct dimensions
+        list_ages <- list()
+
+        # loop through all the rows in nums_sp_subset
+        for(l in 1:nrow(nums_sp_subset)) {
+          nums_row <- nums_sp_subset[l,]
+          # create new data frame with same columns, but just more rows to
+          # account for all the true ages
+          new_rows <- data.frame(species=nums_row$species,
+                                 time=nums_row$time,
+                                 agecl=seq((nums_row$agecl*num_ages - num_ages+1),
+                                           nums_row$agecl*num_ages),
+                                 polygon=nums_row$polygon,
+                                 layer=nums_row$layer,
+                                 atoutput=nums_row$atoutput*nums_proportion,
+                                 Z=nums_row$Z
+                                 )
+
+          ### NOTE: the agecl piece is funny -- because now we are making many
+          # more age classes for some... I think this works? But might want
+          # another set of eyes to check my logic
+
+          list_ages[[length(list_ages)+1]] <- new_rows
+        }
+
+        # now combine all the elements of the list for different rows and make
+        # it an element of the list_species (to represent one time step)
+        list_species[[length(list_species)+1]] <- do.call("rbind", list_ages)
+      }
+      temp.list[[length(temp.list)+1]] <- do.call("rbind", list_species)
+    }
+  }
+
+  # Now just create the output
+  finalout_withZ <- do.call("rbind", temp.list)
+
+  ### CHECK:
+  # do we want to remove the column of Z values? I think so
+  finalout <- finalout_withZ[,-7]
+
+
+  #return(finalout)
+
+#}
+
+
+
+```
+
+That was me introducing a bug by filtering incorrectly; fixed it.
+
+These should be true age comps for Bocaccio in annual ages: 
+
+After corrections were applied to `calc_Z` we were closer to the ballpark in NOBA. This demonstrates that the estimated true ages are not working between the cohort ages, they just drop to 0. This is consistent with what we observed for NOBA. The numbers at true age [don't match atlantis output where we have it for NOBA](https://sgaichas.github.io/poseidon-dev/TestCalcZ.html), so I will do further testing with this function and `calc_stage2age`. 
+
+```{r plotannage, message=FALSE, warning=FALSE}
+
+trueNatage <- readRDS(file.path(d.name, paste0(scenario.name, "Nattrueagecensus.rds")))
+
+# test with one species--this is still full polygon and layer output
+trueNatage_ss <- trueNatage[trueNatage$species == species_ss,]
+
+# run sample fish on this for completeness? yes to aggregate
+trueNagesamp_ss <- sample_fish(trueNatage_ss, effNhigh)
+
+# plot it--first few timesteps for bocaccio
+
+Natageplot <- ggplot(trueNagesamp_ss, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        trueNatage_ss$species))
+
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+
+
+```
+
+### Biological sampling: setup
+
+The next steps of sampling can get us a proper weight at age. Here again a census to generate length comps, which need an average weight at age and carry it forward. First we `sample_fish` (nums and weight components).
+
+On a full model run this takes far too long with all species, so we cut it down to a few assessment species here:
+
+```{r ss-biolsampling, warning=FALSE, message=FALSE}
+
+# get only assessed species, hardcoded here for CCA sardine, hake, bocaccio
+spp.name <- funct.group.names[funct.group.names %in% c("Pacific_sardine",
+                                                       "Mesopel_M_Fish",
+                                                       "Bocaccio_rockfish")]
+
+survey_ssN <- create_survey(dat = truth$nums,
+                                 time = timeall,
+                                 species = spp.name,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# We need an effective N for the sample fish function, setting equal to actual N
+# this one is high but not equal to total for numerous groups
+effNhigh <- data.frame(species=survspp, effN=rep(1e+8, length(survspp)))
+
+# apply default sample fish as before to get numbers
+numssshigh <- sample_fish(survey_ssN, effNhigh)
+
+# aggregate true resn per survey design
+aggresnss <- aggregateDensityData(dat = truth$resn,
+                                 time = timeall,
+                                 species = spp.name,
+                                 boxes = boxall)
+
+# aggregate true structn per survey design
+aggstructnss <- aggregateDensityData(dat = truth$structn,
+                                 time = timeall,
+                                 species = spp.name,
+                                 boxes = boxall)
+
+#dont sample these, just aggregate them using median
+structnss <- sample_fish(aggstructnss, effNhigh, sample = FALSE)
+
+resnss <-  sample_fish(aggresnss, effNhigh, sample = FALSE)
+
+
+```
+
+### Biological sampling: true lengths and weight-at-age
+
+Then we calculate lengths with `calc_age2length`. This will probably not work for the full run with all species outputs 5x per year, but should be ok with 3 species. Still very long runtime! Saved output.
+
+```{r lengthcomp-wtage, eval=FALSE}
+
+length_census_ss <- calc_age2length(structn = structnss,
+                                 resn = resnss,
+                                 nums = numssshigh,
+                                 biolprm = truth$biolprm, fgs = truth$fgs,
+                                 CVlenage = 0.1, remove.zeroes=TRUE)
+
+#save for later use, takes a long time to generate
+saveRDS(length_census_ss, file.path(d.name, paste0(scenario.name, "length_census_sardhakeboca.rds")))
+
+```
+
+```{r lenatage-plot}
+
+length_census_ss <- readRDS(file.path(d.name, paste0(scenario.name, "length_census_sardhakeboca.rds")))
+
+len <- length_census_ss$natlength %>%
+  filter(species == species_ss)
+
+lfplot <- ggplot(len, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        len$species))
+
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
+
+
+```
+
+
+### True biomass survey II
+
+Now we can test the full `sample_survey_biomass` from nums to biomass index with these three species (required a revision of the function to allow time varying weight at age, and a clarification of units):
+
+```{r compare-surveys}
+# apply the proper weight at age (from saved census calc_age2length) to N survey
+
+#length_census_ss <- readRDS(file.path(d.name, paste0(scenario.name, "length_census_sardhakeboca.rds")))
+
+# weight at age output of calc_age2length is in g
+# output of survey should be in t, sample_survey_biomass expects kg wt@age
+# therefore need to divide by 1000 to get wt@age in kg
+
+wtage <- length_census_ss$muweight %>%
+  select(species, agecl, time, wtAtAge = atoutput) %>%
+  mutate(wtAtAge = wtAtAge/1000)
+
+surveyB_fromN <- sample_survey_biomass(survey_ssN, surv_cv, wtage)
+
+```
+
+Now we plot the results of the numbers-based (census) survey against the same Atlantis output file "[modelscenario]BiomIndx.txt" as above. We have a match. 
+
+To get back true biomass we need the full detailed time varying weight at age output, which is fairly cumbersome. The fixed weight at age may be a decent approximation but does result in sigificant misses for some species [as seen here](https://sgaichas.github.io/poseidon-dev/CCAExamples.html). 
+
+```{r matchB_Nsurveys }
+
+atBtxt2tidy <- atBtxt2 %>%
+  select(Time:DIN) %>%
+  #select(Time, FPL:DIN) %>%
+  rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+  gather(species, biomass, -Time) %>%
+  filter(species %in% levels(surveyB_fromN$species))
+
+#all species comparison, time intervals hardcoded for 5 steps per year
+compareB_N <-ggplot() +
+  geom_line(data=surveyB_fromN, aes(x=time/5,y=atoutput, color="survey census N->B"), 
+            alpha = 10/10) +
+  geom_point(data=atBtxt2tidy, aes(x=Time/365,y=biomass, color="txt output true B"),
+             alpha = 1/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+compareB_N + 
+  facet_wrap(~species, scales="free") 
+
+
+```
+
+
+## Fishery catch
+
+We found [after much testing](https://sgaichas.github.io/poseidon-dev/Atlantisom2SSworkflowtest.html) that the most reliable source for catch in biomass at present is the Atlantis output catch.txt file, loaded above. Here is bocaccio annual total catch:
+
+```{r plotcatch}
+
+truecatchbio_ss <- truecatchbio[truecatchbio$species == species_ss,]
+
+plotcatch <- ggplot() +
+  geom_line(data=truecatchbio_ss, aes(x=time,y=atoutput, color="true catch bio"),
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotcatch +
+  facet_wrap(~species, scales="free") 
+
+```
+
+
+## Fishery biological sampling
+
+Now (that catch nums are corrected!--sort of; [when converted to catch in weight they are off by a factor of 2 for sardines in this model](https://sgaichas.github.io/poseidon-dev/SardinesOnlyatlantisom2SStest.html)) we can sample fishery catch for lengths, ages, weights, and as long as these are compositions and not absolute values they should be correct:
+
+Here we use `create_fishery_subset` on the numbers output of `run_truth` to create the survey census of age composition (for just our three species in this case). The `sample_fish` applies the median for aggregation and does not apply multinomial sampling if `sample=FALSE` in the function call. 
+
+Timesteps may be different for fishery output than for the population above. The run parameter file will tell us what time units we are dealing with, and this is already specified in the census_spec.R file as fstepperyr: `r fstepperyr `. Further, we can get the total number of years with nyears from the run parameter file: `r runpar$nyears `. 
+
+Now we know the fishery output timestep, and there will only be 100 years. Because we don't want to wait 24 hours for this, we will look at only our three species.
+
+```{r catchage-len-wt-3spp, echo=TRUE, warning=FALSE, message=FALSE}
+
+# get survey nums with full (no) selectivity
+catch_testNss <- create_fishery_subset(dat = truth$catch,
+                                 time = timeall,
+                                 species = spp.name,
+                                 boxes = boxall)
+
+# apply default sample fish as before to get numbers
+catch_numssshigh <- sample_fish(catch_testNss, effNhigh)
+
+
+# aggregate true resn per survey or fishery subset design
+catch_aggresnss <- aggregateDensityData(dat = truth$resn,
+                                 time = timeall,
+                                 species = spp.name,
+                                 boxes = boxall)
+
+# aggregate true structn per survey or fishery subsetdesign
+catch_aggstructnss <- aggregateDensityData(dat = truth$structn,
+                                 time = timeall,
+                                 species = spp.name,
+                                 boxes = boxall)
+
+#dont sample these, just aggregate them using median
+catch_structnss <- sample_fish(catch_aggstructnss, effNhigh, sample = FALSE)
+
+catch_resnss <-  sample_fish(catch_aggresnss, effNhigh, sample = FALSE)
+
+```
+
+This is true catch at age for bocaccio (in age classes, not true ages):
+
+```{r catage1}
+
+catchage <- catch_numssshigh %>%
+  filter(species == "Bocaccio_rockfish")
+  
+catageplot <- ggplot(catchage, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchage$species))
+
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+Can we split ages for the fishery comps too? True catch at age bocaccio:
+
+```{r cattrueage}
+
+YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
+
+biol <- load_biolprm(d.name, biol.prm.file)
+
+truecatage_ss <- calc_stage2age(nums_data = catch_testNss,
+                                 biolprm = biol, 
+                                 yoy = YOY,
+                                 fgs = funct.groups, 
+                                 runprm = runpar)
+
+# run sample fish on this for completeness? yes to aggregate
+truecatagesamp_ss <- sample_fish(truecatage_ss, effNhigh)
+
+catchtrueage <- truecatagesamp_ss %>%
+ filter(species == "Bocaccio_rockfish")
+
+# plot it
+
+catageplot <- ggplot(catchtrueage, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchtrueage$species))
+
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+Length sample with user specified max length bin (200 cm):
+
+```{r userset-maxlen, echo=TRUE}
+
+catch_length_census_ss <- calc_age2length(structn = catch_structnss,
+                                 resn = catch_resnss,
+                                 nums = catch_numssshigh,
+                                 biolprm = truth$biolprm, fgs = truth$fgs,
+                                 maxbin = 200,
+                                 CVlenage = 0.1, remove.zeroes=TRUE)
+
+
+```
+
+We should get the upper end of anything with a 200cm max length bin.
+
+Bocaccio catch lengths:
+
+```{r vis-fishery-lf-test-1}
+
+catchlen <- catch_length_census_ss$natlength %>%
+  filter(species == "Bocaccio_rockfish")
+
+lfplot <- ggplot(catchlen, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        catchlen$species))
+
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
+lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
+
+```
+
+Fishery weight at (st)age:
+
+```{r vis-fishery-wtageclass-test}
+
+wageplot <- ggplot(catch_length_census_ss$muweight, aes(agecl, atoutput)) +
+  geom_point(aes(colour = time)) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  scale_x_discrete(limits=c(1:10)) +
+  xlab("age class") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste(scenario.name))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
+
+```
+
+Change in wt at (st)age in the fishery over time for age classes using an annual mid-year snapshot (first 22+ years of CCA model run):
+
+```{r aggwtcomp}
+
+wtage_annsurv <- catch_length_census_ss$muweight %>%
+  filter(time %in% annualmidyear)
+
+# reverse to show agecl time series of wt
+wageplot <- ggplot(wtage_annsurv, aes(time, atoutput)) +
+  geom_line(aes(colour = factor(agecl))) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  xlab("model timestep (5 per year)") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
+
+```
+
+## References
