@@ -141,6 +141,12 @@ June 14: fixed a bug and `calc_stage2age` works better now that it is using Z, a
 
 <a href="https://sgaichas.github.io/poseidon-dev/TestCalcStage2AgeNOBA.html" target="_blank">Test stage to age calculations and compare true age output NOBA - June 14, 2019</a>
 
+June 15: while the age splitting is functioning better, applying it to a species with more than 2 ages per age class (CC Bocaccio rockfish) shows that our application of an annual Z estimate may not be the best approach. The functions themselves could use further tweaking.
+
+Overall it is advisable to use true age output from more recent Atlantis codebases where possible.
+
+<a href="https://sgaichas.github.io/poseidon-dev/FullBoccaccioTruthEx2.html" target="_blank">Redo Bocaccio test with CCA F scenario, June 15, 2019</a>
+
 ### Rabbit holes that turned out ok
 
 <a href="https://sgaichas.github.io/poseidon-dev/CheckBiomassAges.html" target="_blank">In which I broke the very first thing that worked, then fixed it - June 4, 2019</a>

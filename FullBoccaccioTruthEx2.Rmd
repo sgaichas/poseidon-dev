@@ -694,7 +694,7 @@ That was me introducing a bug by filtering incorrectly; fixed it.
 
 These should be true age comps for Bocaccio in annual ages: 
 
-After corrections were applied to `calc_Z` we were closer to the ballpark in NOBA. This demonstrates that the estimated true ages are not working between the cohort ages, they just drop to 0. This is consistent with what we observed for NOBA. The numbers at true age [don't match atlantis output where we have it for NOBA](https://sgaichas.github.io/poseidon-dev/TestCalcZ.html), so I will do further testing with this function and `calc_stage2age`. 
+After corrections were applied to `calc_Z` we were closer to the ballpark in NOBA. While the estimated true ages no longer just drop to 0, the patterns here don't seem like a good enough approximation of how age class would decay. The numbers at true age for NOBA cod are closer because there are only 2 ages within a stage to split, but they still [don't match atlantis output where we have it for NOBA](https://sgaichas.github.io/poseidon-dev/TestCalcZ.html), so I will do further testing with this `calc_Z` and `calc_stage2age`. 
 
 ```{r plotannage, message=FALSE, warning=FALSE}
 
@@ -722,6 +722,8 @@ Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free
 
 
 ```
+
+We may need to rethink the annual Z we are estimating to do the approximation.
 
 ### Biological sampling: setup
 
@@ -921,7 +923,7 @@ catch_resnss <-  sample_fish(catch_aggresnss, effNhigh, sample = FALSE)
 
 ```
 
-This is true catch at age for bocaccio (in age classes, not true ages):
+This is true catch at (st)age for bocaccio (in age classes, not true ages):
 
 ```{r catage1}
 
@@ -943,7 +945,7 @@ catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free
 
 Can we split ages for the fishery comps too? True catch at age bocaccio:
 
-```{r cattrueage}
+```{r cattrueage, warning=FALSE, message=FALSE}
 
 YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
 
@@ -976,9 +978,11 @@ catageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free
 
 ```
 
+These still don't look quite right.
+
 Length sample with user specified max length bin (200 cm):
 
-```{r userset-maxlen, echo=TRUE}
+```{r userset-maxlen, echo=TRUE, eval=FALSE}
 
 catch_length_census_ss <- calc_age2length(structn = catch_structnss,
                                  resn = catch_resnss,
@@ -987,6 +991,7 @@ catch_length_census_ss <- calc_age2length(structn = catch_structnss,
                                  maxbin = 200,
                                  CVlenage = 0.1, remove.zeroes=TRUE)
 
+saveRDS(catch_length_census_ss, file.path(d.name, paste0(scenario.name, "catchlength_census_sardhakeboca.rds")))
 
 ```
 
