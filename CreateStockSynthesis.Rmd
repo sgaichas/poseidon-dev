@@ -27,6 +27,8 @@ Dummy files are in the package directory; use `r4ss` to load the dummy data file
 
 ```{r readdata, echo=FALSE}
 require(r4ss)
+source("./config/CCConfig.R")
+source("./config/census_spec.R")
 source("./config/sardine_config.R")
 
 stocksynthesis.data <- r4ss::SS_readdat_3.30(paste0("./inst/extdata/",
@@ -69,30 +71,84 @@ stocksynthesis.data$agebin_vector
 To edit index data, use the `atlantisom` sampling functions to extract survey biomass and numbers. These can then be written using the `SS_write_CPUE` function.
 
 ```{r}
+
+if(!file.exists(file.path(d.name, 
+                          paste0("output", scenario.name, "run_truth.RData")))){
+  #Store all loaded results into an R object
+  results <- run_truth(scenario = scenario.name,
+                     dir = d.name,
+                     file_fgs = functional.groups.file,
+                     file_bgm = box.file,
+                     select_groups = species,
+                     file_init = initial.conditions.file,
+                     file_biolprm = biol.prm.file,
+                     file_runprm = run.prm.file,
+                     verbose = TRUE
+  )
+} else {
+  results <- get(load(file.path(d.name,
+                              paste0("output", scenario.name, "run_truth_all.RData"))))
+}
 results <- get(load(atlantis_output_name))
 devtools::load_all()
 species=c(species)
+truth <- results
 
-#Sample all boxes
-boxes <- unique(results$nums$polygon)
+survey_testBall <- create_survey(dat = truth$biomass_ages,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
 
-#Efficiency of the survey
-effic <- data.frame(species=species, efficiency=eff_case)
+# make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
 
-# Assume uniform selectivity
-sel<- data.frame(species=rep(species,length(age_classes)),
-               agecl=age_classes,
-              selex=sel_by_age)
+# call sample_survey_biomass with a bunch of 1000s for weight at age
+# in the code it multiplies atoutput by wtatage/1000 so this allows us to use
+# biomass directly
+wtage <- data.frame(species=rep(survspp, each=10),
+                    agecl=rep(c(1:10),length(survspp)),
+                    wtAtAge=rep(1000.0,length(survspp)*10))
 
-#Sample survey - 3rd timestep simulates a summer survey
-survey_out <- create_survey(dat=results$nums, time=survey_sample_full, species=species, boxes=boxes, effic=effic, selex=sel)
+surveyB_frombio <- sample_survey_biomass(survey_testBall, surv_cv, wtage)
+
+#save for later use, takes a long time to generate
+saveRDS(surveyB_frombio, file.path(d.name, paste0(scenario.name, "surveyBcensus.rds")))
+
+# this uses result$nums and a new function to get survey index in numbers (abundance)
+
+survey_testNall <- create_survey(dat = truth$nums,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# as above, make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+surveyN <- sample_survey_numbers(survey_testNall, surv_cv)
+
+#save for later use, takes a long time to generate
+saveRDS(surveyN, file.path(d.name, paste0(scenario.name, "surveyNcensus.rds")))
+
+Natage <- readRDS(file.path(d.name, paste0(scenario.name, "natage_census_sard.rds")))
+
+lengthwt_census_ss <- readRDS(file.path(d.name, paste0(scenario.name, "lengthwt_census_sard.rds")))
+
+len <- lengthwt_census_ss$natlength
+
+wtage_ann <- lengthwt_census_ss$muweight %>%
+  filter(time %in% annualmidyear)
 
 #Set effective sample size for age compositions
 effN <- surveyEffN
 highEffN <- data.frame(species=species, effN=rep(effN, length(species)))
 
 #Sample fish for age composition
-age_comp_data <- sample_fish(survey_out, highEffN)
+age_comp_data <- sample_fish(survey_testBall, highEffN)
+boxes <- unique(results$nums$polygon)
 
 # aggregate true resn per survey design
 survey_aggresnstd <- aggregateDensityData(dat = results$resn,
@@ -120,6 +176,9 @@ ss_length_stdsurv <- calc_age2length(structn = ss_structnstd,
                                      biolprm = results$biolprm, fgs = results$fgs,
                                      CVlenage = CVs$lenage, remove.zeroes=TRUE)
 
+
+saveRDS(ss_length_stdsurv, file.path(d.name, paste0(scenario.name, "lengthwt_census_sard.rds")))
+
 #Need to replace with interp function
 wtAtAge <- ss_length_stdsurv$muweight %>%
   select(species, agecl, time, wtAtAge = atoutput) %>%
@@ -129,7 +188,7 @@ wtAtAge <- ss_length_stdsurv$muweight %>%
 cv <- data.frame(species="Pacific_sardine", cv=CVs$survey)
 
 #Sample survey biomass
-survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
+survObsBiom <- sample_survey_biomass(dat=survey_testBall,cv=cv,wtAtAge)
 
 
 
@@ -139,26 +198,33 @@ survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
 ## Catch data
 
 ```{r}
+fish_years <- annualmidyear[fish_years]
 catch_numbers <-  create_fishery_subset(dat = results$catch,
                                          time = fish_years,
                                          species = species,
                                          boxes = boxes)
+
 
 #Sample catch in numbers
 catch_total <- catch_numbers %>%
   group_by(time) %>%
   summarise(catch=sum(atoutput))
 
+#Use .txt file output biomass instead
+names(results$catch_all)[2] <- "Species"
+catch_total <- filter(results$catch_all, Species==species) %>%
+  filter(time %in% (fish_years+8))
+
 #Test writing CPUE in biomass
   stocksynthesis.data <- SS_write_ts(ss_data_list = stocksynthesis.data,
                 ts_data = list(survObsBiom$atoutput[fish_years],
-                  catch_total$catch[catch_total$time==fish_years]),
+                  catch_total$catch),
                 CVs = c(CVs$survey,
                         CVs$fishery),
                 data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             fish_years),
             sampling_month = list(rep(survey_month,nyears),
                                 rep(fishing_month,nyears)),
-                units = c("biomass","numbers"),
+                units = c("biomass","biomass"),
                 data_type=c("CPUE","catch"),
                 fleets = c(2,1))
 
@@ -300,7 +366,7 @@ stocksynthesis.data$maximum_size <- "#"
 #Change minimum sample size to 0.001 for CAAL data (SS won't let it go lower than this)
 stocksynthesis.data$age_info$minsamplesize <- rep(0.001,2)
 
-SS_writedat(stocksynthesis.data, outfile = paste0("./inst/extdata/",model_dir,
+SS_writedat(stocksynthesis.data, outfile = paste0(d.name, "/inst/extdata/",model_dir,
 datfile_name),
                  overwrite=TRUE)
 ```
@@ -310,10 +376,43 @@ datfile_name),
 Below we get the weight-length relationship parameters from atlantis, calculate h and R0 from Atlantis $\alpha$ and $\beta$ parameters, use the \code{calc_Z} function to back out natural mortality (M) from Atlantis, and use the survey length-at-age from Atlantis to estimate a growth curve.
 ```{r}
 #Get biological parameters
-biolprm <- results$biolprm
+
+#Load needed inputs for biological parameters
+source(here("config/CC1Config.R"))
+#biological parameters
+biolprm <- load_biolprm(dir = "C:/Users/chris/Documents/GitHub/atlantisom", file_biolprm = biol.prm.file)
+d.name <- "C:/Users/chris/Documents/GitHub/atlantisom"
+#functional groups
 fgs <- results$fgs
+runprm <- load_runprm(dir = d.name, file_runprm = run.prm.file)
+YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
+truenums_ss <- results$nums[results$nums$species==species,]
+
+YOY_ss <- YOY %>%
+  select(Time, "SAR.0")
+
+fullresZ <- calc_Z(yoy = YOY_ss,
+                   nums = truenums_ss,
+                   fgs = fgs,
+                   biolprm = biolprm,
+                   toutinc = runprm$toutinc)
+
+
+meanwt_spp <- ss_length_stdsurv$muweight %>% 
+  filter(time>burnin) %>%
+  group_by(agecl) %>%
+  summarize(meanwt = mean(atoutput))
+sardine.ctl <-r4ss::SS_readctl(paste0("./inst/extdata/",
+model_dir,
+ctlfile_name))
+sardine.ctl <- SS_write_biol(sardine.ctl, biolprm, "SAR", Z = mean(fullresZ$atoutput), wtsage=meanwt_spp)
+
 li_a_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 2]/1000
 li_b_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 3]
+
+#maturity ogive
+#check what R0 is
+
 
 
 len_nonburn <- ss_length_stdsurv$mulen %>%
@@ -335,6 +434,8 @@ After the data and control file modifications, ensure you copy the local SS 3.3 
 ```{r}
 #Run stock synthesis model
 run_stocksynthesis(species = species, model_dir = model_dir, show_output = TRUE)
+
+#Add a call here to plot output 
 
 ```
 
