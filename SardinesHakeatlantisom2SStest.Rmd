@@ -102,7 +102,7 @@ source(here("config/census_spec.R"))
 
 Get true total biomass, total numbers. This code gets results for all species and saves the output true B and N.
 
-```{r trueB-N}
+```{r trueB-N, eval=FALSE}
 
 # this uses result$biomass_ages to sample biomass directly, no need for wt@age est
 survey_testBall <- create_survey(dat = truth$biomass_ages,
@@ -201,7 +201,7 @@ plotN +
 
 Get true population age comp, length comp, and weight at age. Now we go to single species to speed things up.
 
-```{r true-comps, warning=FALSE, message=FALSE}
+```{r true-comps, warning=FALSE, message=FALSE, eval=FALSE}
 
 # wrap these individual calls into a function
 survey_N_ss <- create_survey(dat = truth$nums,
@@ -346,7 +346,7 @@ plotcatch +
 Get true catch at age and other comps (may not be different from input for our project). First see if catch output is at same timescale as population by checking toutfinc: `r fstepperyr`
 
 
-```{r true-catage-lf-wtage}
+```{r true-catage-lf-wtage, eval=FALSE}
 
 # get survey nums with full (no) selectivity
 catchN_ss <- create_fishery_subset(dat = truth$catch,
@@ -481,7 +481,7 @@ plotcatch +
 
 ```
 
-Sadly, still a problem with the catch correction if it should match catch.txt when comverted to biomass. We are now off by about a factor of 2 (catch nums * wtAtAge is half true catch bio from the txt file):
+Sadly, still a problem with the catch correction if it should match catch.txt when converted to biomass. We are now off by about a factor of 2 (catch nums * wtAtAge is half true catch bio from the txt file), but this differs slightly by species:
 
 ```{r catchoff}
 
@@ -492,9 +492,11 @@ Sadly, still a problem with the catch correction if it should match catch.txt wh
 sardcatchBcomp <- merge(sardcatchB, catchbioN_ss)
 sardcatchBcomp <- mutate(sardcatchBcomp, mult=atoutput/anncatchB)
 
-mean(sardcatchBcomp$mult)
+#mean(sardcatchBcomp$mult)
 
-summary(sardcatchBcomp$mult)
+#summary(sardcatchBcomp$mult)
+Filter(Negate(is.null), tapply(sardcatchBcomp$mult, sardcatchBcomp$species, summary))
+
 
 ```
 
@@ -503,13 +505,15 @@ summary(sardcatchBcomp$mult)
 
 Specify our survey sampling. This could come from other information such as the overlap of actual survey stations with OM polygons, experiments evaluating survey selectivity and efficiency, actual sample-based survey cv, etc. 
 
+Now we are going single species. First we generate the inputs for sardine.
+
 Here we are using Christine's specifications, which approximate the acoustic survey index used in the sardine assessment:
 
 ```{r sardine-survey-spec}
 # from atlantisom/config/sardine_config.R, to be generalized here
 
 #Set species name
-species <- species_ss #"Pacific_sardine" #change to species_ss to match 
+species <- "Pacific_sardine" #change to species_ss if we want both 
 
 #Directory with SS files
 model_dir <- "Sardine_SS_files/"
@@ -661,7 +665,7 @@ wtAtAge <- ss_length_stdsurv$muweight %>%
   mutate(wtAtAge = wtAtAge/1000)
 
 # CV function
-cv <- data.frame(species="Pacific_sardine", cv=CVs$survey)
+cv <- data.frame(species=species_ss, cv=CVs$survey)
 
 #Sample survey biomass
 survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
