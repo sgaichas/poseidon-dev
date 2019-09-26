@@ -147,9 +147,9 @@ saveRDS(surveyN, file.path(d.name, paste0(scenario.name, "surveyNcensus.rds")))
 
 ```
 
-Plot true biomass and numbers for "sardines." 
+Plot true biomass and numbers for both "hake" and "sardines." 
 
-```{r plot-true-B-N}
+```{r plot-true-B-N, message=FALSE, warning=FALSE}
 
 trueB <- readRDS(file.path(d.name, paste0(scenario.name,"surveyBcensus.rds")))
 
@@ -166,7 +166,7 @@ atBtxt2tidy <- atBtxt2 %>%
   #select(Time, FPL:DIN) %>%
   rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
   gather(species, biomass, -Time) %>%
-  filter(species %in% c("Pacific_sardine"))
+  filter(species %in% c("Mesopel_M_Fish", "Pacific_sardine"))
 
 
 plotB <-ggplot() +
@@ -256,22 +256,30 @@ saveRDS(length_census_ss, file.path(d.name, paste0(scenario.name, "lengthwt_cens
 
 ```
 
-Plot some of the age, length comps, and wtatage
+Plot some of the age, length comps, and wtatage for selected timesteps (after burnin)
 
 ```{r plot-true-agecomps}
 
-Natage <- readRDS(file.path(d.name, paste0(scenario.name, "natage_census_sard_hake.rds")))
+Natage <- readRDS(file.path(d.name, paste0(scenario.name, "natage_census_sard_hake.rds"))) 
 
-Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
-  geom_point() +
-  theme_tufte() +
-  labs(subtitle = paste(scenario.name,
-                        Natage$species))
+Natagesub <- Natage %>% 
+  filter(time %in% c(155:195))
 
-Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
-Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
-Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
-Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+for(sp in unique(Natage$species)){
+  Natagesubsp <- Natagesub %>%
+    filter(species==sp)
+  
+  Natageplot <- ggplot(Natagesubsp, aes(x=agecl, y=atoutput)) +
+    geom_point() +
+    theme_tufte() +
+    labs(subtitle = paste(scenario.name,
+                          sp))
+  
+  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+}
 
 ```
 
@@ -281,16 +289,25 @@ lengthwt_census_ss <- readRDS(file.path(d.name, paste0(scenario.name, "lengthwt_
 
 len <- lengthwt_census_ss$natlength
 
-lfplot <- ggplot(len, aes(upper.bins)) +
-  geom_bar(aes(weight = atoutput)) +
-  theme_tufte() +
-  labs(subtitle = paste(scenario.name,
-                        len$species))
+lensub <- len %>% 
+  filter(time %in% c(155:195))
 
-lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
-lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
-lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
-
+for(sp in unique(len$species)){
+  lensubsp <- lensub %>%
+    filter(species==sp)
+  
+  
+  lfplot <- ggplot(len, aes(upper.bins)) +
+    geom_bar(aes(weight = atoutput)) +
+    theme_tufte() +
+    labs(subtitle = paste(scenario.name,
+                          len$species))
+  
+  lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free_y")
+  lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free_y")
+  lfplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free_y")
+  
+}
 
 ```
 
@@ -582,14 +599,16 @@ fish_burnin <- burnin*fstepperyr+1
 fish_nyears <- nyears*fstepperyr
 fish_times <- fish_sample_full[fish_burnin:(fish_burnin+fish_nyears-1)]
 fish_timesteps <- seq(fish_times[5], max(fish_times), by=fstepperyr) #last timestep
-fish_years <- unique(floor(fish_times/fstepperyr)+1)
+#fish_years <- unique(floor(fish_times/fstepperyr)+1) # my original
+fish_years <- unique(floor(fish_times/fstepperyr)) #from Christine's new sardine_config.R
 
 # potential problem: while they are from the same model year,
 # fish_years dont match survey_years timesteps (survey mid year, fishery end)
 # so when matching use the index, not the value itself
 
 #Years to survey, assuming survey is once per year
-survey_years <- survey_sample_full[(burnin+1):(burnin+nyears)]
+#survey_years <- survey_sample_full[(burnin+1):(burnin+nyears)] # my original
+survey_years <- survey_sample_full[burnin:(burnin+nyears-1)] #from Christine's new sardine_config.R
 
 #Month of survey/fishing
 survey_month <- 7
@@ -975,6 +994,17 @@ fish_len_comp_flat <- reformat_compositions(fish_len_comp_anndata,
 fish_len_comp_final <- filter(fish_len_comp_flat,
                          time %in% fish_years)
 
+notbins <- c("time", "nsamp")
+
+# fish_length_bins <- as.integer(names(fish_len_comp_final))
+# fish_length_bins <- fish_length_bins[!is.na(fish_length_bins)]
+
+# need to fill empty length bins with 0s to have same bins as survey for SS_write_comps
+missing.lengths <- setdiff(length_bins, names(fish_len_comp_final)[!names(fish_len_comp_final) %in% notbins])
+fish_len_comp_final[as.character(missing.lengths)] <- 0                    # Add them, filled with '0's
+fish_len_comp_final <- fish_len_comp_final[c("time", length_bins, "nsamp")]
+
+
 # fishery age comps also 5 timesteps per year
 if(fstepperyr>1){
   fish_age_comp_anndata <- catch_numsss_samp %>%
@@ -993,6 +1023,14 @@ fish_age_comp_flat <- reformat_compositions(fish_age_comp_anndata,
 fish_age_comp_final <- filter(fish_age_comp_flat,
                          time %in% fish_years)
 
+# #SS_write_comps breaking because fishery age bins start with 2 not 1; extracting bins from fish file may help?
+# fish_age_bins <- names(fish_age_comp_flat)[!names(fish_age_comp_flat) %in% notbins]
+
+# that leaves an empty column in data file, so instead fill with 0s
+missing.ages <- setdiff(age_bins, names(fish_age_comp_final)[!names(fish_age_comp_final) %in% notbins])
+fish_age_comp_final[missing.ages] <- 0                    # Add them, filled with '0's
+fish_age_comp_final <- fish_age_comp_final[c("time", age_bins, "nsamp")]
+
 comp_list <- list(caal_comp_final,len_comp_final, fish_age_comp_final, fish_len_comp_final)
 
 apply_month <- list(rep(survey_month, nrow(comp_list[[1]])), 
@@ -1001,14 +1039,8 @@ apply_month <- list(rep(survey_month, nrow(comp_list[[1]])),
                     rep(fishing_month,nrow(comp_list[[4]])))
 
 
-# below fails with two errors (only gets to first when running)
-
-# Error in `[<-.data.frame`(`*tmp*`, indices, "Seas", value = c(1, 1, 1, : replacement has 49 rows, data has 2045
-
-# Error in `[.data.frame`(comp_matrix[[i]], , as.character(bins[[i]])) : undefined columns selected
-
-# both these errors come from the fishery age and length comps when I step
-# through the function, survey caal and lengths read in fine
+# This now runs by ensuring that survey and fishery compositions have the same bins 
+# (filled with 0s for missing bins in fishery relative to survey)
 
 # Write CAAL and length composition data
 stocksynthesis.data <- SS_write_comps(ss_data_list = stocksynthesis.data, 
@@ -1048,7 +1080,7 @@ datfile_name),
 After the data and control file modifications, ensure you copy the local SS 3.3 executable into the folder containing the model files. Then run the following chunk.
 
 ```{r runSS, eval=FALSE}
-#Run stock synthesis model
+#Run stock synthesis model 
 run_stocksynthesis(species = species, model_dir = model_dir, show_output = TRUE)
 
 ```
