@@ -17,6 +17,9 @@ May 24: Sardines have a full dataset, but still working on converting to true ag
 
 <a href="https://sgaichas.github.io/poseidon-dev/SardinesOnlyatlantisom2SStest.html" target="_blank">Sardines in the CalCurrent run with F and rec dev scenario, all true and SS data, May 31, 2019, updated June 7</a>
 
+<a href="https://sgaichas.github.io/poseidon-dev/SardinesHakeatlantisom2SStest.html" target="_blank">Sardines in the CalCurrent run with F , rec dev, and climate scenario, all true and SS data, Sept26, 2019</a>
+
+
 ### Read this first on overall workflow
 
 <a href="https://sgaichas.github.io/poseidon-dev/RethinkSamplingFunctions.html" target="_blank">Big picture and new functions needed - May 10, 2019, updated May 16, 2019</a>
