@@ -22,7 +22,7 @@ library(atlantisom)
 
 ## Introduction
 
-Now we test the `atlantisom` to SS workflow with a new California Current run that includes climate forcing, recruitment variability, and the fishing scenario outlined for our project in Norway: "output_CC_2063_OA_OFF_222". 
+Now we test the `atlantisom` to SS workflow with a new California Current run that includes climate forcing, recruitment variability, and the fishing scenario outlined for our project in Norway: "output_CC_2063_OA_OFF_22". 
 
 We will go from atlantis model output to SS input in this page for a single species, "sardine", that doesn't require any age class splitting.
 
@@ -943,7 +943,7 @@ stocksynthesis.data$agecomp
 
 Once we have the natlength matrix, we can munge the data into the proper CAAL and length bin format for SS
 
-```{r SS-comps-formatting, eval=FALSE}
+```{r SS-comps-formatting}
 
 #Check length compositions match age compositions
 #ss_length_stdsurv$natlength %>%
