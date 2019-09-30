@@ -869,11 +869,6 @@ plotcatch +
 ```
 -->
 
-Get population parameters for SS from Atlantis
-
-```{r toSS-poppars}
-
-```
 
 ## Write data for Stock Synthesis
 
@@ -1061,6 +1056,9 @@ head(stocksynthesis.data$agecomp)
 #Change length bin structure to match atlantis data
 stocksynthesis.data$lbin_vector <- length_bins
 
+#Get correct number of length bins
+# stocksynthesis.data$N_lbins <- length(length_bins)
+
 #Set lbin_method to 1 - this makes the population length bins match the data bins 
 #When lbin_method==1, we just comment out the binwidth, minimum, and maximum size arguments since they aren't used
 stocksynthesis.data$lbin_method <- 1
@@ -1074,6 +1072,65 @@ stocksynthesis.data$age_info$minsamplesize <- rep(0.001,2)
 SS_writedat_3.30(stocksynthesis.data, outfile = paste0("./inst/extdata/",model_dir,
 datfile_name),
                  overwrite=TRUE)
+```
+
+## Coming up with dynamic life history parameters
+
+Below we get the weight-length relationship parameters from atlantis, calculate h and R0 from Atlantis $\alpha$ and $\beta$ parameters, use the \code{calc_Z} function to back out natural mortality (M) from Atlantis, and use the survey length-at-age from Atlantis to estimate a growth curve.
+```{r, eval=FALSE}
+#Get biological parameters
+
+#Load needed inputs for biological parameters
+source(here("config/CC3Config.R"))
+#biological parameters
+biolprm <- load_biolprm(dir = d.name, file_biolprm = biol.prm.file)#"C:/Users/chris/Documents/GitHub/atlantisom", 
+#d.name <- "C:/Users/chris/Documents/GitHub/atlantisom"
+#functional groups
+fgs <- truth$fgs
+runprm <- load_runprm(dir = d.name, file_runprm = run.prm.file)
+YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
+truenums_ss <- truth$nums[results$nums$species==species,]
+
+YOY_ss <- YOY %>%
+  select(Time, "SAR.0")
+
+fullresZ <- calc_Z(yoy = YOY_ss,
+                   nums = truenums_ss,
+                   fgs = fgs,
+                   biolprm = biolprm,
+                   toutinc = runprm$toutinc)
+
+
+meanwt_spp <- ss_length_stdsurv$muweight %>% 
+  filter(time>burnin) %>%
+  group_by(agecl) %>%
+  summarize(meanwt = mean(atoutput))
+
+ctlfile_name <-  "sardEM_3_3.ctl"
+sardine.ctl <-r4ss::SS_readctl_3.30(paste0("./inst/extdata/",
+model_dir,
+ctlfile_name))
+sardine.ctl <- SS_write_biol(sardine.ctl, biolprm, "SAR", Z = mean(fullresZ$atoutput), wtsage=meanwt_spp)
+
+li_a_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 2]/1000
+li_b_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 3]
+
+#maturity ogive
+#check what R0 is
+
+
+
+len_nonburn <- ss_length_stdsurv$mulen %>%
+  filter(time > burnin*timestep)
+plot(len_nonburn$atoutput~len_nonburn$agecl, col=len_nonburn$time)
+
+length.data <- data.frame("Year"=(len_nonburn$time-survey_sample_time)/timestep+1, length=len_nonburn$atoutput, Weight=NA, Sex="Female", age=as.integer(len_nonburn$agecl))
+
+#require(bbmle)
+#vb_estimates <-sample_fit_vbgf(length.data, 25, 45, 0.4,
+#  0.1, 0.1, 20, 40, 0.05, 0.01, 0.01,
+#  30, 50, 0.6, 0.3, 0.3, 0.5, 10)
+
 ```
 
 ## Run Stock Synthesis
