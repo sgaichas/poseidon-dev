@@ -1,0 +1,238 @@
+#V3.30.14.04-safe;_2019_08_14;_Stock_Synthesis_by_Richard_Methot_(NOAA)_using_ADMB_12.0
+#Stock Synthesis (SS) is a work of the U.S. Government and is not subject to copyright protection in the United States.
+#Foreign copyrights may apply. See copyright.txt for more information.
+Tue Oct  1 15:28:34 2019
+Bmark_relF(by_fleet_&seas)
+ 1 0
+#
+SR_parm for benchmark:  15.8376 0.95 0.727 0 0 671883
+for years: 1 79  SSB_virgin was: 671883
+Repro_output_by_age:  0 0.000343331 0.00603511 0.026773 0.0510161 0.0726032 0.0925734 0.110017 0.124683 0.136693 0.156494
+#
+find_target_SPR
+SPR_is_spawner_potential_ratio=(fishedSSB/R)/(unfishedSSB/R))
+Iter Fmult F_std SPR tot_catch SSB_Area:1_GP:1
+0 0 0 1 0 0.0889441
+1 0.03996 0.0371479 0.845925 0.00332037 0.07524
+2 0.447533 0.363045 0.259405 0.0125389 0.0230726
+3 0.103637 0.0946086 0.664965 0.0068742 0.0591447
+4 0.252064 0.219446 0.417032 0.0108653 0.0370925
+5 0.609819 0.464533 0.189772 0.0129135 0.0168791
+6 0.357171 0.299634 0.317994 0.0120272 0.0282837
+7 0.208641 0.184303 0.472556 0.0100866 0.0420311
+8 0.289145 0.248527 0.377198 0.0113713 0.0335495
+9 0.237243 0.207582 0.434798 0.0106249 0.0386728
+10 0.251721 0.219173 0.41743 0.01086 0.0371279
+11 0.263221 0.228286 0.404386 0.011031 0.0359678
+12 0.266712 0.231036 0.400551 0.0110804 0.0356267
+13 0.267186 0.231409 0.400034 0.011087 0.0355807
+14 0.267217 0.231433 0.400001 0.0110874 0.0355777
+15 0.267218 0.231434 0.4 0.0110874 0.0355776
+16 0.267218 0.231434 0.4 0.0110874 0.0355776
+17 0.267218 0.231434 0.4 0.0110874 0.0355776
+18 0.267218 0.231434 0.4 0.0110874 0.0355776
+seas fleet Hrate encB deadB retB encN deadN retN: 
+1 1 0.267218 0.0110874 0.0110874 0.0110874 0.26663 0.26663 0.26663
+#
+Find_target_SSB/Bzero; where Bzero is for Bmark years, not Virgin
+Iter Fmult F_std SPR Catch SSB Recruits SSB/Bzero Tot_catch SSB_Area:1_GP:1
+0 0 0 1 0 671883 7.554e+06 1 0 671883
+1 0.447533 0.363045 0.259405 91113.4 167656 7.26644e+06 0.249531 91113.4 167656
+2 0.103637 0.0946086 0.664965 51578.9 443777 7.50325e+06 0.660498 51578.9 443777
+3 0.252064 0.219446 0.417032 80546.8 274974 7.4132e+06 0.409259 80546.8 274974
+4 0.609819 0.464533 0.189772 91995.6 120247 7.12398e+06 0.178969 91995.6 120247
+5 0.357171 0.299634 0.317994 88255.5 207545 7.33798e+06 0.308901 88255.5 207545
+6 0.208641 0.184303 0.472556 75060.6 312778 7.44158e+06 0.465524 75060.6 312778
+7 0.289145 0.248527 0.377198 84007.5 247854 7.3877e+06 0.368894 84007.5 247854
+8 0.237243 0.207582 0.434798 78869.6 287071 7.42307e+06 0.427262 78869.6 287071
+9 0.267499 0.231655 0.399694 82106.2 263170 7.40272e+06 0.39169 82106.2 263170
+10 0.248719 0.21678 0.420942 80184.3 277637 7.41544e+06 0.413222 80184.3 277637
+11 0.254321 0.22124 0.414425 80786.3 273199 7.41168e+06 0.406617 80786.3 273199
+12 0.258617 0.224648 0.409531 81231.1 269868 7.40878e+06 0.401658 81231.1 269868
+13 0.259889 0.225654 0.4081 81360 268893 7.40791e+06 0.400208 81360 268893
+14 0.26006 0.22579 0.407908 81377.3 268762 7.4078e+06 0.400013 81377.3 268762
+15 0.260072 0.225799 0.407895 81378.4 268754 7.40779e+06 0.4 81378.4 268754
+16 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+17 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+18 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+19 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+20 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+21 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+22 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+23 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+24 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+25 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+26 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+27 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+28 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 81378.4 268753
+seas fleet Hrate encB deadB retB encN deadN retN): 
+1 1 0.260072 81378.4 81378.4 81378.4 1.94309e+06 1.94309e+06 1.94309e+06
+#
+Find_MSY_catch
+Iter Fmult F_std SPR Catch SSB Recruits SSB/Bzero Gradient Curvature Tot_Catch Area:1_GP:1
+0 0.260072 0.225799 0.407895 81378.4 268753 7.40779e+06 0.4 17470.1 -16986.1 81378.4 268753
+1 0.267264 0.231471 0.399949 82083.9 263344 7.40289e+06 0.391949 16769.5 -17015 82083.9 263344
+2 0.287757 0.247454 0.37858 83894.8 248795 7.38867e+06 0.370295 14825.6 -16834.4 83894.8 248795
+3 0.318136 0.270663 0.350021 86103.3 229350 7.36696e+06 0.341354 12125.5 -15983.7 86103.3 229350
+4 0.353975 0.297297 0.320441 88104.3 209211 7.3404e+06 0.31138 9272.55 -14355.7 88104.3 209211
+5 0.391843 0.324565 0.293244 89650.3 190694 7.31125e+06 0.283821 6681.17 -12215.6 89650.3 190694
+6 0.429068 0.350498 0.269905 90719.4 174804 7.28155e+06 0.260171 4558.21 -9949.12 90719.4 174804
+7 0.463395 0.373655 0.250897 91389.5 161863 7.25328e+06 0.240909 2957.04 -7879.66 91389.5 161863
+8 0.492974 0.393034 0.236181 91768.9 151843 7.22826e+06 0.225996 1834.12 -6195.92 91768.9 151843
+9 0.516536 0.408095 0.225428 91961 144522 7.20792e+06 0.2151 1098.2 -4955.09 91961 144522
+10 0.53365 0.418827 0.218105 92047.2 139536 7.19292e+06 0.20768 646.444 -4120.9 92047.2 139536
+11 0.557172 0.433298 0.208653 92101.2 133102 7.172e+06 0.198102 132.508 -3077.14 92101.2 133102
+12 0.563504 0.437139 0.206223 92104.1 131447 7.16631e+06 0.195639 14.3313 -2817.65 92104.1 131447
+13 0.564256 0.437593 0.205937 92104.2 131252 7.16564e+06 0.19535 0.843151 -2787.47 92104.2 131252
+14 0.564301 0.437621 0.20592 92104.2 131241 7.1656e+06 0.195332 0.0222075 -2785.65 92104.2 131241
+15 0.564302 0.437621 0.20592 92104.2 131240 7.16559e+06 0.195332 -0.0128519 -2785.59 92104.2 131240
+16 0.564302 0.437621 0.20592 92104.2 131241 7.1656e+06 0.195332 -0.0126649 -2785.61 92104.2 131241
+17 0.564301 0.43762 0.20592 92104.2 131241 7.1656e+06 0.195333 -0.0113888 -2785.63 92104.2 131241
+18 0.5643 0.43762 0.205921 92104.2 131241 7.1656e+06 0.195333 -0.0102263 -2785.65 92104.2 131241
+19 0.5643 0.43762 0.205921 92104.2 131241 7.1656e+06 0.195333 -0.0091915 -2785.66 92104.2 131241
+seas fleet Hrate encB deadB retB encN deadN retN): 
+1 1 0.5643 92104.2 92104.2 92104.2 2.79392e+06 2.79392e+06 2.79392e+06
+#
+Total dead catch: 92104.2   Total catch for optimize:  92104.2
+#
+Equil_N_at_age_at_MSY_each
+Seas Area GP Sex subM 0 1 2 3 4 5 6 7 8 9 10
+1 1 1 1 1  0 7.1656e+06 4.80324e+06 1.85547e+06 707397 269695 102821 39200.6 14945.2 5697.88 3510.81
+Equil_N_at_age_at_MSY_sum
+GP Sex N/Z 0 1 2 3 4 5 6 7 8 9 10
+1 1 N  0 7.1656e+06 4.80324e+06 1.85547e+06 707397 269695 102821 39200.6 14945.2 5697.88 3510.81
+1 1 Z -inf 0.4 0.951155 0.9643 0.9643 0.9643 0.9643 0.9643 0.9643  NA NA
+Equil_N_at_age_M_only_Recr_MSY
+Seas Area GP Sex subM 0 1 2 3 4 5 6 7 8 9 10
+1 1 1 1 1  0 7.1656e+06 4.80324e+06 3.21971e+06 2.15824e+06 1.44671e+06 969758 650048 435740 292086 593881
+Equil_N_at_age_M_only_sum
+GP Sex N/Z  0 1 2 3 4 5 6 7 8 9 10
+1 1 N  0 7.1656e+06 4.80324e+06 3.21971e+06 2.15824e+06 1.44671e+06 969758 650048 435740 292086 593881
+1 1 Z -inf 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4  NA NA
+#
+Management_report
+Steepness_Recr_SSB_virgin(R0) 0.95 7.554e+06 671883
+Steepness_Recr_SSB_benchmark 0.95 7.554e+06 671883
+#
+Summary_age: 1
+#_Bmark_years: beg_bio, end_bio, beg_selex, end_selex, beg_relF, end_relF, beg_recr_dist, end_recr_dist, beg_SRparm, end_SRparm
+ 79 79 79 79 79 79 1 79 1 79
+#
+Element Value Value/Recr
+Recr_unfished(Bmark) 7.554e+06
+SSB_unfished(Bmark) 671883 0.0889441
+BIO_Smry_unfished(Bmark) 782201 0.103548
+#
+Spawner_Potential_Ratio_as_target
+SPR_target 0.4
+SPR_calc 0.4
+Fmult 0.267218
+F_std 0.231434
+Exploit(Catch_dead/B_smry) 0.231434
+Recruits 7.40292e+06
+SPBio 263378 0.0355776
+Catch_encountered 82079.4 0.0110874
+Catch_dead 82079.4 0.0110874
+Catch_retain 82079.4 0.0110874
+Biomass_Smry 354656 0.0479075
+#
+Ratio_SSB/B0_as_target
+Ratio_target  0.4
+Ratio_calc 0.4
+SPR@Btgt 0.407895
+Fmult 0.260072
+F_std 0.225799
+Exploit(Catch_dead/B_smry) 0.225799
+Recruits 7.40779e+06
+SPBio 268753 0.0362798
+Catch_encountered 81378.4 0.0109855
+Catch_dead 81378.4 0.0109855
+Catch_retain 81378.4 0.0109855
+Biomass_Smry 360402 0.0486518
+#
+Maximum_Sustainable_Yield;_where_Yield_is_Dead_Catch
+calculate_FMSY
+SPR 0.205921
+Fmult 0.5643
+F_std 0.43762
+Exploit(Catch/Bsmry) 0.43762
+Recruits@MSY 7.1656e+06
+SPBio 131241 0.0183154
+SPBmsy/SPB_virgin 0.195333
+SPBmsy/SPB_unfished 0.195333
+MSY_for_optimize 92104.2 0.0128537
+MSY_encountered 92104.2 0.0128537
+MSY_dead 92104.2 0.0128537
+MSY_retain 92104.2 0.0128537
+Biomass_Smry 210466 0.0293718
+#
+THIS FORECAST FOR PURPOSES OF STD REPORTING
+4:  Forecast_using_ave_F_from:_79_79
+Annual_Forecast_Fmult: 0.0253167
+Fmultiplier_during_selected_relF_years_was: 0.0253167
+Selectivity_averaged_over_yrs:_79_to_79
+Recruitment_averaged_over_yrs:_1_to_79
+Cap_totalcatch_by_fleet 
+ -1 -1
+Cap_totalcatch_by_area 
+ -1
+Assign_fleets_to_allocation_groups_(0_means_not_in_a_group) 
+ 0 0
+Calculated_number_of_allocation_groups 0
+2:_Caps_&_Alloc_use_dead_catchbio
+#_Relative_F_among_fleets
+based_on_years:_79 _to_ 79
+Seasonal_apicalF=Fmult*Alloc*seas_dur_(can_be>F_std_because_of_selex)
+seas seas_dur  Fishery
+1 1 0.0253167
+#
+N_forecast_yrs: 1
+OY_Control_Rule  Inflection: 0.4 Intercept: 0.01 Scale: 0; Policy (2): ramp scales F as f(B) and buffer (H4010_scale) applied to F
+#
+FORECAST:_With_Constant_F=Fofl;_No_Input_Catches_or_Adjustments;_Equil_Recr;_No_inpl_error
+pop year ABC_Loop season Ramp&Buffer bio-all bio-Smry SpawnBio Depletion recruit-0  sel(B):_1 dead(B):_1 retain(B):_1 sel(N):_1 dead(N):_1 retain(N):_1 F:_1 R/C Catch_Cap Total_Catch F_Std
+1 81 1 1 1 2.20319e+06 2.20319e+06 735085 1.09407 7.56255e+06  66608.2 66608.2 66608.2 2.73954e+06 2.73954e+06 2.73954e+06 0.0253167 R  NA  66608.2 0
+FORECAST:_With_F=Fabc;_With_Input_Catches_and_Catch_Adjustments;_Equil_Recr;_No_inpl_error
+pop year ABC_Loop season Ramp&Buffer bio-all bio-Smry SpawnBio Depletion recruit-0  sel(B):_1 dead(B):_1 retain(B):_1 sel(N):_1 dead(N):_1 retain(N):_1 F:_1 R/C Catch_Cap Total_Catch F_Std
+1 81 1 1 1 2.20319e+06 2.20319e+06 735085 1.09407 7.56255e+06  66608.2 66608.2 66608.2 2.73954e+06 2.73954e+06 2.73954e+06 0.0253167 R  NA  66608.2 0
+1 81 2 1 0 2.20319e+06 2.20319e+06 1.30988e+06 1.94956 7.60272e+06  0 0 0 0 0 0 0 R  NA  0 0
+1 81 3 1 0 2.20319e+06 2.20319e+06 1.31534e+06 1.95768 7.60294e+06  0 0 0 0 0 0 0 R  NA  0 0
+FORECAST:_With_F_to_match_adjusted_catch;_With_Input_Catches_and_Catch_Adjustments;_Stochastic_Recr;_With_inpl_error
+pop year ABC_Loop season Ramp&Buffer bio-all bio-Smry SpawnBio Depletion recruit-0  sel(B):_1 dead(B):_1 retain(B):_1 sel(N):_1 dead(N):_1 retain(N):_1 F:_1 R/C Catch_Cap Total_Catch F_Std
+1 81 3 1 0 2.20319e+06 2.20319e+06 735085 1.09407 7.56255e+06  0 0 0 0 0 0 0 R  NA  0 0
+THIS FORECAST FOR PURPOSES OF GETTING DISPLAY QUANTITIES
+4:  Forecast_using_ave_F_from:_79_79
+Annual_Forecast_Fmult: 0.0253167
+Fmultiplier_during_selected_relF_years_was: 0.0253167
+Selectivity_averaged_over_yrs:_79_to_79
+Recruitment_averaged_over_yrs:_1_to_79
+Cap_totalcatch_by_fleet 
+ -1 -1
+Cap_totalcatch_by_area 
+ -1
+Assign_fleets_to_allocation_groups_(0_means_not_in_a_group) 
+ 0 0
+Calculated_number_of_allocation_groups 0
+2:_Caps_&_Alloc_use_dead_catchbio
+#_Relative_F_among_fleets
+based_on_years:_79 _to_ 79
+Seasonal_apicalF=Fmult*Alloc*seas_dur_(can_be>F_std_because_of_selex)
+seas seas_dur  Fishery
+1 1 0.0253167
+#
+N_forecast_yrs: 1
+OY_Control_Rule  Inflection: 0.4 Intercept: 0.01 Scale: 0; Policy (2): ramp scales F as f(B) and buffer (H4010_scale) applied to F
+#
+FORECAST:_With_Constant_F=Fofl;_No_Input_Catches_or_Adjustments;_Equil_Recr;_No_inpl_error
+pop year ABC_Loop season Ramp&Buffer bio-all bio-Smry SpawnBio Depletion recruit-0  sel(B):_1 dead(B):_1 retain(B):_1 sel(N):_1 dead(N):_1 retain(N):_1 F:_1 R/C Catch_Cap Total_Catch F_Std
+1 81 1 1 1 2.20775e+06 2.20775e+06 735085 1.09407 7.56255e+06  66608.2 66608.2 66608.2 2.73954e+06 2.73954e+06 2.73954e+06 0.0253167 R  NA  66608.2 0
+FORECAST:_With_F=Fabc;_With_Input_Catches_and_Catch_Adjustments;_Equil_Recr;_No_inpl_error
+pop year ABC_Loop season Ramp&Buffer bio-all bio-Smry SpawnBio Depletion recruit-0  sel(B):_1 dead(B):_1 retain(B):_1 sel(N):_1 dead(N):_1 retain(N):_1 F:_1 R/C Catch_Cap Total_Catch F_Std
+1 81 1 1 1 2.20775e+06 2.20775e+06 735085 1.09407 7.56255e+06  66608.2 66608.2 66608.2 2.73954e+06 2.73954e+06 2.73954e+06 0.0253167 R  NA  66608.2 0
+1 81 2 1 0 2.20775e+06 2.20775e+06 1.3103e+06 1.9502 7.60274e+06  0 0 0 0 0 0 0 R  NA  0 0
+1 81 3 1 0 2.20775e+06 2.20775e+06 1.31576e+06 1.95832 7.60295e+06  0 0 0 0 0 0 0 R  NA  0 0
+FORECAST:_With_F_to_match_adjusted_catch;_With_Input_Catches_and_Catch_Adjustments;_Stochastic_Recr;_With_inpl_error
+pop year ABC_Loop season Ramp&Buffer bio-all bio-Smry SpawnBio Depletion recruit-0  sel(B):_1 dead(B):_1 retain(B):_1 sel(N):_1 dead(N):_1 retain(N):_1 F:_1 R/C Catch_Cap Total_Catch F_Std
+1 81 3 1 0 2.20775e+06 2.20775e+06 735085 1.09407 7.56255e+06  0 0 0 0 0 0 0 R  NA  0 0
+#
+ FORECAST: in Bzero report with fishery onoff= 0
