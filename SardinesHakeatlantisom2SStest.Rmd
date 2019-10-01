@@ -1139,7 +1139,7 @@ length.data <- data.frame("Year"=(len_nonburn$time-survey_sample_time)/timestep+
 ## Run Stock Synthesis
 After the data and control file modifications, ensure you copy the local SS 3.3 executable into the folder containing the model files. Then run the following chunk.
 
-```{r runSS, eval=FALSE}
+```{r runSS}
 #Run stock synthesis model 
 # default runs with admb_options = "-noest"
 #run_stocksynthesis(species = species, model_dir = model_dir, show_output = TRUE)
