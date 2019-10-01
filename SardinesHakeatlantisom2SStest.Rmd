@@ -1057,7 +1057,7 @@ head(stocksynthesis.data$agecomp)
 stocksynthesis.data$lbin_vector <- length_bins
 
 #Get correct number of length bins
-# stocksynthesis.data$N_lbins <- length(length_bins)
+stocksynthesis.data$N_lbins <- length(length_bins)
 
 #Set lbin_method to 1 - this makes the population length bins match the data bins 
 #When lbin_method==1, we just comment out the binwidth, minimum, and maximum size arguments since they aren't used
@@ -1074,7 +1074,7 @@ datfile_name),
                  overwrite=TRUE)
 ```
 
-## Coming up with dynamic life history parameters
+## Coming up with dynamic life history parameters (partial from Christine)
 
 Below we get the weight-length relationship parameters from atlantis, calculate h and R0 from Atlantis $\alpha$ and $\beta$ parameters, use the \code{calc_Z} function to back out natural mortality (M) from Atlantis, and use the survey length-at-age from Atlantis to estimate a growth curve.
 
