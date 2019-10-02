@@ -1,0 +1,170 @@
+---
+title: "Comparing assessment results with truth: first pass"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## So your SS model finally ran!
+
+Now we get to plot outputs using `r4ss`
+
+```{r}
+library(here)
+library(r4ss)
+library(atlantisom)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r species-setup}
+
+#Use the right Atlantis output
+source(here("config/CC3Config.R"))
+       
+#Set species name
+species_ss <- "Pacific_sardine" #change to species_ss if we want both 
+
+#Directory with SS files
+model_dir <- "Sardine_SS_files/"
+
+#Name of SS data file
+datfile_name <- "sardEM_3_3.dat"
+
+#ssinput.data <- r4ss::SS_readdat_3.30(paste0("./inst/extdata/", model_dir, datfile_name))
+
+#Name of SS control file
+ctlfile_name <-  "sardEM_3_3.ctl"
+
+# this does not appear to read correctly; has 20 ages for maturity 
+# but the model reads it correcty, so don't use for now
+
+#ssinput.ctl <-r4ss::SS_readctl_3.30(paste0("./inst/extdata/", model_dir, ctlfile_name))
+
+```
+
+## Basic SS Plots
+
+```{r ssplots}
+
+replist <- r4ss::SS_output(dir = here(paste0("./inst/extdata/", model_dir)), verbose=TRUE, printstats=TRUE,covar=FALSE)
+
+SS_plots(replist)
+
+replist$timeseries
+replist$wtatage
+```
+
+## Initial skill assessment
+
+This code is from the multispecies model skill assessment work using Hydra as an operating model and presented in 2015. Original file is hydra_sim_wrapper_modtest.R
+
+```{r skill-functions}
+
+#skill assessment metrics to evaluate model fit
+
+# following from http://heuristically.wordpress.com/2013/07/12/calculate-rmse-and-mae-in-r-and-sas/
+
+# where error = modeled-true or relative error  = modeled/true
+
+# Function that returns Root Mean Squared Error
+rmse <- function(error)
+{
+  sqrt(mean(error^2, na.rm=T))
+}
+
+# Function that returns Mean Absolute Error (SAME AS AAE FOR US)
+aae <- function(error)
+{
+  mean(abs(error), na.rm=T)
+}
+
+# Function that returns Mean Absolute Error (SAME AS AE FOR US)
+ae <- function(error)
+{
+  mean(error, na.rm=T)
+}
+
+# Function that returns Modeling Efficiency MEF
+mef <- function(obs, error)
+{
+  obsavg <- mean(obs, na.rm=T)
+  obserr <- obs - obsavg
+  (sum(obserr^2)-sum(error^2, na.rm=T))/sum(obserr^2)
+}
+
+
+```
+
+Reading in the truth--these files were generated and saved previously [here](https://sgaichas.github.io/poseidon-dev/SardinesHakeatlantisom2SStest.html).
+
+```{r truth}
+
+# generalized timesteps all models
+runpar <- atlantisom::load_runprm(d.name, run.prm.file)
+noutsteps <- runpar$tstop/runpar$outputstep
+stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
+midptyr <- round(median(seq(0,stepperyr)))
+
+
+trueB <- readRDS(file.path(d.name, paste0(scenario.name,"surveyBcensus.rds")))
+
+trueB_ss <- trueB %>%
+  filter(species==species_ss)
+
+trueN <- readRDS(file.path(d.name, paste0(scenario.name,"surveyNcensus.rds")))
+
+trueN_ss <- trueN %>%
+  filter(species==species_ss)
+
+Natage <- readRDS(file.path(d.name, paste0(scenario.name, "natage_census_sard_hake.rds"))) 
+
+Natage_ss <- Natage %>%
+  filter(species==species_ss)
+
+lengthwt_census_ss <- readRDS(file.path(d.name, paste0(scenario.name, "lengthwt_census_sard_hake.rds")))
+
+len_ss <- lengthwt_census_ss$natlength %>%
+  filter(species==species_ss)
+
+
+```
+
+```{r ests}
+
+replist$timeseries
+
+```
+
+
+How does SS3 estimated biomass compare with true?
+
+```{r compareB}
+
+plotB <-ggplot() +
+  geom_line(data=trueB_ss, aes(x=time/stepperyr,y=atoutput, color="True B"), 
+            alpha = 10/10) +
+  geom_point(data=replist$timeseries, aes(x=Yr,y=Bio_all, color="SS3 Est B"),
+             alpha = 10/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotB +
+  facet_wrap(~species, scales="free") 
+
+
+```
+
+What about recruitment?
+
+```{r compare R}
+
+
+
+```
+
