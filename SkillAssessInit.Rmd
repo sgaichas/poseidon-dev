@@ -19,6 +19,7 @@ library(r4ss)
 library(atlantisom)
 library(dplyr)
 library(ggplot2)
+library(ggthemes)
 ```
 
 ```{r species-setup}
@@ -100,7 +101,7 @@ mef <- function(obs, error)
 
 ```
 
-Reading in the truth--these files were generated and saved previously [here](https://sgaichas.github.io/poseidon-dev/SardinesHakeatlantisom2SStest.html).
+Reading in the truth--these files were generated and saved previously [here](https://sgaichas.github.io/poseidon-dev/SardinesHakeatlantisom2SStest.html). Recruitment and mortality are detailed [here](https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html). 
 
 ```{r truth}
 
@@ -110,6 +111,14 @@ noutsteps <- runpar$tstop/runpar$outputstep
 stepperyr <- if(runpar$outputstepunit=="days") 365/runpar$toutinc
 midptyr <- round(median(seq(0,stepperyr)))
 
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
 
 trueB <- readRDS(file.path(d.name, paste0(scenario.name,"surveyBcensus.rds")))
 
@@ -131,12 +140,43 @@ lengthwt_census_ss <- readRDS(file.path(d.name, paste0(scenario.name, "lengthwt_
 len_ss <- lengthwt_census_ss$natlength %>%
   filter(species==species_ss)
 
+YOY <- atlantisom::load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
+
+# load biolprm in some initialize file?
+biol <- atlantisom::load_biolprm(d.name, biol.prm.file)
+
+# get code matching species name to split YOY file
+code_ss <- funct.groups$Code[which(funct.groups$Name == species_ss)]
+
+# cut to a single species in YOY file
+YOY_ss <- YOY %>%
+  select(Time, paste0(code_ss, ".0"))
+
+# mg carbon converted to wet weight in tonnes
+k_wetdry <- biol$kgw2d / 1000000000
+
+# WARNING only works for CCA because YOY.txt rows 2:end are already in numbers
+# and we are merging out the incorrect and irrelevant YOY row 1 (Time=0)
+# also hardcoded for sardine example
+recnums <- YOY_ss %>%
+  mutate(yr = as.integer(round(YOY_ss$Time)/365)) %>%
+  mutate(recnums = SAR.0/k_wetdry/biol$redfieldcn) %>%
+  filter(yr>0)
+
+file.mort <- file.path(d.name, paste0("output", scenario.name, "Mort.txt"))
+
+mortish <- read.table(file.mort, header = TRUE)
+
+relF_ss <- mortish %>%
+  select(Time, relF = paste0(code_ss, ".F"))
 
 ```
 
 ```{r ests}
 
 replist$timeseries
+
+names(replist$timeseries)[19]<-"Fmort"
 
 ```
 
@@ -162,9 +202,34 @@ plotB +
 
 What about recruitment?
 
-```{r compare R}
+```{r compareR}
 
+plotR <-ggplot() +
+  geom_line(data=recnums, aes(x=yr,y=recnums, color="True R"), 
+            alpha = 10/10) +
+  geom_point(data=replist$timeseries, aes(x=Yr,y=(Recruit_0*1000), color="SS3 Est R"),
+             alpha = 10/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
 
+plotR 
+
+```
+And F (understanding that F in the mort.txt file from Atlantis is relative, just looking for patterns).
+
+```{r compare-F}
+
+plotF <-ggplot() +
+  geom_line(data=relF_ss, aes(x=Time/365, y=relF, color="True F"), 
+            alpha = 10/10) +
+  geom_point(data=replist$timeseries, aes(x=Yr,y=Fmort, color="SS3 Est F"),
+             alpha = 10/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotF 
 
 ```
 

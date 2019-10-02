@@ -21,7 +21,9 @@ The below generates a readable dat file for input into SS3 for sardines. The con
 
 <a href="https://sgaichas.github.io/poseidon-dev/SardinesHakeatlantisom2SStest.html" target="_blank">Sardines in the CalCurrent run with F, rec dev, and climate scenario, all true and SS data, October 1, 2019</a>
 
+So we can start some comparisons of true and model estimated attributes.
 
+<a href="https://sgaichas.github.io/poseidon-dev/SkillAssessInit.html" target="_blank">Compare Atlantis truth with SS3 estimated B, R, and F, October 1, 2019</a>
 
 
 ### Read this first on overall workflow
