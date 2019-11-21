@@ -7,6 +7,7 @@
 <meta charset="utf-8" />
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
 
@@ -342,18 +343,6 @@ summary {
 }
 </style>
 
-<script>
-$(document).ready(function () {
-  window.buildTabsets("TOC");
-});
-
-$(document).ready(function () {
-  $('.tabset-dropdown > .nav-tabs > li').click(function () {
-    $(this).parent().toggleClass('nav-tabs-open')
-  });
-});
-</script>
-
 <!-- code folding -->
 
 
@@ -380,6 +369,10 @@ $(document).ready(function () {
 
 <p><!-- ADD LINKS BELOW, note, using the RMD link syntax will open the presentation in the same tab, which is annoying. Use the html with the "_blank" to fix that behavior --></p>
 <p>These pages document initial testing of the atlantisom package in development at <a href="https://github.com/r4atlantis/atlantisom" class="uri">https://github.com/r4atlantis/atlantisom</a> using three different <a href="https://research.csiro.au/atlantis/">Atlantis</a> output datasets. Development of atlantisom began at the <a href="https://research.csiro.au/atlantis/atlantis-summit/">2015 Atlantis Summit</a> in Honolulu, Hawaii, USA.</p>
+<div id="demo-for-nemow-meeting-december-2019" class="section level3">
+<h3>Demo for NEMoW meeting, December 2019</h3>
+<p><a href="https://sgaichas.github.io/poseidon-dev/Sardines_atlantisom2SS_demo.html" target="_blank">Sardines in the CalCurrent run with F, rec dev, and climate scenario, all true and SS data, runs SS3, November 21, 2019</a></p>
+</div>
 <div id="an-example-workflow-for-a-single-species-in-progress" class="section level3">
 <h3>An example workflow for a single species (in progress)</h3>
 <p><a href="https://sgaichas.github.io/poseidon-dev/FullSardineTruthEx.html" target="_blank">Sardines in the CalCurrent, all true data, May 22, 2019, updated May 23, 2019</a></p>
@@ -497,6 +490,23 @@ $(document).ready(function () {
 
 
 </script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
+});
+</script>
+
+<!-- code folding -->
+
 
 <!-- dynamically load mathjax for compatibility with self-contained -->
 <script>
