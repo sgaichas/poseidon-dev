@@ -1,12 +1,8 @@
 #V3.30.14.04-safe;_2019_08_14;_Stock_Synthesis_by_Richard_Methot_(NOAA)_using_ADMB_12.0
 #Stock Synthesis (SS) is a work of the U.S. Government and is not subject to copyright protection in the United States.
 #Foreign copyrights may apply. See copyright.txt for more information.
-Tue Oct  1 15:48:44 2019
+Thu Oct 10 12:17:27 2019
 
- catch is 0.0 in endyr; this can cause problem in the benchmark and forecast calculations
 note: Std_yrmax=-1 in starter, so no variance output for forecast quantities after endyr+1 
 You have just one settlement event; recommend changing to recr_dist_method 4 which takes no recr_dist parameters
  Minimum size bin is:_12; which is >10cm, which is large for use as size-at-age 0.0 recruitment
-Final gradient: 3.8274 is larger than final_conv: 0.0001
- N warnings: 5
-Number_of_active_parameters_on_or_near_bounds: 0
