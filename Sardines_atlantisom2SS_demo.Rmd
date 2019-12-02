@@ -1,8 +1,11 @@
 ---
-title: "Atlantis to SS for California Current sardines and hake: full fishing and climate scenario"
+title: 'Atlantis to SS for California Current sardines and hake: full fishing and
+  climate scenario'
 author: "Sarah Gaichas and Christine Stawitz"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -17,6 +20,8 @@ library(data.table)
 library(here)
 library(ggforce)
 library(ggthemes)
+#For testing
+devtools::load_all("C:/Users/chris/Documents/GitHub/atlantisom")
 library(atlantisom)
 ```
 
@@ -24,7 +29,7 @@ library(atlantisom)
 
 This demonstrates the Atlantis to `atlantisom` to SS3 workflow with the California Current run that includes climate forcing, recruitment variability, and the fishing scenario outlined for our project in Norway: "output_CC_2063_OA_OFF_22". 
 
-We will go from Atlantis model output to SS input and run in this page for a single species, "sardine", that doesn't require any age class splitting.
+We will go from Atlantis model output to SS input and run in this page for a single species, "sardine", that doesn't require any age class splitting. 
 
 
 ```{r initialize}
@@ -32,10 +37,17 @@ We will go from Atlantis model output to SS input and run in this page for a sin
 species_ss <- c("Pacific_sardine")
 
 source(here("config/CC3Config.R"))
+needed.files <- ls()
+print(unlist(lapply(needed.files, FUN=get)))
 
 ```
 
+The below example requires a folder in your project directory named "atlantisom" containing the above files from an Atlantis output.
+
 ```{r get_names, message=FALSE, warning=FALSE}
+#Check for needed files
+
+
 #Load functional groups
 funct.groups <- load_fgs(dir=d.name,
                          file_fgs = functional.groups.file)
@@ -107,9 +119,9 @@ surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
 # call sample_survey_biomass with a bunch of 1000s for weight at age
 # in the code it multiplies atoutput by wtatage/1000 so this allows us to use
 # biomass directly
-wtage <- data.frame(species=rep(survspp, each=10),
+wtage <- data.frame(species=rep(survspp, each=max(age_classes)),
                     agecl=rep(c(1:10),length(survspp)),
-                    wtAtAge=rep(1000.0,length(survspp)*10))
+                    wtAtAge=rep(1000.0,length(survspp)*max(age_classes)))
 
 surveyB_frombio <- sample_survey_biomass(survey_testBall, surv_cv, wtage)
 
@@ -144,7 +156,7 @@ trueB <- readRDS(file.path(d.name, paste0(scenario.name,"surveyBcensus.rds")))
 
 trueB_ss <- trueB %>%
   filter(species==species_ss)
-
+rm(trueB)
 # read Atlantis output files
 atBtxt2 <- read.table(file.path(d.name, paste0("output", scenario.name, "BiomIndx.txt")), header=T)
 groupslookup <- funct.groups %>%
@@ -175,6 +187,9 @@ trueN <- readRDS(file.path(d.name, paste0(scenario.name,"surveyNcensus.rds")))
 
 trueN_ss <- trueN %>%
   filter(species==species_ss)
+
+rm(trueN)
+gc()
 
 plotN <-ggplot() +
   geom_line(data=trueN_ss, aes(x=time/stepperyr,y=atoutput, color="survey census N"), 
@@ -269,7 +284,8 @@ for(sp in unique(Natage$species)){
   Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
   Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
 }
-
+rm(Natage)
+gc()
 ```
 
 ```{r lf-plot}
@@ -280,6 +296,7 @@ len <- lengthwt_census_ss$natlength
 
 lensub <- len %>% 
   filter(time %in% c(155:195))
+
 
 for(sp in unique(len$species)){
   lensubsp <- lensub %>%
@@ -298,12 +315,16 @@ for(sp in unique(len$species)){
   
 }
 
+rm(len)
 ```
 
 ```{r wtage-plot}
 
 wtage_ann <- lengthwt_census_ss$muweight %>%
   filter(time %in% annualmidyear)
+
+rm(lengthwt_census_ss)
+gc()
 
 # reverse to show agecl time series of wt
 wageplot <- ggplot(wtage_ann, aes(time, atoutput)) +
@@ -326,6 +347,8 @@ truecatchbio <- load_catch(d.name, file_catch = catch.file, fgs = funct.groups)
 
 truecatchbio_ss <- truecatchbio[truecatchbio$species == species_ss,]
 
+rm(truecatchbio)
+gc()
 # note: time output of this file is in days
 # what model timestep is this output matching?
 # rescale catch in biomass time from days to years
@@ -343,11 +366,11 @@ plotcatch +
 
 ```
 
-Get true catch at age and other comps (may not be different from input for our project). First see if catch output is at same timescale as population by checking toutfinc: `r fstepperyr`
+Get true catch at age and other comps (may not be different from input for our project). First see if catch output is at same timescale as population by checking `fstepperyr`.
 
 
 ```{r true-catage-lf-wtage, eval=FALSE}
-
+print(fstepperyr)
 # get survey nums with full (no) selectivity
 catchN_ss <- create_fishery_subset(dat = truth$catch,
                                  time = timeall,
@@ -418,6 +441,9 @@ catch_numssshigh <- readRDS(file.path(d.name, paste0(scenario.name, "catchage_ce
 catchage <- catch_numssshigh %>%
   filter(species == "Pacific_sardine")
 
+rm(catch_numssshigh)
+gc()
+
 catageplot <- ggplot(catchage, aes(x=agecl, y=atoutput)) +
   geom_point() +
   theme_tufte() +
@@ -457,7 +483,7 @@ datfile_name <- "sardEM_3_3.dat"
 eff_case <- 0.5
 
 #Age classes of your species
-age_classes <- 1:10
+age_classes <- 1:12
 
 #Selectivity function - a vector equivalent to length (age classes)
 sel_by_age <- rep(1,length(age_classes))
@@ -602,9 +628,9 @@ cv <- data.frame(species=species_ss, cv=CVs$survey)
 survObsBiom <- sample_survey_biomass(dat=survey_out,cv=cv,wtAtAge)
 
 # check against survey with truth$biomass_ages output
-wtage1 <- data.frame(species=rep(species_ss, each=10),
-                    agecl=rep(c(1:10),length(species_ss)),
-                    wtAtAge=rep(1000.0,length(species_ss)*10))
+wtage1 <- data.frame(species=rep(species_ss, each=max(age_classes)),
+                    agecl=rep(c(age_classes),length(species_ss)),
+                    wtAtAge=rep(1000.0,length(species_ss)*max(age_classes)))
 
 survObsBiomB <- sample_survey_biomass(dat=survey_outB,cv=cv,wtage1)
 
@@ -670,6 +696,8 @@ catch_numbers <-  create_fishery_subset(dat = truth$catch,
 
 catch_numsss_samp <- sample_fish(catch_numbers, effN)
 
+rm(catch_numbers)
+gc()
 #Get weights
 # aggregate true resn per fishery subset design
 catch_aggresnss <- aggregateDensityData(dat = truth$resn,
