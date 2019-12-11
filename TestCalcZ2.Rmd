@@ -597,6 +597,40 @@ Both seem to be tracking each other reasonably, and also general trends from mor
 
 We can probably conclude that the `calc_Z` function is working as correctly as possible now, given that it is an approximation no matter what, and the differences we see here are likley from temporal resolution of the Z estimate. 
 
+So what is M? This is an approximate annual M as Z-F from mort.txt (which assumes F is not rescaled!). If we need annual and age specific M then we need a new Z calc function that is cohort specific I think.
+
+```{r isthisM, message=FALSE, warning=FALSE}
+
+annM1 <- merge(annZ1, relF_ss, all.x = T) %>%
+  mutate(M = Z-relF)
+
+annZ2_Time <- annZ2 %>%
+  mutate(Time = yr*365)
+
+annM2 <- merge(annZ2_Time, relF_ss) %>%
+  mutate(M = Z-relF)
+
+plotM <- ggplot() +
+  geom_line(data=Zish, aes(x=Time/365, y=relZ, color="mort.txt Z")) +
+  geom_line(data=Zish, aes(x=Time/365, y=relM, color="mort.txt M")) +
+  geom_point(data=annM1, aes(x=Time/365, y=M, color="M = endyr Z-F")) +
+  geom_point(data=annM2, aes(x=yr, y=M, color="M = sum timestep Z-F")) +
+  theme_tufte() +
+  theme(legend.position = "bottom", legend.box = "horizontal") +
+  scale_color_discrete(NULL) +
+  guides(color = guide_legend(nrow = 1)) +
+  labs(subtitle = paste(scenario.name, species_ss))
+
+plotM + ylim(0, 2.0)
+
+
+
+```
+
+So the problem here is we get negative M if we use our calculated Z from annual numbers at age or timestep numbers at age and subtract the F from mort.txt. (Negative M does not show up as points above because I restrict the y axis scale to 0-2.0.) The F from mort.txt is actually higher than our estimated Z. So Atlantis must rescale F too???
+
+Need to investigate backing out F...
+
 Let's see how it performs with another model.
 
 ### Test calc_Z NOBA

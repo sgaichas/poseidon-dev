@@ -149,7 +149,9 @@ June 11: fixed matching of recruitment to timestep, still seems off
 
 June 13: I think we have the best `calc_Z` we are going to get. After discussion with Beth, we should not expect to match output of Mort.txt because M gets rescaled so much. However, the comparison looks reasonable now for sardine and even for NOBA cod.
 
-<a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA and NOBA - June 7, 2019, updated June 13</a>
+<a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA and NOBA - June 7, 2019, updated June 13 and December 11 with M</a>
+
+Dec 11: Our calculated Z is less than the input F. Does Atlantis rescale F?
 
 June 14: fixed a bug and `calc_stage2age` works better now that it is using Z, and now that Zs are in the right ballpark. Still not a perfect match to true age output.
 

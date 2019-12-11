@@ -269,7 +269,6 @@ code {
 }
 img {
   max-width:100%;
-  height: auto;
 }
 .tabbed-pane {
   padding-top: 12px;
@@ -458,7 +457,8 @@ summary {
 <p>June 7: <code>calc_Z</code> seems incorrect when compared to outputMort.txt; stepping through code needed</p>
 <p>June 11: fixed matching of recruitment to timestep, still seems off</p>
 <p>June 13: I think we have the best <code>calc_Z</code> we are going to get. After discussion with Beth, we should not expect to match output of Mort.txt because M gets rescaled so much. However, the comparison looks reasonable now for sardine and even for NOBA cod.</p>
-<p><a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA and NOBA - June 7, 2019, updated June 13</a></p>
+<p><a href="https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html" target="_blank">Test Z calc and compare with output mort CCA and NOBA - June 7, 2019, updated June 13 and December 11 with M</a></p>
+<p>Dec 11: Our calculated Z is less than the input F. Does Atlantis rescale F?</p>
 <p>June 14: fixed a bug and <code>calc_stage2age</code> works better now that it is using Z, and now that Zs are in the right ballpark. Still not a perfect match to true age output.</p>
 <p><a href="https://sgaichas.github.io/poseidon-dev/TestCalcStage2AgeNOBA.html" target="_blank">Test stage to age calculations and compare true age output NOBA - June 14, 2019</a></p>
 <p>June 15: while the age splitting is functioning better, applying it to a species with more than 2 ages per age class (CC Bocaccio rockfish) shows that our application of an annual Z estimate may not be the best approach. The functions themselves could use further tweaking.</p>
