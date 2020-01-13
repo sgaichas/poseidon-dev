@@ -21,7 +21,7 @@ library(here)
 library(ggforce)
 library(ggthemes)
 #For testing
-devtools::load_all("C:/Users/chris/Documents/GitHub/atlantisom")
+#devtools::load_all("C:/Users/chris/Documents/GitHub/atlantisom")
 library(atlantisom)
 ```
 
