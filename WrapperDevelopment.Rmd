@@ -17,9 +17,19 @@ To make life easier, here are some wrapper functions to do the basic things we w
 
 Basic desired functionality:
 
-1. initialize: locate model output (function to make a config file?), read in basic run parameters and species names, run_truth for all once and save output (optionally, run_truth for only one species?)
+1. initialize: locate model output (function to make a config file?), read in basic run parameters and species names, run_truth for all once and save output 
+
+  + User to make up front decision--want all species or just a subset?
+  + May want multiple species that need to be split in a later step for models
 
 1. get assessment input data: configure survey, run all survey functions, configure fishery, run all fishery functions (how to save output?)
 
+  + Based on decision above, save interim steps for use later
+  + Need a switch for single vs multispecies estimation models?
+
 1. write input data for specific model: wrap functions in development for SS3, add functions for other models (ASAP, multispecies models)
+
+## Cumbersome giant files eat all the memory!
+
+Implement Christine's memory saving things from the NEMOW demo
 
