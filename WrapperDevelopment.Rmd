@@ -1,0 +1,25 @@
+---
+title: "Develop atlantisom wrappers"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Too many steps!
+
+We can run atlantisom with many functions to get stock assessment model inputs.
+
+To make life easier, here are some wrapper functions to do the basic things we want.
+
+Basic desired functionality:
+
+1. initialize: locate model output (function to make a config file?), read in basic run parameters and species names, run_truth for all once and save output (optionally, run_truth for only one species?)
+
+1. get assessment input data: configure survey, run all survey functions, configure fishery, run all fishery functions (how to save output?)
+
+1. write input data for specific model: wrap functions in development for SS3, add functions for other models (ASAP, multispecies models)
+
