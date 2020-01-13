@@ -1,0 +1,1065 @@
+---
+title: "Getting mortality from atlantisom: backing out F and M from Z"
+author: "Sarah Gaichas and Christine Stawitz"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## Introduction
+
+This page documents initial testing of the atlantisom package in development at https://github.com/r4atlantis/atlantisom using three different [Atlantis](https://research.csiro.au/atlantis/) output datasets. Development of atlantisom began at the [2015 Atlantis Summit](https://research.csiro.au/atlantis/atlantis-summit/) in Honolulu, Hawaii, USA. 
+On this page we demonstrate use of atlantisom on both California Current (CCA) and Norwegian Barents Sea Atlantis (NOBA) output files to test function new functions that use `calc_Z` calculating total mortality to back out F and M. These are used initially for comparison with stock assessment model fishing mortality outputs, and to parameterize stock assessment natural mortality. 
+
+[Previous comparisons](https://sgaichas.github.io/poseidon-dev/TestCalcZ2.html) of estimated total mortality with the output[scenario.name]Mort.txt file demonstrated what the Atlantis manual already tels us: 
+>This file is currently only useful for looking at relative M vs F values for a species, as itdoes not give accurate mortalities
+
+We can assumed that the scale of Z from this file will not be the same as our calculation, but since both F and M are rescaled, even from input F values, we need to back out the realized F to subtract from this Z to get M. This approach seems simpler than trying to estimate M directly using predation.
+
+We will first use CCA here because the contrasting F scenario has been implemented. We will test with sardines only first.
+
+All model setup and configuration is described [here](https://sgaichas.github.io/poseidon-dev/FullSardineTruthEx.html).
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+require(dplyr)
+library(ggplot2)
+library(data.table)
+library(here)
+library(ggforce)
+library(ggthemes)
+library(atlantisom)
+```
+
+```{r initialize}
+
+initCCA <- TRUE
+initNOBA <- FALSE
+
+species_ss <- c("Pacific_sardine")
+
+#function to make a config file? need one for each atlantis run
+
+if(initCCA) source(here("config/CC3Config.R"))
+
+if(initNOBA) source(here("config/NOBAaaConfig.R"))
+
+```
+
+```{r get_names, message=FALSE, warning=FALSE}
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+```
+
+```{r get_truth, message=FALSE, warning=FALSE}
+
+# default run_truth setup will save the file, so check for that first
+
+if(!file.exists(file.path(d.name, 
+                          paste0("output", scenario.name, "run_truth.RData")))){
+  #Store all loaded results into an R object
+  truth <- run_truth(scenario = scenario.name,
+                     dir = d.name,
+                     file_fgs = functional.groups.file,
+                     file_bgm = box.file,
+                     select_groups = funct.group.names,
+                     file_init = initial.conditions.file,
+                     file_biolprm = biol.prm.file,
+                     file_runprm = run.prm.file
+  )
+} else{
+  truth <- get(load(file.path(d.name,
+                              paste0("output", scenario.name, "run_truth.RData"))))
+}
+```
+
+
+## Estimate total mortality with calc Z function
+
+This section tests the `atlantisom::calc_Z()` function step by step. Ultimately this output goes to `calc_stage2age` to produce annual numbers at true age, which we can compare with the ANNAGEBIO.nc output produced by NOBA. For now we will just compare to the Mort.txt output.
+
+```{r census-spec, message=FALSE, warning=FALSE}
+
+# make a function for this
+source(here("config/census_spec.R"))
+
+```
+
+Output timestep toutinc for the population is `r runpar$toutinc `, 
+
+so steps per year in run_truth output is `r stepperyr ` 
+
+and the number of output steps in run_truth output is `r noutsteps `. 
+
+### True numbers total (annual)
+
+This gives us the true total numbers on an annual basis. We can compare this with age specific outputs.
+
+```{r surveyNbased, eval=FALSE}
+
+# this uses result$nums and a new function to get survey index in numbers (abundance)
+
+survey_testNall <- create_survey(dat = truth$nums,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# save this, needed as input to calc_Z?
+saveRDS(survey_testNall, file.path(d.name, paste0(scenario.name, "survey_testNall.rds")))
+
+# as above, make up a constant 0 cv for testing
+surv_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
+
+surveyN <- sample_survey_numbers(survey_testNall, surv_cv)
+
+#save for later use, takes a long time to generate
+saveRDS(surveyN, file.path(d.name, paste0(scenario.name, "surveyNcensus.rds")))
+
+```
+
+```{r survNtrue-plot}
+
+surveyN <- readRDS(file.path(d.name, paste0(scenario.name, "surveyNcensus.rds")))
+
+surveyN_ss <- surveyN[surveyN$species == species_ss,]
+
+plotN <-ggplot() +
+  geom_line(data=surveyN_ss, aes(x=time/stepperyr,y=atoutput, color="survey census N"), 
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotN +
+  facet_wrap(~species, scales="free") 
+
+```
+
+
+### What level of aggregation works for calc_Z?
+
+The atlantisom function `calc_stage2age` calls the `calc_Z` function, applying a total mortality rate to estimate the numbers at true age within an age class, but it is unclear whether to use this on the aggregated numbers or the full resolution numbers at age. Here we test outputs of Z for several levels of aggregation:
+
+```{r testZagg}
+# add YOY file to the config files
+YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
+
+# load biolprm in some initialize file?
+biol <- load_biolprm(d.name, biol.prm.file)
+
+# get code matching species name to split YOY file
+code_ss <- funct.groups$Code[which(funct.groups$Name == species_ss)]
+
+# cut to a single species in YOY file
+YOY_ss <- YOY %>%
+  select(Time, paste0(code_ss, ".0"))
+
+# numbers at agecl at full resolution (all polygons and layers)
+truenums_ss <- truth$nums[truth$nums$species == species_ss,]
+
+survey_testNall <- readRDS(file.path(d.name, paste0(scenario.name, "survey_testNall.rds")))
+
+# numbers at agecl aggregated over layers, retain polygons (output of create_survey)
+survey_testN_ss <- survey_testNall[survey_testNall$species == species_ss,] 
+
+# numbers at agecl aggregated over layers and polygons
+Natage_ss <- readRDS(file.path(d.name, paste0(scenario.name, "natage_census_sard.rds")))
+
+#calc_Z <- function(yoy, nums, fgs, biolprm, toutinc)
+
+fullresZ <- calc_Z(yoy = YOY_ss,
+                   nums = truenums_ss,
+                   fgs = funct.groups,
+                   biolprm = biol,
+                   toutinc = runpar$toutinc)
+
+surveyresZ <- calc_Z(yoy = YOY_ss,
+                   nums = survey_testN_ss,
+                   fgs = funct.groups,
+                   biolprm = biol,
+                   toutinc = runpar$toutinc)
+
+sampleresZ <- calc_Z(yoy = YOY_ss,
+                   nums = Natage_ss,
+                   fgs = funct.groups,
+                   biolprm = biol,
+                   toutinc = runpar$toutinc)
+
+
+```
+
+Fixed a bug where grep was used if a # appeared. This ran for the survey resolution numbers. I then went back and ran the two other levels above after fixing `calc_Z.`
+
+Both true full resolution numbers and survey resolution numbers (aggregated over polygon) returned nonzero Z values. As with previous the NOBA test, they are identical aside from eight values with no apparent pattern (rows 100, 105, 180, 200, 220, 240, 355, 400) out of 500 that differ at e-16. Same story with difference from sample resolution; this does not matter to output.
+
+```{r differentZ}
+fullresZ$atoutput - surveyresZ$atoutput
+
+fullresZ$atoutput - sampleresZ$atoutput
+```
+
+I would be happer if the differences were all exactly 0, but I suppose we can attribute that to rounding error.
+
+### What is F at each timestep?
+A relative annual F is found in outputMort.txt!
+```{r getrelF}
+
+file.mort <- file.path(d.name, paste0("output", scenario.name, "Mort.txt"))
+
+mortish <- read.table(file.mort, header = TRUE)
+
+relF_ss <- mortish %>%
+  select(Time, relF = paste0(code_ss, ".F"))
+
+relM_ss <- mortish %>%
+  select(Time, relM = paste0(code_ss, ".M"))
+
+plotF <- ggplot(data=relF_ss, aes(x=Time/365, y=relF)) +
+  geom_line() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name, species_ss))
+
+plotF
+                
+```
+
+This is consistent with the scenario implemented. So far so good.
+
+This probably depends on how the model is set up, but for models forced with F by species we ought to be able to read this out from an input file. If it is a daily rate then we mulitply by toutinc to get the rate at each of these output timestep Z values.
+
+### Quick test to see if Z is right?
+Compare with outputMort.txt!
+```{r compZ}
+
+Zish <- merge(relF_ss,relM_ss) %>%
+  mutate(relZ = relF + relM)
+
+plotZ <- ggplot() +
+  geom_line(data=Zish, aes(x=Time/365, y=relZ)) +
+  geom_point(data=fullresZ, aes(x=(time*73)/365, y=atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name, species_ss))
+
+plotZ
+```
+
+After several iterations of debugging, we are still not matching the pattern, but improved in that it isn't a constant punctuated by occasional high. Variation still doesn't look anything like the txt file either. The 5x yr timesteps are probably messing this up?
+
+I've commented out the detailed debugging block below, but check out the rmd file if you are interested in the sausage making. Changes have been implemented in `calc_Z` so that it now apportions annual recruitment to timesteps and recruitment is correctly aligned with truth nums output. 
+
+However, it is not clear that subtracting off "recruitment" that has not been subject to mortality is appropriate when the output numbers at each timestep have been subject to mortality? I guess that was the input in each timestep as best we know it, but this is at best an approximation.
+<!--
+```{r calczsnippet, eval=FALSE}
+
+#corrections listed here have been applied in calc_Z; this code not run
+
+# test with one species at survey scale (layers aggregated, not time or polygon)
+yoy <- YOY_ss
+nums <- survey_testN_ss
+fgs <- funct.groups
+biolprm <- biol
+toutinc <- runpar$toutinc
+
+# everything below the function definition line
+  # subset the yoy for species included in the fgs file
+  # that are turned on
+  # colnames of the recruit data are "Time" and a column for each
+  # species where the name is the functional group with an additional .0
+  turnedon <- fgs[fgs$IsTurnedOn > 0, ]
+  recruits <- yoy[, colnames(yoy) %in% c("Time", paste0(turnedon$Code, ".0"))]
+
+  # mg carbon converted to wet weight in tonnes
+  k_wetdry <- biolprm$kgw2d / 1000000000
+  # Sum of structural and reserve nitrogen (KWSR_RN + KWSR_SN)
+  nitro <- merge(biolprm$kswr, biolprm$kwrr, by = "1")
+  nitro$sum <- apply(nitro[, 2:3], 1, sum)
+
+  # legacy: If output is from legacy code there will be an error in the
+  # yoy data, where the first row is in a different unit.
+  # yoy.txt is the biomass in tonnes per spawning event summed over the total
+  # model domain.
+  # The first row (< Nov/Dec 2015) is stored as biomass and the remaining rows
+  # are stored in numbers, must convert the entire matrix to biomass
+  # Check if legacy code and if so convert the numbers to biomass
+
+  # G.Fay 2/21/16 : changed yoy to recruits in below loop.
+  if (abs(recruits[1, 2] / recruits[2, 2]) > 10) {
+    recruits[2:NROW(recruits), 2:NCOL(recruits)] <- recruits[2:NROW(recruits), 2:NCOL(recruits)] *
+    nitro[match(gsub(".0", "", colnames(recruits)[-1]), nitro[, 1]), "sum"]
+  }
+
+
+  # Wide to long
+  recruits <- reshape(data = recruits, direction = "long",
+    varying = colnames(recruits)[-1],
+    v.names = "recruits",
+    times = colnames(recruits)[-1],
+    timevar = "group")
+  rownames(recruits) <- 1:NROW(recruits)
+  recruits <- recruits[, -which(colnames(recruits) == "id")]
+  # Switch from species code to species
+  recruits$group <- gsub("\\.0", "", recruits$group)
+  recruits <- merge(recruits, fgs[, c("Code", "Name")],
+    by.x = "group", by.y = "Code")
+
+  # merge recruits with strucn and resn of recruits from biol.prm file
+  recruits <- merge(recruits, nitro[, c(1, 4)],
+    by.x = "group", by.y = "1", all.x = TRUE, all.y = FALSE)
+  colnames(recruits)[which(colnames(recruits) == "recruits")] <- "recruitsbio"
+  # Get recruits in numbers rather than biomass
+  # these match rows 2:end of the legacy file, so good
+  # but is this 1000s or numbers? not real numbers, Gavin corrects below
+  recruits$recruits <- recruits$recruitsbio / recruits$sum
+  recruits$yr <- as.integer(round(recruits$Time)/365)
+  
+  #Isaac determined that yr 0 (Time 0) in the YOY file is not real, don't use it
+  #below assigns year 1 to times 0:stepperyr, all good output timesteps in truth$nums
+
+  # G.Fay 2/21/16
+  # UGLY code below tries to align fraction of annual yoy with timing of recruitment
+  # values in YOY.txt are total YOY that year waiting to recruit.
+  # seems to get rid of most of 'issues' - some v.minor survival >1,
+  #perhaps due to averaging of survival over toutinc days
+  nyrs <- ceiling(max(yoy$Time)/365)
+  times <- unique(yoy$Time)
+  
+  # SKG June 2019
+  # need to match codes below, this mismatches when biolprm not in same order!!
+  #recstart_temp <- biolprm$recruit_time
+  #recstart_temp[,2] <- biolprm$time_spawn[-(grep('#',
+  #                     biolprm$time_spawn[,1])),2] + biolprm$recruit_time[,2]
+  # was this grep to get rid of a species with #XXX? breaks when there are none
+  #recstart_temp[,2] <- biolprm$time_spawn[,2] + biolprm$recruit_time[,2]
+  
+  #recstart_temp <- recstart_temp[recstart_temp[,1]%in%turnedon$Code,] #bug added codes with no YOY output
+  #recstart_temp <- recstart_temp[recstart_temp[,1]%in%recruits$group,]
+
+  # need spawn_period?? if so read out in load_biolprm and merge it here too
+  
+  # rectiming is a dataframe with species code, time_spawn (day of year), 
+  # recruit_time (number of days), and recruit period (number of days). 
+  # we use these to calculate recstart (day of year) and recend (day of year)
+  rectiming <- merge(biolprm$time_spawn, biolprm$recruit_time, by = 1)
+  rectiming <- merge(rectiming, biolprm$recruit_period, by = 1)
+  names(rectiming) <- c("Code", "time_spawn", "recruit_time", "recruit_period")
+  rectiming <- rectiming %>%
+    mutate(recstart = time_spawn + recruit_time) %>% # possibly + spawn_period
+    mutate(recend = recstart + recruit_period)
+  
+  #subsets to groups of interest
+  recstart_temp <- rectiming[rectiming$Code %in% recruits$group,]
+  
+  # do we need this fraction calculation if YOY is annual snapshot?
+  # (check output timing of YOY file with tsumout, available in run.prm)
+  # can we not just allocate the full YOY to the timestep where they come in?
+  # if recstart to recend spans multiple toutinc timesteps then need fraction
+  
+  # align model output timesteps (days) with recruitment periods (days)
+  #numstime.days <- unique(nums$time)*toutinc
+  # Sum numbers output over all boxes/depth/cohorts
+  totnums <- aggregate(atoutput ~ species + time, data = nums, sum) %>%
+    mutate(time.days = (time+1)*toutinc) %>% #makes time 0 into days 0->73, etc
+    mutate(yr = ceiling(time.days/365))  # yr 1 is 0:stepsperyr to match recruits yr1
+    #mutate(yr = floor(time.days/365)) # includes 0 value, yr 1 is 
+
+  totnums <- merge(totnums, recruits,
+    by.x = c("yr", "species"), by.y = c("yr", "Name"),
+    all.x = TRUE) %>%
+    arrange(time)
+  
+  totnums$frac_recruit <- 0
+  
+  for (irow in 1:nrow(recstart_temp)) {
+    group <- recstart_temp$Code[irow]
+    pick <- which(totnums$group == group)
+
+    recstart <- seq(recstart_temp$recstart[irow],by=365,length.out=nyrs)
+    recstart <- recstart[recstart<max(totnums$Time[pick])]
+    recend <- recstart + recstart_temp$recend[irow]
+    #rec_times <- rbind(rec_times,cbind(group,recstart,recend))
+
+    for (i_rec in 1:length(recstart)) {
+      i_tstart <- which(pick==min(pick[totnums$time.days[pick]>=recstart[i_rec]]))
+      i_tstop <- which(pick==min(pick[totnums$time.days[pick]>=recend[i_rec]]))
+      if (i_rec == length(recstart)) i_tstop <- length(pick)
+      n_t <- 1+i_tstop-i_tstart
+      for (i_t in 1:n_t) {
+        t_temp <- totnums$time.days[pick[i_tstart+i_t-1]]
+        num_temp <- t_temp - recstart[i_rec]
+        if (i_t>1) {
+          if ((recend[i_rec]-t_temp)>toutinc) {
+            num_temp <- toutinc
+          }
+          else {
+            num_temp <- recend[i_rec]-(totnums$time.days[pick[i_tstart+i_t-2]])
+          }
+        }
+        frac_temp <- max(c(0,num_temp /(recend[i_rec]-recstart[i_rec])))
+        totnums$frac_recruit[pick[i_tstart+i_t-1]] <- frac_temp
+      }
+    }
+  }
+
+# Time in YOY does not match recstart-recend period still after this loop--fixed
+  
+  # match "Time" of the young of the year with the time-step periodicity
+  # listed in the run.prm or run.xml file
+  #recruits$Time <- recruits$Time / toutinc
+  
+# SKG did this above already in the following line?
+  # Get recruits in numbers rather than biomass
+  #recruits$recruits <- recruits$recruitsbio / recruits$sum
+  
+  #G.Fay 1/6/16, expand to num of recruits
+  # Recruit / mg C converted to wet weight in tonnes / redfield ratio of C:N
+  totnums$recruits <- totnums$recruits/k_wetdry/biolprm$redfieldcn
+
+
+  # Combine recruits and numbers
+  # Only pull recruits from the yearly time step, where the
+  # yearly time step matches the time step
+  # totnums <- merge(totnums, recruits,
+  #   by.x = c("time", "species"), by.y = c("Time", "Name"),
+  #   all.x = TRUE, all.y = FALSE)
+  totnums$group <- recruits$group[match(totnums$species, recruits$Name)]
+  # For all time increments where there
+  totnums$recruits[is.na(totnums$recruits)] <- 0
+
+   # Make sure time is in order, did above
+  #totnums <- totnums[order(totnums$species, totnums$time), ]
+  totnums$annrecruits <- totnums$recruits
+
+  totnums$recruits <- totnums$annrecruits*totnums$frac_recruit
+
+  # Calculate survivors for each species group
+  totnums$survivors <- totnums$recruits
+
+  totnums$survival <- totnums$survivors
+  # Calculate survival for each group
+  for (group in unique(totnums$group)) {
+    #if(group == "SHD") browser()
+    pick <- which(totnums$group == group)
+    survival_temp <- c(NA,
+      totnums$survivors[pick[-1]]/totnums$atoutput[pick[-length(pick)]])
+
+    # G.Fay 2/21/16  "think" this is what things should be, recruits don't show up
+    # in numbers at age until time step after the recruitment event.
+     survival_temp <- c(
+       (totnums$atoutput[pick[-1]]-
+          totnums$recruits[pick[-1]])/totnums$atoutput[pick[-length(pick)]],NA)
+
+#     survival_temp <- c(
+#       (totnums$atoutput[pick[-1]])/
+#          (totnums$recruits[pick[-1]]+totnums$atoutput[pick[-length(pick)]]),NA)
+
+    survival_temp[survival_temp < 0] <- NA
+    # Use first positive value to replace the initial year and all negative vals
+    firstgood <- which(!is.na(survival_temp))[1]
+
+    survival_temp[1:firstgood] <- survival_temp[firstgood]
+    for(ii in seq_along(survival_temp)) {
+      if (is.na(survival_temp[ii])) {
+        nonzero <- which(which(survival_temp > 0) > ii)
+        if (length(nonzero) == 0) nonzero <- which(survival_temp > 0)
+        survival_temp[ii] <- survival_temp[which.min(abs(nonzero - ii))]
+      }
+    }
+    totnums$survival[pick] <- survival_temp
+   }
+
+  #Calculate Z
+  totnums$Z <- -1 * log(totnums$survival)
+  finaldata <- data.frame("species" = totnums$species,
+    "agecl" = NA, "polygon" = NA, "layer" = NA,
+    "time" = totnums$time, "atoutput" = totnums$Z)
+
+surveyresZ <- finaldata
+
+
+```
+-->
+
+### How to turn timestep Z into annual Z for proper comparison?
+
+Two approaches: annual nums each year, calculate survival between years (minus annual recruitment), turn into annual Z, or add timestep Zs to get annual?
+
+First an annual estimate based on end year numbers snapshots:
+
+```{r annZ1}
+
+totnums <- aggregate(atoutput ~ species + time, data = truenums_ss, sum) %>%
+    mutate(time.days = (time+1)*runpar$toutinc) %>% #makes time 0 into days 0->73, etc
+    mutate(yr = ceiling(time.days/365))  # yr 1 is 0:stepsperyr to match recruits yr1
+    #mutate(yr = floor(time.days/365)) # includes 0 value, yr 1 is 
+
+#only want numbers at end of year, snapshot
+totnumsann <- totnums %>%
+  filter(time.days %in% seq(365, max(time.days), by=365))
+
+# mg carbon converted to wet weight in tonnes
+k_wetdry <- biol$kgw2d / 1000000000
+
+# WARNING only works for CCA because YOY.txt rows 2:end are already in numbers
+# and we are merging out the incorrect and irrelevant YOY row 1 (Time=0)
+# also hardcoded for sardine example
+recnums <- YOY_ss %>%
+  mutate(yr = as.integer(round(YOY_ss$Time)/365)) %>%
+  mutate(recnums = SAR.0/k_wetdry/biol$redfieldcn)
+
+annZ1 <- merge(totnumsann, recnums) %>%
+  mutate(recnums = replace_na(recnums, 0)) %>%
+  mutate(numslessrec = atoutput - recnums) %>%
+  mutate(surv = numslessrec/lag(atoutput, default = first(numslessrec))) %>%
+  mutate(Z = -1 * log(surv))
+
+plotZ <- ggplot() +
+  geom_line(data=Zish, aes(x=Time/365, y=relZ)) +
+  geom_point(data=annZ1, aes(x=Time/365, y=Z)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name, species_ss))
+
+plotZ + ylim(0, 2.0)
+
+```
+
+This looks better; we are starting to see a pattern.
+
+Second summing within year Z from calc_Z:
+
+```{r annZ2}
+
+annZ2 <- fullresZ %>%
+  mutate(yr = floor(time/stepperyr)+1) %>%
+  group_by(species, yr) %>%
+  summarise(Z = sum(atoutput))
+
+plotZ <- ggplot() +
+  geom_line(data=Zish, aes(x=Time/365, y=relZ)) +
+  geom_point(data=annZ2, aes(x=yr, y=Z)) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name, species_ss))
+
+plotZ + ylim(0, 2.0)
+
+
+```
+
+Also looks better. Not sure which is more correct.
+
+Compare methods:
+
+```{r compZall}
+
+plotZ <- ggplot() +
+  geom_line(data=Zish, aes(x=Time/365, y=relZ, color="mort.txt Z")) +
+  geom_point(data=annZ1, aes(x=Time/365, y=Z, color="endyr Z")) +
+  geom_point(data=annZ2, aes(x=yr, y=Z, color="sum timestep Z")) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name, species_ss))
+
+plotZ + ylim(0, 2.0)
+
+
+```
+
+Both seem to be tracking each other reasonably, and also general trends from mort.txt output. Discussion with Beth suggests that mort.txt output is an initial calculation combining deaths due to predation with deaths due to fishing, but that there is rescaling of predation (and possibly fishing?) afterward this output stage such that mort.txt does not provide final mortality. If the rescaling varies by timestep, then matching general patterns rather than the full internannual variability is probably the best we can do, since we don't know the full interannual variability.
+
+We can probably conclude that the `calc_Z` function is working as correctly as possible now, given that it is an approximation no matter what, and the differences we see here are likley from temporal resolution of the Z estimate. 
+
+So what is M? This is an approximate annual M as Z-F from mort.txt (which assumes F is not rescaled!). If we need annual and age specific M then we need a new Z calc function that is cohort specific I think.
+
+```{r isthisM, message=FALSE, warning=FALSE}
+
+annM1 <- merge(annZ1, relF_ss, all.x = T) %>%
+  mutate(M = Z-relF)
+
+annZ2_Time <- annZ2 %>%
+  mutate(Time = yr*365)
+
+annM2 <- merge(annZ2_Time, relF_ss) %>%
+  mutate(M = Z-relF)
+
+plotM <- ggplot() +
+  geom_line(data=Zish, aes(x=Time/365, y=relZ, color="mort.txt Z")) +
+  geom_line(data=Zish, aes(x=Time/365, y=relM, color="mort.txt M")) +
+  geom_point(data=annM1, aes(x=Time/365, y=M, color="M = endyr Z-F")) +
+  geom_point(data=annM2, aes(x=yr, y=M, color="M = sum timestep Z-F")) +
+  theme_tufte() +
+  theme(legend.position = "bottom", legend.box = "horizontal") +
+  scale_color_discrete(NULL) +
+  guides(color = guide_legend(nrow = 1)) +
+  labs(subtitle = paste(scenario.name, species_ss))
+
+plotM + ylim(0, 2.0)
+
+
+
+```
+
+So the problem here is we get negative M if we use our calculated Z from annual numbers at age or timestep numbers at age and subtract the F from mort.txt. (Negative M does not show up as points above because I restrict the y axis scale to 0-2.0.) The F from mort.txt is actually higher than our estimated Z. So Atlantis must rescale F too???
+
+Need to investigate backing out F...
+
+Let's see how it performs with another model.
+
+### Test calc_Z NOBA
+
+Might be a good time to switch back to NOBA for comparison with true annual ages.
+
+```{r switch-NOBA}
+
+initCCA <- FALSE
+initNEUS <- FALSE
+initNOBA <- TRUE
+
+if(initNOBA) source(here("config/NOBAaaConfig.R"))
+
+species_ss <- "North_atl_cod"
+
+#Load functional groups
+funct.groups <- load_fgs(dir=d.name,
+                         file_fgs = functional.groups.file)
+#Get just the names of active functional groups
+funct.group.names <- funct.groups %>% 
+  filter(IsTurnedOn == 1) %>%
+  select(Name) %>%
+  .$Name
+
+#Get true NOBAaa
+if(!file.exists(file.path(d.name, 
+                          paste0("output", scenario.name, "run_truth.RData")))){
+  #Store all loaded results into an R object
+  truth <- run_truth(scenario = scenario.name,
+                     dir = d.name,
+                     file_fgs = functional.groups.file,
+                     file_bgm = box.file,
+                     select_groups = funct.group.names,
+                     file_init = initial.conditions.file,
+                     file_biolprm = biol.prm.file,
+                     file_runprm = run.prm.file
+  )
+} else{
+  truth <- get(load(file.path(d.name,
+                              paste0("output", scenario.name, "run_truth.RData"))))
+}
+
+source(here("config/census_spec.R"))
+
+```
+
+Lets try just the Z part for NOBA:
+
+```{r Znoba}
+
+# make a function for this
+# add YOY file to the config files
+YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
+
+# load biolprm in some initialize file?
+biol <- load_biolprm(d.name, biol.prm.file)
+
+# get code matching species name to split YOY file
+code_ss <- funct.groups$Code[which(funct.groups$Name == species_ss)]
+
+# cut to a single species in YOY file
+YOY_ss <- YOY %>%
+  select(Time, paste0(code_ss, ".0"))
+
+# numbers at agecl at full resolution (all polygons and layers)
+truenums_ss <- truth$nums[truth$nums$species == species_ss,]
+
+#calc_Z <- function(yoy, nums, fgs, biolprm, toutinc)
+
+#oops, need to generalize calc_Z for subannual timesteps in YOY!
+#or input YOY only at 0, 365, etc since the numbers repeat for timesteps 
+YOY_ss <- YOY_ss %>%
+  filter(Time %in% seq(0, max(Time), by=365))
+
+fullresZ <- calc_Z(yoy = YOY_ss,
+                   nums = truenums_ss,
+                   fgs = funct.groups,
+                   biolprm = biol,
+                   toutinc = runpar$toutinc)
+
+# compare as above with mort.txt output
+file.mort <- file.path(d.name, paste0("output", scenario.name, "Mort.txt"))
+
+mortish <- read.table(file.mort, header = TRUE)
+
+relF_ss <- mortish %>%
+  select(Time, relF = paste0(code_ss, ".F"))
+
+relM_ss <- mortish %>%
+  select(Time, relM = paste0(code_ss, ".M"))
+
+Zish <- merge(relF_ss,relM_ss) %>%
+  mutate(relZ = relF + relM)
+
+annZ2 <- fullresZ %>%
+  mutate(yr = floor(time/stepperyr)+1) %>%
+  group_by(species, yr) %>%
+  summarise(Z = sum(atoutput))
+
+plotZ <- ggplot() +
+  geom_line(data=Zish, aes(x=Time/365, y=relZ, color="mort.txt Z")) +
+  geom_point(data=fullresZ, aes(x=time/stepperyr, y=atoutput, color="each timestep Z")) +
+  geom_point(data=annZ2, aes(x=yr-1, y=Z, color="sum timestep Z")) +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name, species_ss))
+
+plotZ + ylim(-1, 10.0)
+
+```
+
+This Z is a bad match. The Z values in NOBA's mort.txt are huge. Not sure what to make of this.
+
+The above figure is now the best it is going to get after a deeper dive back into `calc_Z` for NOBA before we proceed to true ages. Found one bug hidden by sardine's equal recruit_period and recend, another where the recruitment period is all within one output timestep that resulted in proportions over 1 (inflating the recruitment and then subtracting it off). Further, it appears that timesteps for recruitment were still not correctly aligned, so trying a different alignment that leaves out the timestep 0 from the truth. Not sure the latter is correct, or if we need to rethink the calculation of survival based on when recruits actually enter the model.
+
+Update: the new code actually makes the CCA sardine Z estimates more in line with each other, so the updates are correct and we are keeping them in `calc_Z`. 
+
+Most important: Beth says that the M in mort.txt can really be as far off as we are seeing it here. The green line in the above NOBA Z plot reflects the initial estimate of what dies by predation mortality, which is a gigantic overesimate because many availability parameters are set to 1. After this output step, the predation mortality is rescaled within the model to account for the fact that there really aren't that many to be eaten.
+
+Our estimate of Z is from the actual numbers alive at the end of each timestep and the known input recruitment prior to any mortality, so I think it really is the best estimate we have. More debugging code commented out below but see the rmd file for the gory and redundant details.
+<!--
+```{r calcZ-snippet2, eval=FALSE}
+
+survey_testNall <- readRDS(file.path(d.name, paste0(scenario.name, "survey_testNall.rds")))
+
+# numbers at ageclaggregated over layers, retain polygons (output of create_survey)
+survey_testN_ss <- survey_testNall[survey_testNall$species == species_ss,]
+
+yoy <- YOY_ss
+nums <- survey_testN_ss
+fgs <- funct.groups
+biolprm <- biol
+toutinc <- runpar$toutinc
+
+#calc_Z <- function(yoy, nums, fgs, biolprm, toutinc) {
+  # subset the yoy for species included in the fgs file
+  # that are turned on
+  # colnames of the recruit data are "Time" and a column for each
+  # species where the name is the functional group with an additional .0
+  turnedon <- fgs[fgs$IsTurnedOn > 0, ]
+  recruits <- yoy[, colnames(yoy) %in% c("Time", paste0(turnedon$Code, ".0"))]
+
+  # mg carbon converted to wet weight in tonnes
+  k_wetdry <- biolprm$kgw2d / 1000000000
+  # Sum of structural and reserve nitrogen (KWSR_RN + KWSR_SN)
+  nitro <- merge(biolprm$kswr, biolprm$kwrr, by = "1")
+  nitro$sum <- apply(nitro[, 2:3], 1, sum)
+
+  # legacy: If output is from legacy code there will be an error in the
+  # yoy data, where the first row is in a different unit.
+  # yoy.txt is the biomass in tonnes per spawning event summed over the total
+  # model domain.
+  # The first row (< Nov/Dec 2015) is stored as biomass and the remaining rows
+  # are stored in numbers, must convert the entire matrix to biomass
+  # Check if legacy code and if so convert the numbers to biomass
+
+  # G.Fay 2/21/16 : changed yoy to recruits in below loop.
+  if (abs(recruits[1, 2] / recruits[2, 2]) > 10) {
+    recruits[2:NROW(recruits), 2:NCOL(recruits)] <- recruits[2:NROW(recruits), 2:NCOL(recruits)] *
+    nitro[match(gsub(".0", "", colnames(recruits)[-1]), nitro[, 1]), "sum"]
+  }
+
+
+  # Wide to long
+  recruits <- reshape(data = recruits, direction = "long",
+    varying = colnames(recruits)[-1],
+    v.names = "recruits",
+    times = colnames(recruits)[-1],
+    timevar = "group")
+  rownames(recruits) <- 1:NROW(recruits)
+  recruits <- recruits[, -which(colnames(recruits) == "id")]
+  # Switch from species code to species
+  recruits$group <- gsub("\\.0", "", recruits$group)
+  recruits <- merge(recruits, fgs[, c("Code", "Name")],
+    by.x = "group", by.y = "Code")
+
+  # merge recruits with strucn and resn of recruits from biol.prm file
+  recruits <- merge(recruits, nitro[, c(1, 4)],
+    by.x = "group", by.y = "1", all.x = TRUE, all.y = FALSE)
+  colnames(recruits)[which(colnames(recruits) == "recruits")] <- "recruitsbio"
+  # Get recruits in numbers rather than biomass
+  recruits$recruits <- recruits$recruitsbio / recruits$sum
+  recruits$yr <- as.integer(round(recruits$Time)/365) #needed to merge with totnums
+
+  # June 2019:Isaac determined that yr 0 (Time 0) in the YOY file is not real, don't use it
+  # code below assigns year 1 to times 0:stepperyr, all good output timesteps in truth$nums
+
+
+  # G.Fay 2/21/16
+  # UGLY code below tries to align fraction of annual yoy with timing of recruitment
+  # values in YOY.txt are total YOY that year waiting to recruit.
+  # seems to get rid of most of 'issues' - some v.minor survival >1,
+  #perhaps due to averaging of survival over toutinc days
+  nyrs <- ceiling(max(yoy$Time)/365)
+  times <- unique(yoy$Time)
+
+  # SKG June 2019
+  # need to match codes below, this mismatches when biolprm not in same order!!
+  #recstart_temp <- biolprm$recruit_time
+  #recstart_temp[,2] <- biolprm$time_spawn[-(grep('#',
+  #                     biolprm$time_spawn[,1])),2] + biolprm$recruit_time[,2]
+  # was this grep to get rid of a species with #XXX? breaks when there are none
+  #recstart_temp[,2] <- biolprm$time_spawn[,2] + biolprm$recruit_time[,2]
+
+  #recstart_temp <- recstart_temp[recstart_temp[,1]%in%turnedon$Code,] #bug added codes with no YOY output
+  #recstart_temp <- recstart_temp[recstart_temp[,1]%in%recruits$group,]
+
+  # June 12 2019 Beth determined that we do not need spawn_period
+
+  # rectiming is a dataframe with species code, time_spawn (day of year),
+  # recruit_time (number of days), and recruit period (number of days).
+  # we use these to calculate recstart (day of year) and recend (day of year)
+  rectiming <- merge(biolprm$time_spawn, biolprm$recruit_time, by = 1)
+  rectiming <- merge(rectiming, biolprm$recruit_period, by = 1)
+  names(rectiming) <- c("Code", "time_spawn", "recruit_time", "recruit_period")
+  rectiming <- rectiming %>%
+    mutate(recstart = time_spawn + recruit_time) %>%
+    mutate(recend = recstart + recruit_period)
+
+  #subsets to groups of interest
+  recstart_temp <- rectiming[rectiming$Code %in% recruits$group,]
+
+  # Sum numbers output over all boxes/depth/cohorts
+  # align model output timesteps (days) with recruitment periods (days)
+  totnums <- aggregate(atoutput ~ species + time, data = nums, sum) %>%
+    #mutate(time.days = (time+1)*toutinc) %>% #makes time 0 into days 0->73, etc
+    mutate(time.days = (time)*toutinc) %>% #makes time 1 into days 0->73, etc
+    mutate(yr = ceiling(time.days/365))  # yr 1 is 0:stepsperyr to match recruits yr1
+
+  totnums <- merge(totnums, recruits,
+                   by.x = c("yr", "species"), by.y = c("yr", "Name"),
+                   all.x = TRUE) %>%
+    arrange(time)
+
+  totnums$frac_recruit <- 0
+
+  for (irow in 1:nrow(recstart_temp)) {
+    group <- recstart_temp$Code[irow]
+    pick <- which(totnums$group == group)
+
+    recstart <- seq(recstart_temp$recstart[irow],by=365,length.out=nyrs)
+    recstart <- recstart[recstart<max(totnums$Time[pick])]
+    recend <- recstart + recstart_temp$recruit_period[irow]
+    #rec_times <- rbind(rec_times,cbind(group,recstart,recend))
+
+    for (i_rec in 1:length(recstart)) {
+      i_tstart <- which(pick==min(pick[totnums$time.days[pick]>=recstart[i_rec]]))
+      i_tstop <- which(pick==min(pick[totnums$time.days[pick]>=recend[i_rec]]))
+      if (i_rec == length(recstart)) i_tstop <- length(pick)
+      n_t <- 1+i_tstop-i_tstart
+      for (i_t in 1:n_t) {
+        t_temp <- totnums$time.days[pick[i_tstart+i_t-1]]
+        num_temp <- t_temp - recstart[i_rec]
+        if (i_t>1) {
+          if ((recend[i_rec]-t_temp)>toutinc) {
+            num_temp <- toutinc
+          }
+          else {
+            num_temp <- recend[i_rec]-(totnums$time.days[pick[i_tstart+i_t-2]])
+          }
+        }
+        frac_temp <- max(c(0,num_temp /(recend[i_rec]-recstart[i_rec])))
+        if(frac_temp > 1.0) frac_temp = 1.0
+        totnums$frac_recruit[pick[i_tstart+i_t-1]] <- frac_temp
+      }
+    }
+  }
+
+  #G.Fay 1/6/16, expand to num of recruits
+  # Recruit / mg C converted to wet weight in tonnes / redfield ratio of C:N
+  totnums$recruits <- totnums$recruits/k_wetdry/biolprm$redfieldcn
+
+  totnums$group <- recruits$group[match(totnums$species, recruits$Name)]
+  # For all time increments where there
+  totnums$recruits[is.na(totnums$recruits)] <- 0
+
+  totnums$annrecruits <- totnums$recruits
+
+  totnums$recruits <- totnums$annrecruits*totnums$frac_recruit
+
+  # Calculate survivors for each species group
+  totnums$survivors <- totnums$recruits
+
+  totnums$survival <- totnums$survivors
+  # Calculate survival for each group
+  for (group in unique(totnums$group)) {
+    #if(group == "SHD") browser()
+    pick <- which(totnums$group == group)
+    survival_temp <- c(NA,
+      totnums$survivors[pick[-1]]/totnums$atoutput[pick[-length(pick)]])
+
+    # G.Fay 2/21/16  "think" this is what things should be, recruits don't show up
+    # in numbers at age until time step after the recruitment event.
+     survival_temp <- c(
+       (totnums$atoutput[pick[-1]]-
+          totnums$recruits[pick[-1]])/totnums$atoutput[pick[-length(pick)]],NA)
+
+#     survival_temp <- c(
+#       (totnums$atoutput[pick[-1]])/
+#          (totnums$recruits[pick[-1]]+totnums$atoutput[pick[-length(pick)]]),NA)
+
+    survival_temp[survival_temp < 0] <- NA
+    # Use first positive value to replace the initial year and all negative vals
+    firstgood <- which(!is.na(survival_temp))[1]
+
+    survival_temp[1:firstgood] <- survival_temp[firstgood]
+    for(ii in seq_along(survival_temp)) {
+      if (is.na(survival_temp[ii])) {
+        nonzero <- which(which(survival_temp > 0) > ii)
+        if (length(nonzero) == 0) nonzero <- which(survival_temp > 0)
+        survival_temp[ii] <- survival_temp[which.min(abs(nonzero - ii))]
+      }
+    }
+    totnums$survival[pick] <- survival_temp
+   }
+
+  #Calculate Z
+  totnums$Z <- -1 * log(totnums$survival)
+  finaldata <- data.frame("species" = totnums$species,
+    "agecl" = NA, "polygon" = NA, "layer" = NA,
+    "time" = totnums$time, "atoutput" = totnums$Z)
+
+  #return(finaldata)
+#}
+
+
+```
+-->
+
+## Biological sampling: true numbers at age class
+
+Number of true age classes is stored in the [...]groups[...].csv file, which is read in using `load_fgs`. We read this in as funct.groups above. The column NumAgeClassSize stores the number of true ages:
+
+Number of age classes for Cod: `r funct.groups$NumAgeClassSize[funct.groups$Name=="North_atl_cod"] `
+
+```{r Natage-plot}
+
+Natage <- readRDS(file.path(d.name, paste0(scenario.name, "Natageclcensus.rds")))
+
+Natage_ss <- Natage[Natage$species == species_ss,]
+
+Natageplot <- ggplot(Natage_ss, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        Natage_ss$species))
+
+Natageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 1, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 2, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 3, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=4, nrow = 4, page = 4, scales="free")
+
+```
+
+This really is still overly optimistic, but now that I think `calc_Z` is working, if we feed these into `calc_stage2age` and get a result that matches the NOBA output ANNAGEBIO.nc, then we can assume that function is correct.
+
+These are estimated true age comps for Cod in annual ages:
+
+```{r plotannage}
+
+survey_testNall <- readRDS(file.path(d.name, paste0(scenario.name, "survey_testNall.rds")))
+
+# numbers at ageclaggregated over layers, retain polygons (output of create_survey)
+survey_testN_ss <- survey_testNall[survey_testNall$species == species_ss,]
+
+
+# for single species, Z was calculated above as surveyresZ
+trueages_ss <- calc_stage2age(nums_data = survey_testN_ss,
+                                 biolprm = biol, 
+                                 yoy = YOY_ss,
+                                 fgs = funct.groups, 
+                                 runprm = runpar)
+
+# run sample fish on this for completeness? yes to aggregate
+trueNagesamp_ss <- sample_fish(trueages_ss, effNhigh)
+
+# plot it
+
+Natageplot <- ggplot(trueNagesamp_ss, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(scenario.name,
+                        trueNagesamp_ss$species))
+
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+Still not looking great, but at least not constant. I am now assuming we have the wrong calculations in `calc_stage2age`. Load true ages from ANNAGEBIO.nc:
+
+```{r compareages}
+
+annage_nc <- paste0("output", scenario.name, "ANNAGEBIO.nc")
+bboxes <- get_boundary(boxpars)
+
+# need to change load_nc, at line 117 hardcoded for 10 cohorts!
+trueage_atout <- load_nc(dir = d.name,
+                         file_nc = annage_nc,
+                         bps = boxpars,
+                         fgs = funct.groups,
+                         select_groups = survspp,
+                         select_variable = "Nums",
+                         check_acronyms = TRUE,
+                         bboxes = bboxes)
+
+trueage_atout_ss <- trueage_atout[trueage_atout$species == species_ss,]
+
+#survey census to agg over layers
+survey_trueage_atout_ss <- create_survey(dat = trueage_atout_ss,
+                                 time = timeall,
+                                 species = survspp,
+                                 boxes = boxall,
+                                 effic = effic1,
+                                 selex = selex1)
+
+# sample fish to agg over polygons
+sample_trueage_atout_ss <- sample_fish(survey_trueage_atout_ss, effNhigh)
+
+```
+
+Compare true age output from atlantis with our estimate (and with aggregated age comps):
+
+```{r plot-esttrueage-atltrueage}
+
+compareAge <- ggplot() +
+  geom_point(data=trueNagesamp_ss, aes(x=agecl,y=atoutput, color="atlantisom"), alpha = 10/10) +
+  geom_point(data=sample_trueage_atout_ss, aes(x=agecl,y=atoutput, color="atout true"), alpha = 10/10) + 
+  geom_point(data=Natage_ss, aes(x=agecl*2, y=atoutput, color="cohort true"), alpha = 10/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(subtitle = paste(scenario.name,
+                        trueNagesamp_ss$species))
+
+compareAge + 
+  facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+compareAge + 
+  facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+compareAge + 
+  facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+compareAge + 
+  facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+
+```
+
+We only have the first 10 cohorts of true age output due to hardcoding in load_nc. I may write another load function that changes that. Either way our early ages don't match. Need to step through `calc_stage2age` next!
+
+
