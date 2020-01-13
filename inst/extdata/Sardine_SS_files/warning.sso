@@ -1,7 +1,7 @@
 #V3.30.14.04-safe;_2019_08_14;_Stock_Synthesis_by_Richard_Methot_(NOAA)_using_ADMB_12.0
 #Stock Synthesis (SS) is a work of the U.S. Government and is not subject to copyright protection in the United States.
 #Foreign copyrights may apply. See copyright.txt for more information.
-Thu Oct 10 12:17:27 2019
+Mon Jan 13 09:41:53 2020
 
 note: Std_yrmax=-1 in starter, so no variance output for forecast quantities after endyr+1 
 You have just one settlement event; recommend changing to recr_dist_method 4 which takes no recr_dist parameters
