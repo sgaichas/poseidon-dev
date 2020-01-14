@@ -26,6 +26,7 @@ Basic desired functionality:
 
   + Based on decision above, save interim steps for use later
   + Need a switch for single vs multispecies estimation models?
+  + Separate index and comp functions in output
 
 1. write input data for specific model: wrap functions in development for SS3, add functions for other models (ASAP, multispecies models)
 
