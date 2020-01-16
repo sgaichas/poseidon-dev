@@ -465,6 +465,31 @@ relM_ss <- mortish %>%
 Zish <- merge(relF_ss,relM_ss) %>%
   mutate(relZ = relF + relM)
 
+totnums <- aggregate(atoutput ~ species + time, data = truenums_ss, sum) %>%
+    mutate(time.days = (time+1)*runpar$toutinc) %>% #makes time 0 into days 0->73, etc
+    mutate(yr = ceiling(time.days/365))  # yr 1 is 0:stepsperyr to match recruits yr1
+    #mutate(yr = floor(time.days/365)) # includes 0 value, yr 1 is 
+
+#only want numbers at end of year, snapshot
+totnumsann <- totnums %>%
+  filter(time.days %in% seq(365, max(time.days), by=365))
+
+# mg carbon converted to wet weight in tonnes
+k_wetdry <- biol$kgw2d / 1000000000
+
+# WARNING only works for CCA because YOY.txt rows 2:end are already in numbers
+# and we are merging out the incorrect and irrelevant YOY row 1 (Time=0)
+# also hardcoded for sardine example
+recnums <- YOY_ss %>%
+  mutate(yr = as.integer(round(YOY_ss$Time)/365)) %>%
+  mutate(recnums = SSH.0/k_wetdry/biol$redfieldcn)
+
+annZ1 <- merge(totnumsann, recnums) %>%
+  mutate(recnums = replace_na(recnums, 0)) %>%
+  mutate(numslessrec = atoutput - recnums) %>%
+  mutate(surv = numslessrec/lag(atoutput, default = first(numslessrec))) %>%
+  mutate(Z = -1 * log(surv))
+
 annZ2 <- fullresZ %>%
   mutate(yr = floor(time/stepperyr)+1) %>%
   group_by(species, yr) %>%
@@ -472,7 +497,8 @@ annZ2 <- fullresZ %>%
 
 plotZ <- ggplot() +
   geom_line(data=Zish, aes(x=Time/365, y=relZ, color="mort.txt Z")) +
-  geom_point(data=fullresZ, aes(x=time/stepperyr, y=atoutput, color="each timestep Z")) +
+  #geom_point(data=fullresZ, aes(x=time/stepperyr, y=atoutput, color="each timestep Z")) +
+  geom_point(data=annZ1, aes(x=yr-1, y=Z, color="annual Z")) +
   geom_point(data=annZ2, aes(x=yr-1, y=Z, color="sum timestep Z")) +
   theme_tufte() +
   labs(subtitle = paste(scenario.name, species_ss))
@@ -596,6 +622,42 @@ catch_numsss <- catch_numsss %>%
 totnumss <- totnumss %>%
   select(species, agecl, time, popnum=atoutput) %>%
   mutate(Ftime = time)
+
+#what about annual Z from totnumss catch curve?
+# each timestep use lm(agecl~ log(atoutput))
+library(dplyr)
+library(broom) # to change model results into data frame
+catchcurve1 <- totnumss %>% 
+  group_by(time) %>%
+  do(tidy(lm(log(popnum) ~ agecl, data = .))) %>% 
+  filter(term == "agecl") 
+
+# or do for the year averaging natage at each timestep?
+catchcurve2 <- totnumss %>%
+  mutate(yr = floor(time/stepperyr)+1) %>%
+  group_by(yr, agecl) %>%
+  summarise(avgpopnum = mean(popnum)) %>%
+  do(tidy(lm(log(avgpopnum) ~ agecl, data = .))) %>% 
+  filter(term == "agecl") 
+
+altZ1 <- catchcurve1 %>%
+  select(time, estimate) %>%
+  mutate(yr = floor(time/stepperyr)+1) %>%
+  group_by(yr) %>%
+  summarise(Z = sum(-estimate))
+
+altZ2 <- catchcurve2 %>%
+  mutate(Z=-estimate) %>%
+  select(yr, Z)
+
+#another alternative tracking cohorts
+# get rid of agecl 1 to ignore recruitment
+# still need rec_time to know when they go to next agecl
+# survival is 
+#  within year 
+# SSH actually have two ages per agecl so this wont work
+# also, when I look at an age class numbers are INCREASING each timestep
+# which makes no sense unless there is migration in?
 
 #not done yet dont use this
 timestepnumF <- merge(totnumss, catch_numsss) %>%
