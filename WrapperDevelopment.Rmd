@@ -58,6 +58,8 @@ Basic desired functionality:
     
 ### atlantisom initialize function
 
+Things to add: checks for output timestep, loading bioind.file with function similar to load_catch, loading box file separately?
+
 ```{r ominit}
 
 library(tidyverse)
@@ -144,16 +146,46 @@ CC3om <- om_init(here("config/CC3config.r"))
 
 ### Get assessment input data
 
-Split to single species or subset of assessed species, get index data, get compositional data.
+Split to single species or subset of assessed species, get index data, get compositional data. By default, remove full om results and keep only species subsets to save memory.
 
 ```{r inputs}
 
-om_species <- function(species = spp, omlist){
+om_species <- function(species = spp, omlist, removefullom = TRUE){
   # spp format c("speciesname1", "speciesname2")
   if(!all(species %in% omlist$funct.group.names)) stop("species name not found") 
   species_ss <- species
   
-  return(species_ss)
+  #subset species true bio
+  #-----REDO THIS with a function like load_catch and load above----#
+  # read Atlantis output files
+  atBtxt2 <- read.table(file.path(d.name, paste0("output", scenario.name, "BiomIndx.txt")), header=T)
+  groupslookup <- funct.groups %>%
+    filter(IsTurnedOn > 0)
+  
+  truetotbio_ss <- atBtxt2 %>%
+    select(Time:DIN) %>%
+    #select(Time, FPL:DIN) %>%
+    rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
+    gather(species, biomass, -Time) %>%
+    filter(species %in% species_ss)
+  
+  #subset species true catch
+  truecatchbio_ss <- omlist$truecatchbio[truecatchbio$species == species_ss,]
+
+  #subset species YOY
+  
+  #subset species biol parameters
+  
+  #subset species funtional group info?
+  
+  #keep the runpar and also need boxes for survey selection
+  
+  omlist_ss <- list("species_ss" = species_ss,
+                    "runpar" = omlist$runpar)
+  
+  if(removefullom = TRUE) rm(omlist)
+  
+  return(omlist_ss)
 }
 
 ```
