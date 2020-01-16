@@ -18,17 +18,154 @@ To make life easier, here are some wrapper functions to do the basic things we w
 Basic desired functionality:
 
 1. initialize: locate model output (function to make a config file?), read in basic run parameters and species names, run_truth for all once and save output 
-
-  + User to make up front decision--want all species or just a subset?
-  + May want multiple species that need to be split in a later step for models
-
+    + User to make up front decision--want all species or just a subset?
+    + May want multiple species that need to be split in a later step for models
+    + wraps functions 
+        + sourcing model config file--add function to make config file?
+      + specifies top directory for source files, names key files for use later
+      + load_fgs
+      + load all other needed files--YOY, catch
+      + run_truth
 1. get assessment input data: configure survey, run all survey functions, configure fishery, run all fishery functions (how to save output?)
-
-  + Based on decision above, save interim steps for use later
-  + Need a switch for single vs multispecies estimation models?
-  + Separate index and comp functions in output
-
+    + Based on decision above, save interim steps for use later
+    + Need a switch for single vs multispecies estimation models?
+    + Separate index and comp functions in output
+    + indices:
+      + create survey config file(s), default is a census of all see census_spec.R
+        + survey index in biomass or numbers? (uses truth$biomass_ages vs truth$nums)
+        + wraps functions create_survey, sample_survey_biomass
+      + create fishery config file(s)
+    + comps:
+      + select age only or age and length
+        + age only wraps create_survey using nums with sample_fish to get age comps
+        + age and length (with weight at age)
+          + create_survey followed by sample_fish, 
+          + aggregateDensityData for resn and structn followed by sample_fish
+          + inputs all to calc_age2length
+      + catch comps wrap create_fishery_subset with sample_fish to get age comps, same as above for lengths
 1. write input data for specific model: wrap functions in development for SS3, add functions for other models (ASAP, multispecies models)
+    + wrap r4ss functions to read and write dat and ctl files
+    + possibly start with set of dummy SS files with package (take from ss3sim?)
+      + read in dat file
+      + indices wrap SS_write_ts
+      + comps wrap reformat_compositions, SS_write_comps, some of the checks for bin matches\
+      + write full dat file
+    + start with dummy ctl file (any from ss3sim?)
+      + read in ctl file
+      + wrap SS_write_bio using outputs of calc_Z, load_YOY, load_biolprm, load_runprm, etc
+1. run specified model--automate for scenarios, save outputs 
+1. skill assessment metrics: compare stored Atlantis truth with model output 
+    
+### atlantisom initialize function
+
+```{r ominit}
+
+library(tidyverse)
+
+om_init <- function(config = configfile){
+  
+  # Where are the atlantis output files? Consider filling with shiny app in future
+  source(config)
+  # needs these files, for example config file CC3config.R is:
+  
+  # d.name <- here::here("atlantisoutput","CC_2063_OA_OFF_22")
+  # functional.groups.file <- "CalCurrentV3Groups.csv"
+  # biomass.pools.file <- "DIVCalCurrentV3_Biol.nc"
+  # biol.prm.file <- "CalCurrentV3_Biol.prm"
+  # box.file <- "CalCurrentV3_utm.bgm"
+  # initial.conditions.file <- "DIVCalCurrentV3_Biol.nc"
+  # run.prm.file <- "CalCurrentV3_run.xml"
+  # scenario.name <- "CCV3"
+  # bioind.file <- "outputCCV3BiomIndx.txt"
+  # catch.file <- "outputCCV3Catch.txt"
+
+  #Load functional groups
+  funct.groups <- atlantisom::load_fgs(dir=d.name,
+                           file_fgs = functional.groups.file)
+  #Get just the names of active functional groups
+  funct.group.names <- funct.groups %>% 
+    filter(IsTurnedOn == 1) %>%
+    select(Name) %>%
+    .$Name
+  
+  # load true catch in tons
+  truecatchbio <- atlantisom::load_catch(d.name, file_catch = catch.file, fgs = funct.groups)
+
+  # load YOY
+  YOY <- atlantisom::load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
+  
+  # load biol_prm
+  biol <- atlantisom::load_biolprm(d.name, biol.prm.file)
+  
+  # load run_prm
+  runpar <- atlantisom::load_runprm(d.name, run.prm.file)
+
+  # default run_truth setup will save the file, so check for that first
+  if(!file.exists(file.path(d.name, 
+                            paste0("output", scenario.name, "run_truth.RData")))){
+    #Store all loaded results into an R object
+    truth <- atlantisom::run_truth(scenario = scenario.name,
+                       dir = d.name,
+                       file_fgs = functional.groups.file,
+                       file_bgm = box.file,
+                       select_groups = funct.group.names,
+                       file_init = initial.conditions.file,
+                       file_biolprm = biol.prm.file,
+                       file_runprm = run.prm.file,
+                       verbose = TRUE
+    )
+  } else {
+    truth <- get(load(file.path(d.name,
+                                paste0("output", scenario.name, "run_truth.RData"))))
+  }
+  
+  omlist <-list("funct.groups" = funct.groups, 
+                "funct.group.names" = funct.group.names,
+                "truecatchbio" = truecatchbio,
+                "YOY" = YOY,
+                "biol" = biol,
+                "runpar" = runpar,
+                "truth" = truth)
+  
+  return(omlist)
+}
+  
+
+```
+
+Usage: 
+
+```{r exinit}
+
+library(here)
+CC3om <- om_init(here("config/CC3config.r"))
+
+```
+
+### Get assessment input data
+
+Split to single species or subset of assessed species, get index data, get compositional data.
+
+```{r inputs}
+
+om_species <- function(species = spp, omlist){
+  # spp format c("speciesname1", "speciesname2")
+  if(!all(species %in% omlist$funct.group.names)) stop("species name not found") 
+  species_ss <- species
+  
+  return(species_ss)
+}
+
+```
+
+Usage: 
+
+```{r exsp}
+
+om_species(c("Pacific_sardine"), CC3om)
+
+```
+
 
 ## Cumbersome giant files eat all the memory!
 
