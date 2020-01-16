@@ -364,13 +364,13 @@ summary {
 
 <h1 class="title toc-ignore">Develop atlantisom wrappers</h1>
 <h4 class="author">Sarah Gaichas and Christine Stawitz</h4>
-<h4 class="date">15 January, 2020</h4>
+<h4 class="date">16 January, 2020</h4>
 
 </div>
 
 
-<div id="too-many-steps" class="section level2">
-<h2>Too many steps!</h2>
+<div id="too-many-steps-and-too-much-memory" class="section level2">
+<h2>Too many steps! and too much memory!</h2>
 <p>We can run atlantisom with many functions to get stock assessment model inputs.</p>
 <p>To make life easier, here are some wrapper functions to do the basic things we want.</p>
 <p>Basic desired functionality:</p>
@@ -424,8 +424,7 @@ summary {
 <ul>
 <li>read in dat file</li>
 <li>indices wrap SS_write_ts</li>
-<li>comps wrap reformat_compositions, SS_write_comps, some of the checks for bin matches<br />
-</li>
+<li>comps wrap reformat_compositions, SS_write_comps, some of the checks for bin matches</li>
 <li>write full dat file</li>
 </ul></li>
 <li>start with dummy ctl file (any from ss3sim?)
@@ -439,6 +438,7 @@ summary {
 </ol>
 <div id="atlantisom-initialize-function" class="section level3">
 <h3>atlantisom initialize function</h3>
+<p>Things to add: checks for output timestep?</p>
 <pre class="r"><code>library(tidyverse)</code></pre>
 <pre><code>## ── Attaching packages ──────────────────────────────────────────────────── tidyverse 1.2.1 ──</code></pre>
 <pre><code>## ✔ ggplot2 3.2.1     ✔ purrr   0.3.3
@@ -474,6 +474,9 @@ summary {
     select(Name) %&gt;%
     .$Name
   
+  # load true total biomass in tons
+  truetotbio &lt;- atlantisom::load_bioind(d.name, file_bioind = bioind.file, fgs = funct.groups)
+  
   # load true catch in tons
   truecatchbio &lt;- atlantisom::load_catch(d.name, file_catch = catch.file, fgs = funct.groups)
 
@@ -485,6 +488,9 @@ summary {
   
   # load run_prm
   runpar &lt;- atlantisom::load_runprm(d.name, run.prm.file)
+  
+  # load box info file
+  boxpars &lt;- atlantisom::load_box(d.name, box.file)
 
   # default run_truth setup will save the file, so check for that first
   if(!file.exists(file.path(d.name, 
@@ -507,10 +513,12 @@ summary {
   
   omlist &lt;-list(&quot;funct.groups&quot; = funct.groups, 
                 &quot;funct.group.names&quot; = funct.group.names,
+                &quot;truetotbio&quot; = truetotbio,
                 &quot;truecatchbio&quot; = truecatchbio,
                 &quot;YOY&quot; = YOY,
                 &quot;biol&quot; = biol,
                 &quot;runpar&quot; = runpar,
+                &quot;boxpars&quot; = boxpars,
                 &quot;truth&quot; = truth)
   
   return(omlist)
@@ -524,22 +532,85 @@ summary {
 </div>
 <div id="get-assessment-input-data" class="section level3">
 <h3>Get assessment input data</h3>
-<p>Split to single species or subset of assessed species, get index data, get compositional data.</p>
-<pre class="r"><code>om_species &lt;- function(species = spp, omlist){
+<p>Split to single species or subset of assessed species, get index data, get compositional data. By default, remove full om results and keep only species subsets to save memory.</p>
+<div id="split-to-focal-species" class="section level4">
+<h4>Split to focal species</h4>
+<p>Is this where we should reconcile timesteps? depends what functions are expecting.</p>
+<pre class="r"><code>om_species &lt;- function(species = spp, omlist, removefullom = TRUE){
   # spp format c(&quot;speciesname1&quot;, &quot;speciesname2&quot;)
   if(!all(species %in% omlist$funct.group.names)) stop(&quot;species name not found&quot;) 
   species_ss &lt;- species
   
-  return(species_ss)
+  #subset species true bio
+  truetotbio_ss &lt;- omlist$truetotbio[omlist$truetotbio$species %in% species_ss,]
+
+  #subset species true catch
+  truecatchbio_ss &lt;- omlist$truecatchbio[omlist$truecatchbio$species %in% species_ss,]
+
+  #subset species YOY
+  # get code matching species name to split YOY file
+  code_ss &lt;- omlist$funct.groups$Code[which(omlist$funct.groups$Name %in% species_ss)]
+  # cut to a single species in YOY file
+  YOY_ss &lt;- omlist$YOY %&gt;%
+    select(Time, paste0(code_ss, &quot;.0&quot;))
+  # reformat to be like all the other objects
+  
+  # numbers at agecl at full resolution (all polygons and layers)
+  truenums_ss &lt;- omlist$truth$nums[omlist$truth$nums$species %in% species_ss,]
+  
+  # biomass at agecl at full resolution (all polygons and layers)
+  truebio_ss &lt;- omlist$truth$biomass_ages[omlist$truth$biomass_ages$species %in% species_ss,]
+  
+  # reserve nitrogen at agecl at full resolution
+  trueresn_ss &lt;- omlist$truth$resn[omlist$truth$resn$species %in% species_ss,]
+  
+  # structural nitrogen at agecl at full resolution
+  truestructn_ss &lt;- omlist$truth$structn[omlist$truth$structn$species %in% species_ss,]
+  
+  # catch in numbers at agecl at full resoluation (all polygons, no layer in output)
+  truecatchnum_ss &lt;- omlist$truth$catch[omlist$truth$catch$species %in% species_ss,]
+  
+  #subset species biol parameters? no, may miss some globals that aren&#39;t by species
+  
+  #subset species functional group info
+  funct.groups_ss &lt;- omlist$funct.groups[omlist$funct.groups$Code %in% code_ss,]
+  
+  #keep the runpar and also need boxes for survey selection
+  
+  omlist_ss &lt;- list(&quot;species_ss&quot; = species_ss,
+                    &quot;code_ss&quot; = code_ss,
+                    &quot;truetotbio_ss&quot; = truetotbio_ss,
+                    &quot;truecatchbio_ss&quot; = truecatchbio_ss,
+                    &quot;YOY_ss&quot; = YOY_ss,
+                    &quot;truenums_ss&quot; = truenums_ss,
+                    &quot;truebio_ss&quot; = truebio_ss,
+                    &quot;trueresn_ss&quot; = trueresn_ss,
+                    &quot;truestructn_ss&quot; = truestructn_ss,
+                    &quot;truecatchnum_ss&quot; = truecatchnum_ss,
+                    &quot;funct.group_ss&quot; = funct.groups_ss,
+                    &quot;biol&quot; = omlist$biol,
+                    &quot;boxpars&quot; = omlist$boxpars,
+                    &quot;runpar&quot; = omlist$runpar)
+  
+  if(removefullom) rm(omlist) #not removing passed data object
+  
+  return(omlist_ss)
 }</code></pre>
 <p>Usage:</p>
-<pre class="r"><code>om_species(c(&quot;Pacific_sardine&quot;), CC3om)</code></pre>
-<pre><code>## [1] &quot;Pacific_sardine&quot;</code></pre>
+<pre class="r"><code>CC3om_sardine &lt;- om_species(c(&quot;Pacific_sardine&quot;), CC3om)</code></pre>
+</div>
+<div id="generate-index-data-for-assessment" class="section level4">
+<h4>Generate index data for assessment</h4>
+<pre class="r"><code>om_index &lt;- function(){
+  
+}</code></pre>
+<p>Usage:</p>
+<pre class="r"><code>#CC3om_sard_ind &lt;- om_index(c(&quot;survey1&quot;, &quot;fishery&quot;), CC3om_sardine)</code></pre>
+</div>
+<div id="generate-compositional-data-for-assessment" class="section level4">
+<h4>Generate compositional data for assessment</h4>
 </div>
 </div>
-<div id="cumbersome-giant-files-eat-all-the-memory" class="section level2">
-<h2>Cumbersome giant files eat all the memory!</h2>
-<p>Implement Christine’s memory saving things from the NEMOW demo</p>
 </div>
 
 

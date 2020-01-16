@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Too many steps!
+## Too many steps! and too much memory!
 
 We can run atlantisom with many functions to get stock assessment model inputs.
 
@@ -48,7 +48,7 @@ Basic desired functionality:
     + possibly start with set of dummy SS files with package (take from ss3sim?)
       + read in dat file
       + indices wrap SS_write_ts
-      + comps wrap reformat_compositions, SS_write_comps, some of the checks for bin matches\
+      + comps wrap reformat_compositions, SS_write_comps, some of the checks for bin matches
       + write full dat file
     + start with dummy ctl file (any from ss3sim?)
       + read in ctl file
@@ -58,7 +58,7 @@ Basic desired functionality:
     
 ### atlantisom initialize function
 
-Things to add: checks for output timestep, loading bioind.file with function similar to load_catch, loading box file separately?
+Things to add: checks for output timestep?
 
 ```{r ominit}
 
@@ -90,6 +90,9 @@ om_init <- function(config = configfile){
     select(Name) %>%
     .$Name
   
+  # load true total biomass in tons
+  truetotbio <- atlantisom::load_bioind(d.name, file_bioind = bioind.file, fgs = funct.groups)
+  
   # load true catch in tons
   truecatchbio <- atlantisom::load_catch(d.name, file_catch = catch.file, fgs = funct.groups)
 
@@ -101,6 +104,9 @@ om_init <- function(config = configfile){
   
   # load run_prm
   runpar <- atlantisom::load_runprm(d.name, run.prm.file)
+  
+  # load box info file
+  boxpars <- atlantisom::load_box(d.name, box.file)
 
   # default run_truth setup will save the file, so check for that first
   if(!file.exists(file.path(d.name, 
@@ -123,10 +129,12 @@ om_init <- function(config = configfile){
   
   omlist <-list("funct.groups" = funct.groups, 
                 "funct.group.names" = funct.group.names,
+                "truetotbio" = truetotbio,
                 "truecatchbio" = truecatchbio,
                 "YOY" = YOY,
                 "biol" = biol,
                 "runpar" = runpar,
+                "boxpars" = boxpars,
                 "truth" = truth)
   
   return(omlist)
@@ -148,6 +156,10 @@ CC3om <- om_init(here("config/CC3config.r"))
 
 Split to single species or subset of assessed species, get index data, get compositional data. By default, remove full om results and keep only species subsets to save memory.
 
+#### Split to focal species
+
+Is this where we should reconcile timesteps? depends what functions are expecting.
+
 ```{r inputs}
 
 om_species <- function(species = spp, omlist, removefullom = TRUE){
@@ -156,34 +168,57 @@ om_species <- function(species = spp, omlist, removefullom = TRUE){
   species_ss <- species
   
   #subset species true bio
-  #-----REDO THIS with a function like load_catch and load above----#
-  # read Atlantis output files
-  atBtxt2 <- read.table(file.path(d.name, paste0("output", scenario.name, "BiomIndx.txt")), header=T)
-  groupslookup <- funct.groups %>%
-    filter(IsTurnedOn > 0)
-  
-  truetotbio_ss <- atBtxt2 %>%
-    select(Time:DIN) %>%
-    #select(Time, FPL:DIN) %>%
-    rename_(.dots=with(groupslookup, setNames(as.list(as.character(Code)), Name))) %>%
-    gather(species, biomass, -Time) %>%
-    filter(species %in% species_ss)
-  
+  truetotbio_ss <- omlist$truetotbio[omlist$truetotbio$species %in% species_ss,]
+
   #subset species true catch
-  truecatchbio_ss <- omlist$truecatchbio[truecatchbio$species == species_ss,]
+  truecatchbio_ss <- omlist$truecatchbio[omlist$truecatchbio$species %in% species_ss,]
 
   #subset species YOY
+  # get code matching species name to split YOY file
+  code_ss <- omlist$funct.groups$Code[which(omlist$funct.groups$Name %in% species_ss)]
+  # cut to a single species in YOY file
+  YOY_ss <- omlist$YOY %>%
+    select(Time, paste0(code_ss, ".0"))
+  # reformat to be like all the other objects
   
-  #subset species biol parameters
+  # numbers at agecl at full resolution (all polygons and layers)
+  truenums_ss <- omlist$truth$nums[omlist$truth$nums$species %in% species_ss,]
   
-  #subset species funtional group info?
+  # biomass at agecl at full resolution (all polygons and layers)
+  truebio_ss <- omlist$truth$biomass_ages[omlist$truth$biomass_ages$species %in% species_ss,]
+  
+  # reserve nitrogen at agecl at full resolution
+  trueresn_ss <- omlist$truth$resn[omlist$truth$resn$species %in% species_ss,]
+  
+  # structural nitrogen at agecl at full resolution
+  truestructn_ss <- omlist$truth$structn[omlist$truth$structn$species %in% species_ss,]
+  
+  # catch in numbers at agecl at full resoluation (all polygons, no layer in output)
+  truecatchnum_ss <- omlist$truth$catch[omlist$truth$catch$species %in% species_ss,]
+  
+  #subset species biol parameters? no, may miss some globals that aren't by species
+  
+  #subset species functional group info
+  funct.groups_ss <- omlist$funct.groups[omlist$funct.groups$Code %in% code_ss,]
   
   #keep the runpar and also need boxes for survey selection
   
   omlist_ss <- list("species_ss" = species_ss,
+                    "code_ss" = code_ss,
+                    "truetotbio_ss" = truetotbio_ss,
+                    "truecatchbio_ss" = truecatchbio_ss,
+                    "YOY_ss" = YOY_ss,
+                    "truenums_ss" = truenums_ss,
+                    "truebio_ss" = truebio_ss,
+                    "trueresn_ss" = trueresn_ss,
+                    "truestructn_ss" = truestructn_ss,
+                    "truecatchnum_ss" = truecatchnum_ss,
+                    "funct.group_ss" = funct.groups_ss,
+                    "biol" = omlist$biol,
+                    "boxpars" = omlist$boxpars,
                     "runpar" = omlist$runpar)
   
-  if(removefullom = TRUE) rm(omlist)
+  if(removefullom) rm(omlist) #not removing passed data object
   
   return(omlist_ss)
 }
@@ -194,12 +229,33 @@ Usage:
 
 ```{r exsp}
 
-om_species(c("Pacific_sardine"), CC3om)
+CC3om_sardine <- om_species(c("Pacific_sardine"), CC3om)
+
+```
+
+#### Generate index data for assessment
+
+```{r omindices}
+
+om_index <- function(){
+  
+}
+
+```
+
+Usage: 
+
+```{r exindex}
+
+#CC3om_sard_ind <- om_index(c("survey1", "fishery"), CC3om_sardine)
+
+```
+
+#### Generate compositional data for assessment
+
+```{r omcomps}
 
 ```
 
 
-## Cumbersome giant files eat all the memory!
-
-Implement Christine's memory saving things from the NEMOW demo
 
