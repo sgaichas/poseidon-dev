@@ -235,55 +235,7 @@ CC3om_sardine <- om_species(c("Pacific_sardine"), CC3om)
 
 #### Generate index data for assessment
 
-```{r surveyconfig}
-
-surveyconfig <- function(omlist_ss, usersurvey = usersurvey_file){
-  #configure the independent survey, a default census is in config/survcensus.R
-  #survey configuration must specify survey time, area, efficiency (q), selectivity
-  #survey species inherited from omlist_ss
-  survspp <- omlist_ss$species_ss
-  # survey season and other time dimensioning parameters
-  # generalized timesteps all models
-  noutsteps <- omlist_ss$runpar$tstop/omlist_ss$runpar$outputstep
-  timeall <- c(0:noutsteps)
-  stepperyr <- if(omlist_ss$runpar$outputstepunit=="days") 365/omlist_ss$runpar$toutinc
-  midptyr <- round(median(seq(0,stepperyr)))
-  
-  # model areas, subset in surveyconfig
-  allboxes <- c(0:(omlist_ss$boxpars$nbox - 1))
-  
-  # fishery output: learned the hard way this can be different from ecosystem outputs
-  fstepperyr <- if(omlist_ss$runpar$outputstepunit=="days") 365/omlist_ss$runpar$toutfinc
-  
-  # survey selectivity (agecl based)
-  # should return all age classes fully sampled (Atlantis output is 10 age groups per spp)
-  n_age_classes <- omlist_ss$funct.group_ss$NumCohorts
-  age_classes <- 1:n_age_classes
-  
-  n_annages <- n_age_classes * omlist_ss$funct.group_ss$NumAgeClassSize
-  annages <- 1:n_annages
-  
-  # user options for survey--default is a census with mid-year sample
-  source(usersurvey, local = TRUE)
-  
-  surveyspecs <- list("survtime" = survtime,
-                      "survboxes" = survboxes,
-                      "surveffic" = surveffic,
-                      "survselex" = survselex,
-                      "surveffN" = surveffN,
-                      "surv_cv" = surv_cv)
-  
-  return(surveyspecs)
-}
-```
-
-Usage: 
-
-```{r specsex}
-
-mysurvey <- surveyconfig(CC3om_sardine, here("config/usersurvey.R"))
-```
-
+The hardcoded script omdimensions.R needs to sit in the atlantisom config folder.
 
 ```{r omindices}
 
@@ -293,16 +245,21 @@ om_index <- function(usersurvey = usersurvey_file,
                      n_reps = n_reps,
                      save = TRUE){
   
-  surveyspec <- surveyconfig(omlist_ss, usersurvey = usersurvey_file)
+  #one script for dimension parameters to be used in multiple functions
+  source("config/omdimensions.R", local = TRUE)
   
+  # user options for survey--default is a census with mid-year sample
+  source(usersurvey, local = TRUE)
+
+
   #biomass based fishery independent survey index
   # this uses result$biomass_ages to sample biomass directly, no need for wt@age est
   survey_B <- atlantisom::create_survey(dat = omlist_ss$truebio_ss,
-                                        time = surveyspec$survtime,
-                                        species = surveyspec$survspp,
-                                        boxes = surveyspec$survboxes,
-                                        effic = surveyspec$surveffic,
-                                        selex = surveyspec$survselex)
+                                        time = survtime,
+                                        species = survspp,
+                                        boxes = survboxes,
+                                        effic = surveffic,
+                                        selex = survselex)
   
   # call sample_survey_biomass with a bunch of 1000s for weight at age
   # in the code it multiplies atoutput by wtatage/1000 so this allows us to use
@@ -327,7 +284,7 @@ om_index <- function(usersurvey = usersurvey_file,
   #configure the fishery, a default is in config/fisherycensus.R
   #fishery configuration must specify survey time, area, efficiency (q), selectivity
   #fishery species inherited from omlist_ss
-  source(fisheryconfig)
+  source(userfishery, local = TRUE)
   
   #we are not currently subsetting fishery catch because we cannot correct catch.nc
   #  instead the catch in biomass from catch.txt is read in for the index
@@ -354,11 +311,11 @@ Usage:
 
 ```{r exindex}
 
-CC3om_sard_ind <- om_index(surveyconfig = here("config/survcensus.R"), 
-                           fisheryconfig = here("config/fisherycensus.R"),
+CC3om_sard_ind <- om_index(usersurvey = here("config/usersurvey.R"), 
+                           userfishery = here("config/fisherycensus.R"),
                            omlist_ss = CC3om_sardine, 
                            n_reps = 5, 
-                           save = FALSE)
+                           save = TRUE)
 
 ```
 

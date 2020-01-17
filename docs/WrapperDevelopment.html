@@ -364,7 +364,7 @@ summary {
 
 <h1 class="title toc-ignore">Develop atlantisom wrappers</h1>
 <h4 class="author">Sarah Gaichas and Christine Stawitz</h4>
-<h4 class="date">16 January, 2020</h4>
+<h4 class="date">17 January, 2020</h4>
 
 </div>
 
@@ -601,11 +601,78 @@ summary {
 </div>
 <div id="generate-index-data-for-assessment" class="section level4">
 <h4>Generate index data for assessment</h4>
-<pre class="r"><code>om_index &lt;- function(){
+<p>The hardcoded script omdimensions.R needs to sit in the atlantisom config folder.</p>
+<pre class="r"><code>om_index &lt;- function(usersurvey = usersurvey_file, 
+                     userfishery = userfishery_file, 
+                     omlist_ss, 
+                     n_reps = n_reps,
+                     save = TRUE){
   
+  #one script for dimension parameters to be used in multiple functions
+  source(&quot;config/omdimensions.R&quot;, local = TRUE)
+  
+  # user options for survey--default is a census with mid-year sample
+  source(usersurvey, local = TRUE)
+
+
+  #biomass based fishery independent survey index
+  # this uses result$biomass_ages to sample biomass directly, no need for wt@age est
+  survey_B &lt;- atlantisom::create_survey(dat = omlist_ss$truebio_ss,
+                                        time = survtime,
+                                        species = survspp,
+                                        boxes = survboxes,
+                                        effic = surveffic,
+                                        selex = survselex)
+  
+  # call sample_survey_biomass with a bunch of 1000s for weight at age
+  # in the code it multiplies atoutput by wtatage/1000 so this allows us to use
+  # biomass directly
+  wtage &lt;- data.frame(species=rep(survspp, each=max(age_classes)),
+                      agecl=rep(c(1:max(age_classes)),length(survspp)),
+                      wtAtAge=rep(1000.0,length(survspp)*max(age_classes)))
+  
+  # this is the step to repeat n_reps time if we want different realizations 
+  # of the same survey design specified above; only observation error differs
+  # using the census cv of 0 will produce identical reps!
+  survObsBiomB &lt;- list()
+  for(i in 1:n_reps){
+    survObsBiomB[[i]] &lt;- atlantisom::sample_survey_biomass(survey_B, surv_cv, wtage)
+  }
+  
+  #save survey indices, takes a long time to generate with lots of reps/species
+  if(save){
+    saveRDS(survObsBiomB, file.path(d.name, paste0(scenario.name, &quot;surveyB.rds&quot;)))
+  }
+  
+  #configure the fishery, a default is in config/fisherycensus.R
+  #fishery configuration must specify survey time, area, efficiency (q), selectivity
+  #fishery species inherited from omlist_ss
+  source(userfishery, local = TRUE)
+  
+  #we are not currently subsetting fishery catch because we cannot correct catch.nc
+  #  instead the catch in biomass from catch.txt is read in for the index
+  #  we do not apply any cv to this, but we could this way (default cv=0)
+  
+  fishObsCatchB &lt;- list()
+  for(i in 1:n_reps){
+    fishObsCatchB[[i]] &lt;- atlantisom::sample_fishery_totcatch(omlist_ss$truecatchbio_ss, fish_cv)
+  }
+
+  if(save){
+    saveRDS(fishObsCatchB, file.path(d.name, paste0(scenario.name, &quot;fishCatch.rds&quot;)))
+  }
+ 
+  indices &lt;- list(&quot;survObsBiomB&quot; = survObsBiomB,
+                  &quot;fishObsCatchB&quot; = fishObsCatchB)
+  
+  return(indices)
 }</code></pre>
 <p>Usage:</p>
-<pre class="r"><code>#CC3om_sard_ind &lt;- om_index(c(&quot;survey1&quot;, &quot;fishery&quot;), CC3om_sardine)</code></pre>
+<pre class="r"><code>CC3om_sard_ind &lt;- om_index(usersurvey = here(&quot;config/usersurvey.R&quot;), 
+                           userfishery = here(&quot;config/fisherycensus.R&quot;),
+                           omlist_ss = CC3om_sardine, 
+                           n_reps = 5, 
+                           save = TRUE)</code></pre>
 </div>
 <div id="generate-compositional-data-for-assessment" class="section level4">
 <h4>Generate compositional data for assessment</h4>
