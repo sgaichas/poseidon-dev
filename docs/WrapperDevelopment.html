@@ -524,11 +524,8 @@ summary {
   return(omlist)
 }</code></pre>
 <p>Usage:</p>
-<pre class="r"><code>library(here)</code></pre>
-<pre><code>## here() starts at /Users/sgaichas/Documents/0_Data/Atlantis/Poseidon/poseidon-dev</code></pre>
-<pre class="r"><code>CC3om &lt;- om_init(here(&quot;config/CC3config.r&quot;))</code></pre>
-<pre><code>## Warning in `[&lt;-.data.frame`(`*tmp*`, , 3:12, value = structure(list(`1` =
-## structure(c(469L, : provided 13 variables to replace 10 variables</code></pre>
+<pre class="r"><code>library(here)
+CC3om &lt;- om_init(here(&quot;config/CC3config.r&quot;))</code></pre>
 </div>
 <div id="get-assessment-input-data" class="section level3">
 <h3>Get assessment input data</h3>
@@ -645,7 +642,7 @@ summary {
   }
   
   #configure the fishery, a default is in config/fisherycensus.R
-  #fishery configuration must specify survey time, area, efficiency (q), selectivity
+  #fishery configuration can specify only area and time of observation
   #fishery species inherited from omlist_ss
   source(userfishery, local = TRUE)
   
@@ -676,6 +673,195 @@ summary {
 </div>
 <div id="generate-compositional-data-for-assessment" class="section level4">
 <h4>Generate compositional data for assessment</h4>
+<p>Note that if a census is truly desired for age comps, don’t use the sample fish function but just aggregate. I’ll make a function for that too.</p>
+<p>ToDo: write the atlantisom function sample_ages to subset the age comp here, that way there will be way more lengths than ages, similar to most real world sampling.</p>
+<pre class="r"><code>om_comps &lt;- function(usersurvey = usersurvey_file, 
+                     userfishery = userfishery_file, 
+                     omlist_ss, 
+                     n_reps = n_reps,
+                     save = TRUE){
+  
+  #one script for dimension parameters to be used in multiple functions
+  source(&quot;config/omdimensions.R&quot;, local = TRUE)
+  
+  # user options for survey--default is a census with mid-year sample
+  source(usersurvey, local = TRUE)
+  
+  #numbers based fishery independent survey for age and length comps
+  # same user specifications as indices
+  survey_N &lt;- atlantisom::create_survey(dat = omlist_ss$truenums_ss,
+                                        time = survtime,
+                                        species = survspp,
+                                        boxes = survboxes,
+                                        effic = surveffic,
+                                        selex = survselex)
+  
+  #Sample fish for age composition
+  # if we want replicates for obs error this sample function will generate them
+  age_comp_data &lt;- list()
+  for(i in 1:n_reps){
+    age_comp_data[[i]] &lt;- atlantisom::sample_fish(survey_N, surveffN)
+  }
+  
+  # save age comps
+  if(save){
+    saveRDS(age_comp_data, file.path(d.name, paste0(scenario.name, &quot;survObsAgeComp.rds&quot;)))
+  }
+  
+  #weights needed for weight at age and length comp calcs
+  # aggregate true resn per survey design
+  survey_aggresn &lt;- atlantisom::aggregateDensityData(dat = omlist_ss$trueresn_ss,
+                                                     time = survtime,
+                                                     species = survspp,
+                                                     boxes = survboxes)
+  
+  # aggregate true structn per survey design
+  survey_aggstructn &lt;- atlantisom::aggregateDensityData(dat = omlist_ss$truestructn_ss,
+                                                        time = survtime,
+                                                        species = survspp,
+                                                        boxes = survboxes)
+  
+  #dont sample these, just aggregate them using median
+  structnss &lt;- atlantisom::sample_fish(survey_aggresn, surveffN, sample = FALSE)
+  
+  resnss &lt;- atlantisom::sample_fish(survey_aggstructn, surveffN, sample = FALSE)
+  
+  #this is all input into the length function, replicates follow age comp reps
+  #  separating the length comps from the weight at age here
+  survey_lenwt &lt;- list()
+  survObsLenComp &lt;- list()
+  survObsWtAtAge &lt;- list()
+  
+  for(i in 1:n_reps){
+    survey_lenwt[[i]] &lt;- atlantisom::calc_age2length(structn = structnss,
+                                                     resn = resnss,
+                                                     nums = age_comp_data[[i]],
+                                                     biolprm = omlist_ss$biol, 
+                                                     fgs = omlist_ss$funct.group_ss,
+                                                     maxbin = maxbin,
+                                                     CVlenage = lenage_cv, 
+                                                     remove.zeroes=TRUE)
+    
+    survObsLenComp[[i]] &lt;- survey_lenwt[[i]]$natlength
+    survObsWtAtAge[[i]] &lt;- survey_lenwt[[i]]$muweight
+  }
+  
+  if(save){
+    saveRDS(survObsLenComp, file.path(d.name, paste0(scenario.name, &quot;survObsLenComp.rds&quot;)))
+    saveRDS(survObsWtAtAge, file.path(d.name, paste0(scenario.name, &quot;survObsWtAtAge.rds&quot;)))
+  }
+    
+  #now do fishery comps
+  # user options for fishery--default is a census with mid-year sample
+  source(userfishery, local = TRUE)
+  
+  #fishery catch at age each observed timestep summed over observed polygons
+  # catch at age by area and timestep
+  catch_numbers &lt;-  atlantisom::create_fishery_subset(dat = omlist_ss$truecatchnum_ss,
+                                                      time = fishtime,
+                                                      species = survspp,
+                                                      boxes = fishboxes)
+  
+  # if we want replicates for obs error this sample function will generate them
+  catch_age_comp &lt;- list()
+  for(i in 1:n_reps){
+    catch_age_comp[[i]] &lt;- atlantisom::sample_fish(catch_numbers, fisheffN)
+  }
+  
+  # save fishery age comps
+  if(save){
+    saveRDS(catch_age_comp, file.path(d.name, paste0(scenario.name, &quot;fishObsAgeComp.rds&quot;)))
+  }
+
+  #Get catch weights for length comp calc
+  # aggregate true resn per fishery subset design
+  catch_aggresnss &lt;- atlantisom::aggregateDensityData(dat = omlist_ss$trueresn_ss,
+                                                      time = fishtime,
+                                                      species = survspp,
+                                                      boxes = fishboxes)
+  
+  # aggregate true structn fishery subsetdesign
+  catch_aggstructnss &lt;- atlantisom::aggregateDensityData(dat = omlist_ss$truestructn_ss,
+                                                         time = fishtime,
+                                                         species = survspp,
+                                                         boxes = fishboxes)
+  
+  #dont sample these, just aggregate them using median
+  catch_structnss &lt;- atlantisom::sample_fish(catch_aggstructnss, fisheffN, sample = FALSE)
+  
+  catch_resnss &lt;- atlantisom::sample_fish(catch_aggresnss, fisheffN, sample = FALSE)
+  
+  # these fishery lengths and weight at age are each output timestep
+  #same structure as above for surveys, replicates follow age comp reps
+  #  separating the length comps from the weight at age here
+  fishery_lenwt &lt;- list()
+  fishObsLenComp &lt;- list()
+  fishObsWtAtAge &lt;- list()
+  
+  for(i in 1:n_reps){
+    fishery_lenwt[[i]] &lt;- atlantisom::calc_age2length(structn = catch_structnss,
+                                                      resn = catch_resnss,
+                                                      nums = catch_age_comp[[i]],
+                                                      biolprm = omlist_ss$biol, 
+                                                      fgs = omlist_ss$funct.group_ss,
+                                                      maxbin = maxbin,
+                                                      CVlenage = lenage_cv, 
+                                                      remove.zeroes=TRUE)
+    
+    fishObsLenComp[[i]] &lt;- fishery_lenwt[[i]]$natlength
+    fishObsWtAtAge[[i]] &lt;- fishery_lenwt[[i]]$muweight
+  }
+  
+  if(save){
+    saveRDS(fishObsLenComp, file.path(d.name, paste0(scenario.name, &quot;fishObsLenComp.rds&quot;)))
+    saveRDS(fishObsWtAtAge, file.path(d.name, paste0(scenario.name, &quot;fishObsWtAtAge.rds&quot;)))
+  }
+    
+  
+  comps &lt;- list(&quot;survObsAgeComp&quot; = age_comp_data,
+                &quot;survObsLenComp&quot; = survObsLenComp,
+                &quot;survObsWtAtAge&quot; = survObsWtAtAge,
+                &quot;fishObsAgeComp&quot; = catch_age_comp,
+                &quot;fishObsLenComp&quot; = fishObsLenComp,
+                &quot;fishObsWtAtAge&quot; = fishObsWtAtAge)
+  
+  return(comps)
+}</code></pre>
+<p>Usage:</p>
+<pre class="r"><code>CC3om_sard_comp &lt;- om_comps(usersurvey = here(&quot;config/usersurvey.R&quot;), 
+                           userfishery = here(&quot;config/fisherycensus.R&quot;),
+                           omlist_ss = CC3om_sardine, 
+                           n_reps = 1, 
+                           save = TRUE)</code></pre>
+<p>Test these with updated length-weight parameters for CCA sardines:</p>
+<p>I updated CalCurrentV3_Biol.prm with new sardine length-weight parameters from Isaac</p>
+<blockquote>
+<p>On the basis of the last sardine stock assessment that seems to have estimated growth, <a href="http://www.pcouncil.org/wp-content/uploads/2014_CPS_SAFE_Sardine_assessment_Appendix_C.pdf" class="uri">http://www.pcouncil.org/wp-content/uploads/2014_CPS_SAFE_Sardine_assessment_Appendix_C.pdf</a></p>
+<p>I say length-weight A and B params, for W = A*(L^B)</p>
+<p>should be A= 0.0075242 and B = 3.2332</p>
+<p>where weight is in grams and length is in CM.</p>
+</blockquote>
+<p>and renamed it CalCurrentV3_Biol_sardLWcorrection.prm</p>
+<p>Config files for this extraction should match previous sardine survey and fishery:</p>
+<p>CC3Config_sardLWcorr.R sardinesurvey.R sardinefishery.R</p>
+<pre class="r"><code>library(here)</code></pre>
+<pre><code>## here() starts at /Users/sgaichas/Documents/0_Data/Atlantis/Poseidon/poseidon-dev</code></pre>
+<pre class="r"><code>CC3om &lt;- om_init(here(&quot;config/CC3config_sardLWcorr.R&quot;))</code></pre>
+<pre><code>## Warning in `[&lt;-.data.frame`(`*tmp*`, , 3:12, value = structure(list(`1` =
+## structure(c(469L, : provided 13 variables to replace 10 variables</code></pre>
+<pre class="r"><code>CC3om_sardine &lt;- om_species(c(&quot;Pacific_sardine&quot;), CC3om)
+
+CC3om_sard_ind &lt;- om_index(usersurvey = here(&quot;config/sardinesurvey.R&quot;), 
+                           userfishery = here(&quot;config/sardinefishery.R&quot;),
+                           omlist_ss = CC3om_sardine, 
+                           n_reps = 1, 
+                           save = TRUE)
+
+CC3om_sard_comp &lt;- om_comps(usersurvey = here(&quot;config/sardinesurvey.R&quot;), 
+                           userfishery = here(&quot;config/sardinefishery.R&quot;),
+                           omlist_ss = CC3om_sardine, 
+                           n_reps = 1, 
+                           save = TRUE)</code></pre>
 </div>
 </div>
 </div>

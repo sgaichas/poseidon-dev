@@ -145,7 +145,7 @@ om_init <- function(config = configfile){
 
 Usage: 
 
-```{r exinit}
+```{r exinit, eval=FALSE}
 
 library(here)
 CC3om <- om_init(here("config/CC3config.r"))
@@ -227,7 +227,7 @@ om_species <- function(species = spp, omlist, removefullom = TRUE){
 
 Usage: 
 
-```{r exsp}
+```{r exsp, eval=FALSE}
 
 CC3om_sardine <- om_species(c("Pacific_sardine"), CC3om)
 
@@ -309,7 +309,7 @@ om_index <- function(usersurvey = usersurvey_file,
 
 Usage: 
 
-```{r exindex}
+```{r exindex, eval=FALSE}
 
 CC3om_sard_ind <- om_index(usersurvey = here("config/usersurvey.R"), 
                            userfishery = here("config/fisherycensus.R"),
@@ -322,6 +322,8 @@ CC3om_sard_ind <- om_index(usersurvey = here("config/usersurvey.R"),
 #### Generate compositional data for assessment
 
 Note that if a census is truly desired for age comps, don't use the sample fish function but just aggregate. I'll make a function for that too.
+
+ToDo: write the atlantisom function sample_ages to subset the age comp here, that way there will be way more lengths than ages, similar to most real world sampling.
 
 ```{r omcomps}
 
@@ -481,7 +483,7 @@ om_comps <- function(usersurvey = usersurvey_file,
 ```
 
 Usage:
-```{r compex}
+```{r compex, eval=FALSE}
 
 CC3om_sard_comp <- om_comps(usersurvey = here("config/usersurvey.R"), 
                            userfishery = here("config/fisherycensus.R"),
@@ -491,5 +493,51 @@ CC3om_sard_comp <- om_comps(usersurvey = here("config/usersurvey.R"),
 
 ```
 
+Test these with updated length-weight parameters for CCA sardines:
+
+I updated CalCurrentV3_Biol.prm with new sardine length-weight parameters from Isaac
+
+>On the basis of the last sardine stock assessment that seems to have estimated growth, 
+http://www.pcouncil.org/wp-content/uploads/2014_CPS_SAFE_Sardine_assessment_Appendix_C.pdf 
+>
+>I say length-weight A and B params,  for W = A*(L^B)
+>
+>should be A= 0.0075242
+>and B = 3.2332
+>
+>where weight is in grams
+>and length is in CM. 
+
+and renamed it CalCurrentV3_Biol_sardLWcorrection.prm
+
+Config files for this extraction should match previous sardine survey and fishery:
+
+CC3Config_sardLWcorr.R
+sardinesurvey.R
+sardinefishery.R
+
+```{r full-test}
+
+library(here)
+
+CC3om <- om_init(here("config/CC3config_sardLWcorr.R"))
+
+CC3om_sardine <- om_species(c("Pacific_sardine"), CC3om)
+
+CC3om_sard_ind <- om_index(usersurvey = here("config/sardinesurvey.R"), 
+                           userfishery = here("config/sardinefishery.R"),
+                           omlist_ss = CC3om_sardine, 
+                           n_reps = 1, 
+                           save = TRUE)
+
+CC3om_sard_comp <- om_comps(usersurvey = here("config/sardinesurvey.R"), 
+                           userfishery = here("config/sardinefishery.R"),
+                           omlist_ss = CC3om_sardine, 
+                           n_reps = 1, 
+                           save = TRUE)
+
+
+
+```
 
 
