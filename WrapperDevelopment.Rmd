@@ -540,4 +540,59 @@ CC3om_sard_comp <- om_comps(usersurvey = here("config/sardinesurvey.R"),
 
 ```
 
+### Write input data for specific assessment models
+
+Use the saved outputs of above to write a Stock Synthesis dat file
+
+```{r writedat}
+
+require(r4ss)
+#still needs omlist_ss and all this stuff
+source(here("/config/CC3Config_sardLWcorr.R"))
+source(here("/config/omdimensions.R"))
+source(here("/config/sardinesurvey.R"))
+source(here("/config/sardinefishery.R")) 
+
+#Directory with SS files
+model_dir <- "Sardine_SS_files/"
+
+#Name of SS data file
+datfile_name <- "sardEM_3_3.dat"
+
+#CVs for length at age, catch, and survey
+CVs <- list("lenage"=0.1, "fishery"=0.01, "survey"=0.1)
+
+#Month of survey/fishing
+survey_month <- 7
+fishing_month <- 1
+
+#read time series data
+survObsBiom <- readRDS(file.path(d.name, paste0(scenario.name, "surveyB.rds")))
+truecatchbio_ss <- readRDS(file.path(d.name, paste0(scenario.name, "fishCatch.rds")))
+
+#load dummy dat file
+stocksynthesis.data <- r4ss::SS_readdat_3.30(paste0("./inst/extdata/",
+model_dir,
+datfile_name))
+
+#Test writing CPUE in biomass
+  stocksynthesis.data <- atlantisom::SS_write_ts(ss_data_list = stocksynthesis.data,
+                ts_data = list(survObsBiom$atoutput[fish_years],
+                  truecatchbio_ss$atoutput[truecatchbio_ss$time %in% fish_years]),
+                CVs = c(CVs$survey,
+                        CVs$fishery),
+                data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             fish_years),
+            sampling_month = list(rep(survey_month,nyears),
+                                rep(fishing_month,nyears)),
+                units = c("biomass","biomass"),
+                data_type=c("CPUE","catch"),
+                fleets = c(2,1))
+
+  
+stocksynthesis.data$CPUE
+
+stocksynthesis.data$catch
+
+```
+
 
