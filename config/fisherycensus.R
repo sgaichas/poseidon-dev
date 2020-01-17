@@ -1,5 +1,4 @@
-# Default survey configuration here is a census
-# Need to define survey season, area, efficiency, selectivity
+# Default fishery configuration here is a census
 # Inherits species from input omlist_ss
 fishspp <- omlist_ss$species_ss 
 
@@ -16,7 +15,7 @@ fishboxes <- c(0:(omlist_ss$boxpars$nbox - 1))
 # this effective N is high but not equal to total for numerous groups
 fisheffN <- data.frame(species=survspp, effN=rep(1e+8, length(survspp)))
 
-# survey index cv needed for sample_survey_xxx
+# fishery catch cv can be used in sample_survey_biomass
 # perfect observation
 fish_cv <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
 
