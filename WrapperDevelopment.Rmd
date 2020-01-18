@@ -545,6 +545,10 @@ CC3om_sard_comp <- om_comps(usersurvey = here("config/sardinesurvey.R"),
 Use the saved outputs of above to write a Stock Synthesis dat file
 This is not a function yet, copy in Christine's
 
+**Need to adjust time unit for fishery to years for this to work**
+**Length comp may need this too**
+**this is still breaking**
+
 ```{r writedat}
 
 require(r4ss)
@@ -641,6 +645,10 @@ fish_len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsLe
 
 len_comp_data <- len_comp_data[[1]]
 fish_len_comp_data <- fish_len_comp_data[[1]]
+
+#add this to om_indices function so that this has years when read in
+fish_len_comp_data$time <- as.integer(fish_len_comp_data$time/365)
+
 
 if(fstepperyr>1){
   fish_len_comp_anndata <- fish_len_comp_data %>%
