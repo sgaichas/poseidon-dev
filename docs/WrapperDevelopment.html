@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
 
 <meta charset="utf-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
@@ -331,6 +330,7 @@ summary {
   border: none;
   display: inline-block;
   border-radius: 4px;
+  background-color: transparent;
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li {
@@ -364,7 +364,7 @@ summary {
 
 <h1 class="title toc-ignore">Develop atlantisom wrappers</h1>
 <h4 class="author">Sarah Gaichas and Christine Stawitz</h4>
-<h4 class="date">17 January, 2020</h4>
+<h4 class="date">16 March, 2020</h4>
 
 </div>
 
@@ -439,16 +439,9 @@ summary {
 <div id="atlantisom-initialize-function" class="section level3">
 <h3>atlantisom initialize function</h3>
 <p>Things to add: checks for output timestep?</p>
-<pre class="r"><code>library(tidyverse)</code></pre>
-<pre><code>## ── Attaching packages ──────────────────────────────────────────────────── tidyverse 1.2.1 ──</code></pre>
-<pre><code>## ✔ ggplot2 3.2.1     ✔ purrr   0.3.3
-## ✔ tibble  2.1.3     ✔ dplyr   0.8.3
-## ✔ tidyr   1.0.0     ✔ stringr 1.4.0
-## ✔ readr   1.3.1     ✔ forcats 0.4.0</code></pre>
-<pre><code>## ── Conflicts ─────────────────────────────────────────────────────── tidyverse_conflicts() ──
-## ✖ dplyr::filter() masks stats::filter()
-## ✖ dplyr::lag()    masks stats::lag()</code></pre>
-<pre class="r"><code>om_init &lt;- function(config = configfile){
+<pre class="r"><code>library(tidyverse)
+
+om_init &lt;- function(config = configfile){
   
   # Where are the atlantis output files? Consider filling with shiny app in future
   source(config)
@@ -525,6 +518,8 @@ summary {
 }</code></pre>
 <p>Usage:</p>
 <pre class="r"><code>library(here)
+library(tidyverse)
+library(atlantisom)
 CC3om &lt;- om_init(here(&quot;config/CC3config.r&quot;))</code></pre>
 </div>
 <div id="get-assessment-input-data" class="section level3">
@@ -846,7 +841,18 @@ CC3om &lt;- om_init(here(&quot;config/CC3config.r&quot;))</code></pre>
 <p>CC3Config_sardLWcorr.R sardinesurvey.R sardinefishery.R</p>
 <pre class="r"><code>library(here)</code></pre>
 <pre><code>## here() starts at /Users/sgaichas/Documents/0_Data/Atlantis/Poseidon/poseidon-dev</code></pre>
-<pre class="r"><code>CC3om &lt;- om_init(here(&quot;config/CC3config_sardLWcorr.R&quot;))</code></pre>
+<pre class="r"><code>library(tidyverse)</code></pre>
+<pre><code>## ── Attaching packages ────────────────────────────────────────────────────── tidyverse 1.3.0 ──</code></pre>
+<pre><code>## ✓ ggplot2 3.2.1     ✓ purrr   0.3.3
+## ✓ tibble  2.1.3     ✓ dplyr   0.8.4
+## ✓ tidyr   1.0.2     ✓ stringr 1.4.0
+## ✓ readr   1.3.1     ✓ forcats 0.4.0</code></pre>
+<pre><code>## ── Conflicts ───────────────────────────────────────────────────────── tidyverse_conflicts() ──
+## x dplyr::filter() masks stats::filter()
+## x dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>library(atlantisom)
+
+CC3om &lt;- om_init(here(&quot;config/CC3config_sardLWcorr.R&quot;))</code></pre>
 <pre><code>## Warning in `[&lt;-.data.frame`(`*tmp*`, , 3:12, value = structure(list(`1` =
 ## structure(c(469L, : provided 13 variables to replace 10 variables</code></pre>
 <pre class="r"><code>CC3om_sardine &lt;- om_species(c(&quot;Pacific_sardine&quot;), CC3om)
@@ -863,6 +869,490 @@ CC3om_sard_comp &lt;- om_comps(usersurvey = here(&quot;config/sardinesurvey.R&qu
                            n_reps = 1, 
                            save = TRUE)</code></pre>
 </div>
+</div>
+<div id="write-input-data-for-specific-assessment-models" class="section level3">
+<h3>Write input data for specific assessment models</h3>
+<p>Use the saved outputs of above to write a Stock Synthesis dat file This is not a function yet, copy in Christine’s</p>
+<p><strong>See corrections below, in fishery time fixed and nsamp added to length comps</strong></p>
+<pre class="r"><code>require(r4ss)</code></pre>
+<pre><code>## Loading required package: r4ss</code></pre>
+<pre class="r"><code>omlist_ss&lt;-CC3om_sardine
+source(here(&quot;/config/CC3Config_sardLWcorr.R&quot;))
+source(here(&quot;/config/omdimensions.R&quot;))
+source(here(&quot;/config/sardinesurvey.R&quot;))
+source(here(&quot;/config/sardinefishery.R&quot;)) 
+
+#Directory with SS files
+model_dir &lt;- &quot;Sardine_SS_files/&quot;
+
+#Name of SS data file
+datfile_name &lt;- &quot;sardEM_3_3.dat&quot;
+
+#CVs for length at age, catch, and survey
+CVs &lt;- list(&quot;lenage&quot;=0.1, &quot;fishery&quot;=0.01, &quot;survey&quot;=0.1)
+
+#Month of survey/fishing
+survey_month &lt;- 7
+fishing_month &lt;- 1
+
+#Years to survey, assuming survey is once per year
+#survey_years &lt;- survey_sample_full[(burnin+1):(burnin+nyears)] # my original
+survey_years &lt;- survey_sample_full[burnin:(burnin+nyears-1)] #from Christine&#39;s new sardine_config.R
+
+
+#read time series data
+survObsBiom &lt;- readRDS(file.path(d.name, paste0(scenario.name, &quot;surveyB.rds&quot;)))
+truecatchbio_ss &lt;- readRDS(file.path(d.name, paste0(scenario.name, &quot;fishCatch.rds&quot;)))
+
+survObsBiom &lt;- survObsBiom[[1]]
+truecatchbio_ss &lt;- truecatchbio_ss[[1]]
+
+#add this to om_indices function so that this has years when read in
+truecatchbio_ss$time &lt;- as.integer(truecatchbio_ss$time/365)
+
+
+#load dummy dat file
+stocksynthesis.data &lt;- r4ss::SS_readdat_3.30(paste0(&quot;./inst/extdata/&quot;,
+model_dir,
+datfile_name))</code></pre>
+<pre><code>## Running SS_readdat_3.30</code></pre>
+<pre><code>## SS_readdat_3.30 - read version = 3.30</code></pre>
+<pre><code>## use_meanbodywt (0/1): 0</code></pre>
+<pre><code>## N_lbinspop:</code></pre>
+<pre><code>## use_lencomp (0/1): 1</code></pre>
+<pre><code>## N_lbins: 24</code></pre>
+<pre><code>## N_agebins: 10</code></pre>
+<pre><code>## use_MeanSize_at_Age_obs (0/1): 0</code></pre>
+<pre><code>## N_environ_variables: 0</code></pre>
+<pre><code>## Read of data file complete. Final value = 999</code></pre>
+<pre class="r"><code>#Test writing CPUE in biomass
+  stocksynthesis.data &lt;- atlantisom::SS_write_ts(ss_data_list = stocksynthesis.data,
+                ts_data = list(survObsBiom$atoutput[fish_years],
+                  truecatchbio_ss$atoutput[truecatchbio_ss$time %in% fish_years]),
+                CVs = c(CVs$survey,
+                        CVs$fishery),
+                data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             fish_years),
+            sampling_month = list(rep(survey_month,nyears),
+                                rep(fishing_month,nyears)),
+                units = c(&quot;biomass&quot;,&quot;biomass&quot;),
+                data_type=c(&quot;CPUE&quot;,&quot;catch&quot;),
+                fleets = c(2,1))
+
+#test  
+stocksynthesis.data$CPUE</code></pre>
+<pre><code>##    year seas index     obs se_log
+## 1    30    7     2 1473233    0.1
+## 2    31    7     2 1225742    0.1
+## 3    32    7     2 1416616    0.1
+## 4    33    7     2  768337    0.1
+## 5    34    7     2  434655    0.1
+## 6    35    7     2  383408    0.1
+## 7    36    7     2  191031    0.1
+## 8    37    7     2  132599    0.1
+## 9    38    7     2  119390    0.1
+## 10   39    7     2  106199    0.1
+## 11   40    7     2  152458    0.1
+## 12   41    7     2  193054    0.1
+## 13   42    7     2  251721    0.1
+## 14   43    7     2  293432    0.1
+## 15   44    7     2  331404    0.1
+## 16   45    7     2  442443    0.1
+## 17   46    7     2  383806    0.1
+## 18   47    7     2  494316    0.1
+## 19   48    7     2  435655    0.1
+## 20   49    7     2  425854    0.1
+## 21   50    7     2  448885    0.1
+## 22   51    7     2  291746    0.1
+## 23   52    7     2  328018    0.1
+## 24   53    7     2  229350    0.1
+## 25   54    7     2  215188    0.1
+## 26   55    7     2  318676    0.1
+## 27   56    7     2  374595    0.1
+## 28   57    7     2  531952    0.1
+## 29   58    7     2  756311    0.1
+## 30   59    7     2 1066868    0.1
+## 31   60    7     2 1281785    0.1
+## 32   61    7     2 1309161    0.1
+## 33   62    7     2 1485767    0.1
+## 34   63    7     2 1467737    0.1
+## 35   64    7     2 1913783    0.1
+## 36   65    7     2 1192730    0.1
+## 37   66    7     2 1057531    0.1
+## 38   67    7     2 1025210    0.1
+## 39   68    7     2 1185421    0.1
+## 40   69    7     2 1172572    0.1
+## 41   70    7     2 1075856    0.1
+## 42   71    7     2 1085515    0.1
+## 43   72    7     2 1005556    0.1
+## 44   73    7     2 1095885    0.1
+## 45   74    7     2 1164954    0.1
+## 46   75    7     2 1408502    0.1
+## 47   76    7     2 1376419    0.1
+## 48   77    7     2  983279    0.1
+## 49   78    7     2  848801    0.1
+## 50   79    7     2 1072650    0.1</code></pre>
+<pre class="r"><code>stocksynthesis.data$catch</code></pre>
+<pre><code>##    year seas fleet   catch catch_se
+## 1    30    1     1       0     0.01
+## 2    31    1     1 1015587     0.01
+## 3    32    1     1  748161     0.01
+## 4    33    1     1  421524     0.01
+## 5    34    1     1  291419     0.01
+## 6    35    1     1  158473     0.01
+## 7    36    1     1  115746     0.01
+## 8    37    1     1  101901     0.01
+## 9    38    1     1   88133     0.01
+## 10   39    1     1   74266     0.01
+## 11   40    1     1   83104     0.01
+## 12   41    1     1  143047     0.01
+## 13   42    1     1  157900     0.01
+## 14   43    1     1  184691     0.01
+## 15   44    1     1  299570     0.01
+## 16   45    1     1  316369     0.01
+## 17   46    1     1  304011     0.01
+## 18   47    1     1  324433     0.01
+## 19   48    1     1  320565     0.01
+## 20   49    1     1  278869     0.01
+## 21   50    1     1  252838     0.01
+## 22   51    1     1  244582     0.01
+## 23   52    1     1  191974     0.01
+## 24   53    1     1  177460     0.01
+## 25   54    1     1  166370     0.01
+## 26   55    1     1  177474     0.01
+## 27   56    1     1  106602     0.01
+## 28   57    1     1  157125     0.01
+## 29   58    1     1  208875     0.01
+## 30   59    1     1  249818     0.01
+## 31   60    1     1  287051     0.01
+## 32   61    1     1  332627     0.01
+## 33   62    1     1  344913     0.01
+## 34   63    1     1  371024     0.01
+## 35   64    1     1  278117     0.01
+## 36   65    1     1  267113     0.01
+## 37   66    1     1  241639     0.01
+## 38   67    1     1  237016     0.01
+## 39   68    1     1  289428     0.01
+## 40   69    1     1  269131     0.01
+## 41   70    1     1  273419     0.01
+## 42   71    1     1  271369     0.01
+## 43   72    1     1  259563     0.01
+## 44   73    1     1  246420     0.01
+## 45   74    1     1  289859     0.01
+## 46   75    1     1  309607     0.01
+## 47   76    1     1  225118     0.01
+## 48   77    1     1  199851     0.01
+## 49   78    1     1  225234     0.01
+## 50   79    1     1  259820     0.01</code></pre>
+<pre class="r"><code>#read in comp data
+age_comp_data &lt;- readRDS(file.path(d.name, paste0(scenario.name, &quot;survObsAgeComp.rds&quot;)))
+age_comp_data &lt;- age_comp_data[[1]]
+
+fish_age_comp &lt;- readRDS(file.path(d.name, paste0(scenario.name, &quot;fishObsAgeComp.rds&quot;)))
+fish_age_comp &lt;- fish_age_comp[[1]]
+
+
+#Get the age bins
+age_bin_names &lt;- names(stocksynthesis.data$agecomp)[10:length(names(stocksynthesis.data$agecomp))]
+age_bins &lt;- sub(&quot;a&quot;,&quot;&quot;,age_bin_names)
+
+require(maditr)</code></pre>
+<pre><code>## Loading required package: maditr</code></pre>
+<pre><code>## 
+## To aggregate all non-grouping columns: take(mtcars, fun = mean, by = am)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;maditr&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:dplyr&#39;:
+## 
+##     between, coalesce, first, last</code></pre>
+<pre><code>## The following object is masked from &#39;package:purrr&#39;:
+## 
+##     transpose</code></pre>
+<pre class="r"><code># add dependency on maditr::dcast to atlantisom
+age_comp_flat &lt;- atlantisom::reformat_compositions(age_comp_data,
+                     round.places = 4,
+                     comp_type = &quot;agecomp&quot;)
+
+## Write age composition data for survey
+stocksynthesis.data &lt;- atlantisom::SS_write_comps(ss_data_list = stocksynthesis.data,
+               comp_matrix = list(age_comp_flat[burnin:(burnin+nyears-1),]),
+               data_rows = list(stocksynthesis.data$styr:(stocksynthesis.data$styr+nyears-1)),
+               sampling_month = list(rep(survey_month,nyears)),
+               data_type = c(&quot;agecomp&quot;),
+               fleet_number = c(1),
+               bins = list(age_bins),
+               caal_bool = c(FALSE))
+stocksynthesis.data$agecomp</code></pre>
+<pre><code>##    Yr Seas FltSvy Gender Part Ageerr Lbin_lo Lbin_hi Nsamp    a1    a2    a3
+## 1  30    7      1      0    0      1      -1      -1  1000 0.100 0.012 0.051
+## 2  31    7      1      0    0      1      -1      -1  1000 0.076 0.084 0.009
+## 3  32    7      1      0    0      1      -1      -1  1000 0.066 0.099 0.086
+## 4  33    7      1      0    0      1      -1      -1  1000 0.228 0.061 0.074
+## 5  34    7      1      0    0      1      -1      -1  1000 0.027 0.320 0.050
+## 6  35    7      1      0    0      1      -1      -1  1000 0.126 0.022 0.309
+## 7  36    7      1      0    0      1      -1      -1  1000 0.353 0.108 0.024
+## 8  37    7      1      0    0      1      -1      -1  1000 0.043 0.384 0.110
+## 9  38    7      1      0    0      1      -1      -1  1000 0.012 0.067 0.388
+## 10 39    7      1      0    0      1      -1      -1  1000 0.552 0.007 0.033
+## 11 40    7      1      0    0      1      -1      -1  1000 0.733 0.174 0.004
+## 12 41    7      1      0    0      1      -1      -1  1000 0.145 0.689 0.098
+## 13 42    7      1      0    0      1      -1      -1  1000 0.137 0.167 0.580
+## 14 43    7      1      0    0      1      -1      -1  1000 0.718 0.053 0.049
+## 15 44    7      1      0    0      1      -1      -1  1000 0.037 0.755 0.033
+## 16 45    7      1      0    0      1      -1      -1  1000 0.014 0.050 0.737
+## 17 46    7      1      0    0      1      -1      -1  1000 0.430 0.008 0.026
+## 18 47    7      1      0    0      1      -1      -1  1000 0.223 0.398 0.008
+## 19 48    7      1      0    0      1      -1      -1  1000 0.167 0.205 0.292
+## 20 49    7      1      0    0      1      -1      -1  1000 0.096 0.184 0.182
+## 21 50    7      1      0    0      1      -1      -1  1000 0.401 0.068 0.113
+## 22 51    7      1      0    0      1      -1      -1  1000 0.174 0.341 0.055
+## 23 52    7      1      0    0      1      -1      -1  1000 0.166 0.191 0.255
+## 24 53    7      1      0    0      1      -1      -1  1000 0.216 0.142 0.169
+## 25 54    7      1      0    0      1      -1      -1  1000 0.340 0.158 0.085
+## 26 55    7      1      0    0      1      -1      -1  1000 0.724 0.112 0.044
+## 27 56    7      1      0    0      1      -1      -1  1000 0.103 0.707 0.074
+## 28 57    7      1      0    0      1      -1      -1  1000 0.247 0.096 0.527
+## 29 58    7      1      0    0      1      -1      -1  1000 0.085 0.242 0.078
+## 30 59    7      1      0    0      1      -1      -1  1000 0.068 0.100 0.227
+## 31 60    7      1      0    0      1      -1      -1  1000 0.293 0.062 0.062
+## 32 61    7      1      0    0      1      -1      -1  1000 0.062 0.284 0.049
+## 33 62    7      1      0    0      1      -1      -1  1000 0.178 0.064 0.236
+## 34 63    7      1      0    0      1      -1      -1  1000 0.121 0.145 0.052
+## 35 64    7      1      0    0      1      -1      -1  1000 0.170 0.112 0.121
+## 36 65    7      1      0    0      1      -1      -1  1000 0.064 0.195 0.121
+## 37 66    7      1      0    0      1      -1      -1  1000 0.060 0.060 0.209
+## 38 67    7      1      0    0      1      -1      -1  1000 0.473 0.044 0.037
+## 39 68    7      1      0    0      1      -1      -1  1000 0.112 0.483 0.032
+## 40 69    7      1      0    0      1      -1      -1  1000 0.013 0.128 0.500
+## 41 70    7      1      0    0      1      -1      -1  1000 0.034 0.028 0.123
+## 42 71    7      1      0    0      1      -1      -1  1000 0.023 0.054 0.017
+## 43 72    7      1      0    0      1      -1      -1  1000 0.103 0.019 0.041
+## 44 73    7      1      0    0      1      -1      -1  1000 0.561 0.063 0.010
+## 45 74    7      1      0    0      1      -1      -1  1000 0.029 0.580 0.055
+## 46 75    7      1      0    0      1      -1      -1  1000 0.015 0.030 0.567
+## 47 76    7      1      0    0      1      -1      -1  1000 0.029 0.014 0.037
+## 48 77    7      1      0    0      1      -1      -1  1000 0.266 0.032 0.013
+## 49 78    7      1      0    0      1      -1      -1  1000 0.114 0.256 0.032
+## 50 79    7      1      0    0      1      -1      -1  1000 0.383 0.092 0.140
+##       a4    a5    a6    a7    a8    a9   a10
+## 1  0.063 0.265 0.101 0.262 0.103 0.026 0.017
+## 2  0.058 0.032 0.243 0.102 0.272 0.099 0.025
+## 3  0.010 0.052 0.059 0.210 0.090 0.251 0.077
+## 4  0.068 0.007 0.046 0.036 0.198 0.084 0.198
+## 5  0.092 0.075 0.016 0.049 0.037 0.237 0.097
+## 6  0.059 0.109 0.086 0.017 0.045 0.040 0.187
+## 7  0.256 0.058 0.058 0.057 0.013 0.044 0.029
+## 8  0.018 0.218 0.057 0.067 0.060 0.009 0.034
+## 9  0.101 0.016 0.242 0.050 0.055 0.063 0.006
+## 10 0.165 0.037 0.012 0.107 0.025 0.041 0.021
+## 11 0.005 0.039 0.013 0.003 0.020 0.005 0.004
+## 12 0.002 0.006 0.034 0.011 0.000 0.010 0.005
+## 13 0.071 0.003 0.005 0.018 0.009 0.001 0.009
+## 14 0.155 0.019 0.000 0.000 0.003 0.003 0.000
+## 15 0.036 0.115 0.013 0.001 0.000 0.006 0.004
+## 16 0.031 0.026 0.116 0.020 0.001 0.001 0.004
+## 17 0.417 0.025 0.030 0.051 0.012 0.000 0.001
+## 18 0.024 0.277 0.016 0.013 0.035 0.006 0.000
+## 19 0.004 0.021 0.242 0.013 0.009 0.041 0.006
+## 20 0.254 0.009 0.018 0.202 0.007 0.009 0.039
+## 21 0.112 0.170 0.004 0.005 0.112 0.008 0.007
+## 22 0.080 0.096 0.133 0.004 0.006 0.107 0.004
+## 23 0.042 0.067 0.078 0.125 0.002 0.008 0.066
+## 24 0.218 0.040 0.054 0.057 0.094 0.004 0.006
+## 25 0.107 0.143 0.026 0.045 0.035 0.059 0.002
+## 26 0.024 0.029 0.039 0.007 0.005 0.005 0.011
+## 27 0.031 0.015 0.022 0.026 0.004 0.007 0.011
+## 28 0.056 0.021 0.012 0.017 0.020 0.002 0.002
+## 29 0.488 0.053 0.020 0.008 0.006 0.016 0.004
+## 30 0.088 0.407 0.056 0.016 0.008 0.012 0.018
+## 31 0.172 0.054 0.300 0.036 0.009 0.008 0.004
+## 32 0.054 0.160 0.056 0.282 0.031 0.015 0.007
+## 33 0.040 0.047 0.112 0.036 0.254 0.029 0.004
+## 34 0.183 0.036 0.046 0.122 0.038 0.226 0.031
+## 35 0.044 0.190 0.033 0.040 0.090 0.029 0.171
+## 36 0.155 0.048 0.184 0.045 0.042 0.106 0.040
+## 37 0.133 0.164 0.043 0.164 0.035 0.037 0.095
+## 38 0.111 0.070 0.082 0.031 0.113 0.021 0.018
+## 39 0.030 0.087 0.075 0.063 0.027 0.081 0.010
+## 40 0.021 0.026 0.079 0.068 0.049 0.029 0.087
+## 41 0.502 0.036 0.025 0.099 0.062 0.073 0.018
+## 42 0.125 0.518 0.035 0.042 0.085 0.054 0.047
+## 43 0.014 0.172 0.446 0.027 0.019 0.096 0.063
+## 44 0.017 0.005 0.060 0.221 0.012 0.009 0.042
+## 45 0.011 0.027 0.011 0.044 0.227 0.009 0.007
+## 46 0.044 0.008 0.026 0.010 0.066 0.217 0.017
+## 47 0.551 0.061 0.016 0.024 0.017 0.062 0.189
+## 48 0.031 0.520 0.050 0.013 0.013 0.009 0.053
+## 49 0.008 0.034 0.485 0.043 0.007 0.015 0.006
+## 50 0.025 0.007 0.025 0.300 0.023 0.002 0.003</code></pre>
+<pre class="r"><code>#length comps
+len_comp_data &lt;- readRDS(file.path(d.name, paste0(scenario.name, &quot;survObsLenComp.rds&quot;)))
+fish_len_comp_data &lt;- readRDS(file.path(d.name, paste0(scenario.name, &quot;fishObsLenComp.rds&quot;)))
+
+len_comp_data &lt;- len_comp_data[[1]]
+fish_len_comp_data &lt;- fish_len_comp_data[[1]]
+
+#add this to om_indices function so that this has years when read in
+fish_len_comp_data$time &lt;- as.integer(floor(fish_len_comp_data$time/fstepperyr))
+fish_age_comp$time &lt;- as.integer(floor(fish_age_comp$time/fstepperyr))
+
+
+if(fstepperyr&gt;1){
+  fish_len_comp_anndata &lt;- fish_len_comp_data %&gt;%
+    #mutate(yr = floor(time/fstepperyr)) %&gt;%
+    #group_by(species, agecl, lower.bins, upper.bins, time=as.integer(yr)) %&gt;%
+    group_by(species, agecl, lower.bins, upper.bins, time) %&gt;% 
+    summarise(annnatlength=sum(atoutput)) %&gt;%
+    rename(atoutput = annnatlength)
+} else {
+  fish_len_comp_anndata &lt;- fish_len_comp_data
+}
+
+caal_comp_flat &lt;- atlantisom::reformat_compositions(len_comp_data,                                round.places=4,
+                comp_type=&quot;caalcomp&quot;)
+
+
+#remove burnin
+caal_comp_final &lt;- filter(caal_comp_flat,
+                         time %in% survey_years)
+
+
+#Add over age classes to get sample size
+len_comp_flat &lt;- atlantisom::reformat_compositions(len_comp_data,
+                                  round.places = 0,
+                           comp_type=&quot;lencomp&quot;)
+#remove burnin
+len_comp_final &lt;- filter(len_comp_flat,
+                         time %in% survey_years)
+
+length_bins &lt;- as.integer(names(len_comp_final))</code></pre>
+<pre><code>## Warning: NAs introduced by coercion</code></pre>
+<pre class="r"><code>length_bins &lt;- length_bins[!is.na(length_bins)]
+
+# fishery length comps are still 5 timesteps per year
+# need to aggregate to annual (done above)
+# also,  make effN annual goal/fstepsperyr (done above)
+fish_len_comp_flat &lt;- atlantisom::reformat_compositions(fish_len_comp_anndata,
+                                  round.places = 0,
+                           comp_type=&quot;lencomp&quot;)
+
+#remove burnin works after adjustment above
+fish_len_comp_final &lt;- filter(fish_len_comp_flat,
+                         time %in% fish_years)
+
+notbins &lt;- c(&quot;time&quot;, &quot;nsamp&quot;)
+
+# fish_length_bins &lt;- as.integer(names(fish_len_comp_final))
+# fish_length_bins &lt;- fish_length_bins[!is.na(fish_length_bins)]
+
+# need to fill empty length bins with 0s to have same bins as survey for SS_write_comps
+missing.lengths &lt;- setdiff(length_bins, names(fish_len_comp_final)[!names(fish_len_comp_final) %in% notbins])
+fish_len_comp_final[as.character(missing.lengths)] &lt;- 0                    # Add them, filled with &#39;0&#39;s
+fish_len_comp_final &lt;- fish_len_comp_final[c(&quot;time&quot;, length_bins, &quot;nsamp&quot;)] #
+
+
+# fishery age comps also 5 timesteps per year
+if(fstepperyr&gt;1){
+  fish_age_comp_anndata &lt;- fish_age_comp %&gt;%
+    #mutate(yr = floor(time/fstepperyr)) %&gt;%
+    #group_by(species, agecl, time=as.integer(yr)) %&gt;%
+    group_by(species, agecl, time) %&gt;%
+    summarise(annnatage=sum(atoutput)) %&gt;%
+    rename(atoutput = annnatage)
+} else {
+  fish_age_comp_anndata &lt;- fish_age_comp
+}
+
+fish_age_comp_flat &lt;- atlantisom::reformat_compositions(fish_age_comp_anndata,
+                           comp_type=&quot;agecomp&quot;)
+
+#remove burnin (not necessary?fish comps made with fish_years only) 
+fish_age_comp_final &lt;- filter(fish_age_comp_flat,
+                         time %in% fish_years)
+
+# #SS_write_comps breaking because fishery age bins start with 2 not 1; extracting bins from fish file may help?
+# fish_age_bins &lt;- names(fish_age_comp_flat)[!names(fish_age_comp_flat) %in% notbins]
+
+# that leaves an empty column in data file, so instead fill with 0s
+missing.ages &lt;- setdiff(age_bins, names(fish_age_comp_final)[!names(fish_age_comp_final) %in% notbins])
+fish_age_comp_final[missing.ages] &lt;- 0                    # Add them, filled with &#39;0&#39;s
+fish_age_comp_final &lt;- fish_age_comp_final[c(&quot;time&quot;, age_bins, &quot;nsamp&quot;)]
+
+comp_list &lt;- list(caal_comp_final,len_comp_final, fish_age_comp_final, fish_len_comp_final)
+
+apply_month &lt;- list(rep(survey_month, nrow(comp_list[[1]])), 
+                    rep(survey_month, nrow(comp_list[[2]])),
+                    rep(fishing_month,nrow(comp_list[[3]])),
+                    rep(fishing_month,nrow(comp_list[[4]])))
+
+
+# This now runs by ensuring that survey and fishery compositions have the same bins 
+# (filled with 0s for missing bins in fishery relative to survey)
+
+# Write CAAL and length composition data
+stocksynthesis.data &lt;- atlantisom::SS_write_comps(ss_data_list = stocksynthesis.data, 
+                                      comp_matrix = comp_list, 
+                                      data_rows = list((comp_list[[1]]$time-survey_sample_time)/timestep + 1 , (survey_years-survey_sample_time)/timestep + 1,fish_years,fish_years),
+                                      sampling_month = apply_month, 
+                                      data_type = rep(c(&quot;agecomp&quot;, &quot;lencomp&quot;),2), 
+                                      fleet_number = c(2,2,1,1),  
+                                      bins = list(age_bins, 
+                                                  length_bins, 
+                                                  age_bins, 
+                                                  length_bins), 
+                                      caal_bool = c(TRUE, rep(FALSE,3)))
+
+head(stocksynthesis.data$lencomp)</code></pre>
+<pre><code>##   Yr Seas FltSvy Gender Part Nsamp l5 l6 l7 l8 l9 l10 l11 l12 l13 l14 l15 l16
+## 1 30    7      2      0    0   993  0 11 44 36 12  10  19  35  62  95 129 145
+## 2 31    7      2      0    0   998  0  8 33 32 29  33  22  19  28  50  85 124
+## 3 32    7      2      0    0   996  0  6 28 30 32  43  43  37  31  35  56  88
+## 4 33    7      2      0    0   997  0 20 93 90 39  30  32  36  37  34  38  55
+## 5 34    7      2      0    0   996  0  2 12 23 68 118  97  58  45  48  49  55
+## 6 35    7      2      0    0   997  0 10 50 50 20  26  64 102 103  80  69  66
+##   l17 l18 l19 l20 l21 l22 l23 l24 l25 l26 l27
+## 1 136 109  73  43  21   9   4   0   0   0   0
+## 2 145 139 109  72  40  19   8   3   0   0   0
+## 3 120 132 120  89  56  29  14   5   2   0   0
+## 4  80 101 104  86  60  35  17   7   2   1   0
+## 5  68  81  85  75  52  33  16   7   3   1   0
+## 6  67  69  67  57  44  27  15   7   3   1   0</code></pre>
+<pre class="r"><code>head(stocksynthesis.data$agecomp)</code></pre>
+<pre><code>##   Yr Seas FltSvy Gender Part Ageerr Lbin_lo Lbin_hi Nsamp     a1    a2     a3
+## 1 30    7      2      0    0      1       6       7    11 0.0111 0.000 0.0000
+## 2 30    7      2      0    0      1       7       8    44 0.0443 0.000 0.0000
+## 3 30    7      2      0    0      1       8       9    36 0.0352 0.001 0.0000
+## 4 30    7      2      0    0      1       9      10    12 0.0081 0.003 0.0010
+## 5 30    7      2      0    0      1      10      11    10 0.0010 0.004 0.0050
+## 6 30    7      2      0    0      1      11      12    19 0.0000 0.002 0.0131
+##      a4    a5 a6 a7 a8 a9 a10
+## 1 0.000 0.000  0  0  0  0   0
+## 2 0.000 0.000  0  0  0  0   0
+## 3 0.000 0.000  0  0  0  0   0
+## 4 0.000 0.000  0  0  0  0   0
+## 5 0.000 0.000  0  0  0  0   0
+## 6 0.003 0.001  0  0  0  0   0</code></pre>
+<pre class="r"><code>#Change length bin structure to match atlantis data
+stocksynthesis.data$lbin_vector &lt;- length_bins
+
+#Get correct number of length bins
+stocksynthesis.data$N_lbins &lt;- length(length_bins)
+
+#Set lbin_method to 1 - this makes the population length bins match the data bins 
+#When lbin_method==1, we just comment out the binwidth, minimum, and maximum size arguments since they aren&#39;t used
+stocksynthesis.data$lbin_method &lt;- 1
+stocksynthesis.data$binwidth &lt;- &quot;#&quot;
+stocksynthesis.data$minimum_size &lt;- &quot;#&quot;
+stocksynthesis.data$maximum_size &lt;- &quot;#&quot;
+
+#Change minimum sample size to 0.001 for CAAL data (SS won&#39;t let it go lower than this)
+stocksynthesis.data$age_info$minsamplesize &lt;- rep(0.001,2)
+
+SS_writedat_3.30(stocksynthesis.data, outfile = paste0(&quot;./inst/extdata/&quot;,model_dir,
+datfile_name),
+                 overwrite=TRUE)</code></pre>
+<pre><code>## running SS_writedat_3.30</code></pre>
+<pre><code>## opening connection to ./inst/extdata/Sardine_SS_files/sardEM_3_3.dat</code></pre>
+<pre><code>## file written to ./inst/extdata/Sardine_SS_files/sardEM_3_3.dat</code></pre>
 </div>
 </div>
 

@@ -60,7 +60,7 @@ Basic desired functionality:
 
 Things to add: checks for output timestep?
 
-```{r ominit}
+```{r ominit, eval=FALSE}
 
 library(tidyverse)
 
@@ -148,6 +148,8 @@ Usage:
 ```{r exinit, eval=FALSE}
 
 library(here)
+library(tidyverse)
+library(atlantisom)
 CC3om <- om_init(here("config/CC3config.r"))
 
 ```
@@ -160,7 +162,7 @@ Split to single species or subset of assessed species, get index data, get compo
 
 Is this where we should reconcile timesteps? depends what functions are expecting.
 
-```{r inputs}
+```{r inputs, eval=FALSE}
 
 om_species <- function(species = spp, omlist, removefullom = TRUE){
   # spp format c("speciesname1", "speciesname2")
@@ -237,7 +239,7 @@ CC3om_sardine <- om_species(c("Pacific_sardine"), CC3om)
 
 The hardcoded script omdimensions.R needs to sit in the atlantisom config folder.
 
-```{r omindices}
+```{r omindices, eval=FALSE}
 
 om_index <- function(usersurvey = usersurvey_file, 
                      userfishery = userfishery_file, 
@@ -325,7 +327,7 @@ Note that if a census is truly desired for age comps, don't use the sample fish 
 
 ToDo: write the atlantisom function sample_ages to subset the age comp here, that way there will be way more lengths than ages, similar to most real world sampling.
 
-```{r omcomps}
+```{r omcomps, eval=FALSE}
 
 om_comps <- function(usersurvey = usersurvey_file, 
                      userfishery = userfishery_file, 
@@ -519,6 +521,8 @@ sardinefishery.R
 ```{r full-test}
 
 library(here)
+library(tidyverse)
+library(atlantisom)
 
 CC3om <- om_init(here("config/CC3config_sardLWcorr.R"))
 
@@ -545,9 +549,7 @@ CC3om_sard_comp <- om_comps(usersurvey = here("config/sardinesurvey.R"),
 Use the saved outputs of above to write a Stock Synthesis dat file
 This is not a function yet, copy in Christine's
 
-**Need to adjust time unit for fishery to years for this to work**
-**Length comp may need this too**
-**this is still breaking**
+**See corrections below, in fishery time fixed and nsamp added to length comps**
 
 ```{r writedat}
 
@@ -647,13 +649,15 @@ len_comp_data <- len_comp_data[[1]]
 fish_len_comp_data <- fish_len_comp_data[[1]]
 
 #add this to om_indices function so that this has years when read in
-fish_len_comp_data$time <- as.integer(fish_len_comp_data$time/365)
+fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time/fstepperyr))
+fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
 
 
 if(fstepperyr>1){
   fish_len_comp_anndata <- fish_len_comp_data %>%
-    mutate(yr = floor(time/fstepperyr)) %>%
-    group_by(species, agecl, lower.bins, upper.bins, time=as.integer(yr)) %>%
+    #mutate(yr = floor(time/fstepperyr)) %>%
+    #group_by(species, agecl, lower.bins, upper.bins, time=as.integer(yr)) %>%
+    group_by(species, agecl, lower.bins, upper.bins, time) %>% 
     summarise(annnatlength=sum(atoutput)) %>%
     rename(atoutput = annnatlength)
 } else {
@@ -699,14 +703,15 @@ notbins <- c("time", "nsamp")
 # need to fill empty length bins with 0s to have same bins as survey for SS_write_comps
 missing.lengths <- setdiff(length_bins, names(fish_len_comp_final)[!names(fish_len_comp_final) %in% notbins])
 fish_len_comp_final[as.character(missing.lengths)] <- 0                    # Add them, filled with '0's
-fish_len_comp_final <- fish_len_comp_final[c("time", length_bins, "nsamp")]
+fish_len_comp_final <- fish_len_comp_final[c("time", length_bins, "nsamp")] #
 
 
 # fishery age comps also 5 timesteps per year
 if(fstepperyr>1){
   fish_age_comp_anndata <- fish_age_comp %>%
-    mutate(yr = floor(time/fstepperyr)) %>%
-    group_by(species, agecl, time=as.integer(yr)) %>%
+    #mutate(yr = floor(time/fstepperyr)) %>%
+    #group_by(species, agecl, time=as.integer(yr)) %>%
+    group_by(species, agecl, time) %>%
     summarise(annnatage=sum(atoutput)) %>%
     rename(atoutput = annnatage)
 } else {
