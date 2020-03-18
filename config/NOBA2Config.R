@@ -1,0 +1,10 @@
+d.name <- here("atlantisoutput","NOBA_march_2020")
+functional.groups.file <- "nordic_groups_v04.csv"
+biomass.pools.file <- "nordic_biol_v23.nc"
+biol.prm.file <- "nordic_biol_incl_harv_v_007_3.prm"
+box.file <- "Nordic02.bgm"
+initial.conditions.file <- "nordic_biol_v23.nc"
+run.prm.file <- "nordic_run_v01.xml"
+scenario.name <- "nordic_runresults_01"
+bioind.file <- "outputnordic_runresults_01BiomIndx.txt"
+catch.file <- "outputnordic_runresults_01Catch.txt"
