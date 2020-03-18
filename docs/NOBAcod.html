@@ -374,7 +374,7 @@ summary {
 <p>Let’s use the wrapper functions to get initial stock assessment model inputs.</p>
 <p>Then we need to adjust the base atlantisom functions for true age classes, and develop options to call those within the wrappers.</p>
 <p>We need config files for the NOBA model, our surveys and fisheries. Surveys and fisheries are based on the ones we used for sardine in the California Current as a test.</p>
-<p><em>Special note: Atlantis output files usually have the prefix “output” and <code>atlantisom</code> expects this. NOBA output files use a different naming convention. I’ve appended “output” to the beginning of each NOBA output filename for <code>atlantisom</code> to work.</em></p>
+<p><strong>Special note:</strong> <em>Atlantis output files usually have the prefix “output” and <code>atlantisom</code> expects this. NOBA output files use a different naming convention. I’ve appended “output” to the beginning of each NOBA output filename for <code>atlantisom</code> to work.</em></p>
 <p><code>NOBA2config.R</code> looks like this (adjusted from Alfonso’s original):</p>
 <pre><code>d.name &lt;- here(&quot;atlantisoutput&quot;,&quot;NOBA_march_2020&quot;)
 functional.groups.file &lt;- &quot;nordic_groups_v04.csv&quot;

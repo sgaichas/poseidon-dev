@@ -17,7 +17,7 @@ Then we need to adjust the base atlantisom functions for true age classes, and d
 
 We need config files for the NOBA model, our surveys and fisheries. Surveys and fisheries are based on the ones we used for sardine in the California Current as a test. 
 
-*Special note: Atlantis output files usually have the prefix "output" and `atlantisom` expects this. NOBA output files use a different naming convention. I've appended "output" to the beginning of each NOBA output filename for `atlantisom` to work.*
+**Special note:** *Atlantis output files usually have the prefix "output" and `atlantisom` expects this. NOBA output files use a different naming convention. I've appended "output" to the beginning of each NOBA output filename for `atlantisom` to work.*
 
 `NOBA2config.R` looks like this (adjusted from Alfonso's original):
 
