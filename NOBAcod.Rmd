@@ -17,7 +17,11 @@ Then we need to adjust the base atlantisom functions for true age classes, and d
 
 We need config files for the NOBA model, our surveys and fisheries. Surveys and fisheries are based on the ones we used for sardine in the California Current as a test. 
 
-**Special note:** *Atlantis output files usually have the prefix "output" and `atlantisom` expects this. NOBA output files use a different naming convention. I've appended "output" to the beginning of each NOBA output filename for `atlantisom` to work.*
+**Special note:** *Atlantis output files usually have the prefix "output" and `atlantisom` expects this. NOBA output files use a different naming convention. I've appended "output" to the beginning of each NOBA output filename for `atlantisom` to work. Need to update `atlantisom` functions for user-specified output filenames.*
+
+**Special note 2:** *NOBA's nordic_groups_v04.csv file has an inFishery column, rather than the `atlantisom` expected InFishery column. I've changed the column name in the input file, but need to add robustness to atlantisom code to remove case sensitivity.*
+
+### Config files
 
 `NOBA2config.R` looks like this (adjusted from Alfonso's original):
 
@@ -164,6 +168,8 @@ fisheffN$effN <- fisheffN$effN/fstepperyr
 fish_cv <- data.frame(species=survspp, cv=rep(0.01,length(survspp)))
 ```
 
+### Using the wrappers
+
 All the config files go in the config folder and we'll try running this:
 
 ```{r full-test, eval=FALSE}
@@ -192,7 +198,116 @@ NOBAom_cod_comp <- om_comps(usersurvey = here("config/sardinesurvey.R"),
 
 ```
 
-### Write input data for specific assessment models
+### Wrapper test results {.tabset}
+
+#### Biomass index
+```{r bioind-1}
+
+library(ggthemes)
+omlist_ss <- NOBAom_cod
+source(here("config/omdimensions.R"))
+
+#read time series data
+survObsBiom <- readRDS(file.path(d.name, paste0(scenario.name, "surveyB.rds")))
+
+survObsBiom <- survObsBiom[[1]]
+
+plotB <-ggplot() +
+  geom_line(data=survObsBiom, aes(x=time/stepperyr,y=atoutput, color="survey Biomass"), 
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotB +
+  facet_wrap(~species, scales="free") 
+
+```
+
+
+#### Catch time series
+```{r catchind-1}
+#read time series data
+catchbio_ss <- readRDS(file.path(d.name, paste0(scenario.name, "fishCatch.rds")))
+
+catchbio_ss <- catchbio_ss[[1]]
+
+plotC <-ggplot() +
+  geom_line(data=catchbio_ss, aes(x=time/365,y=atoutput, color="observed Catch"), 
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotC +
+  facet_wrap(~species, scales="free") 
+
+
+```
+
+
+#### Survey length composition
+```{r lencomp-1}
+
+#length comps
+len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsLenComp.rds")))
+fish_len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsLenComp.rds")))
+
+len_comp_data <- len_comp_data[[1]]
+fish_len_comp_data <- fish_len_comp_data[[1]]
+
+#add this to om_indices function so that this has years when read in
+fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time/fstepperyr))
+
+len <- filter(len_comp_data, time %in% c(55:175))
+
+  lfplot <- ggplot(len, aes(upper.bins)) +
+    geom_bar(aes(weight = atoutput)) +
+    theme_tufte() +
+    labs(subtitle = paste(scenario.name,
+                          len$species))
+  
+  lfplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+
+
+```
+
+
+#### Age composition (age classes)
+```{r agecomp-1}
+
+#read in comp data
+age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsAgeComp.rds")))
+age_comp_data <- age_comp_data[[1]]
+
+fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
+fish_age_comp <- fish_age_comp[[1]]
+
+#add this to om_indices function so that this has years when read in
+fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
+
+Natageplot <- ggplot(Natagesubsp, aes(x=agecl, y=atoutput)) +
+    geom_point() +
+    theme_tufte() +
+    labs(subtitle = paste(scenario.name,
+                          sp))
+  
+  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
+  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
+  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
+  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+```
+
+
+### {-}
+
+Wrappers work for NOBA cod using standard age classes. Now to modify the underlying code to get full age structure.
+
+## Updating functions for full age structure
+
+
+
+## Write input data for specific assessment models
 
 We will need to alter this for SAM, SS3, etc. Right now just makes SS3.
 
