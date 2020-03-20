@@ -172,7 +172,7 @@ fish_cv <- data.frame(species=survspp, cv=rep(0.01,length(survspp)))
 
 All the config files go in the config folder and we'll try running this:
 
-```{r full-test, eval=FALSE}
+```{r full-test}
 
 library(here)
 library(tidyverse)
@@ -286,16 +286,15 @@ fish_age_comp <- fish_age_comp[[1]]
 #add this to om_indices function so that this has years when read in
 fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
 
-Natageplot <- ggplot(Natagesubsp, aes(x=agecl, y=atoutput)) +
+Natage <- filter(age_comp_data, time %in% c(55:175))
+
+Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
     geom_point() +
     theme_tufte() +
     labs(subtitle = paste(scenario.name,
-                          sp))
+                          Natage$species))
   
-  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 1, scales="free")
-  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 2, scales="free")
-  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 3, scales="free")
-  Natageplot + facet_wrap_paginate(~time, ncol=3, nrow = 3, page = 4, scales="free")
+  Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
 ```
 
 
@@ -305,7 +304,7 @@ Wrappers work for NOBA cod using standard age classes. Now to modify the underly
 
 ## Updating functions for full age structure
 
-
+NEXT!!
 
 ## Write input data for specific assessment models
 
