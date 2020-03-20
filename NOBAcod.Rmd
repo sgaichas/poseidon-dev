@@ -304,7 +304,20 @@ Wrappers work for NOBA cod using standard age classes. Now to modify the underly
 
 ## Updating functions for full age structure
 
-NEXT!!
+General strategy:
+
+1. add annual age option to run_truth function call, default it to FALSE
+  + if true, looks for ANNAGEBIO and ANNAGECATCH in designated directory, error out if missing
+  + if true, read these files in addition to existing set rather than replace existing
+    + read them in with new load_nc_annage function
+    + add them to the output object in addition to existing set
+1. write load_nc_annage
+  + need to understand annage nc structures
+    + if same as others just with full age structure, replace previous nc
+    + only numbers output? 
+      + how to match with resn and structn for lengths/wts?
+      + reconcile with bio parameters such as maturity ogive?
+    + only for some groups?
 
 ## Write input data for specific assessment models
 
