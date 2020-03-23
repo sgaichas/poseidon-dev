@@ -30,9 +30,14 @@ surveffic <- data.frame(species=survspp,
 
 # survey selectivity (agecl based)
 # this is by age class, need to change to use with ANNAGEBIO output
-survselex <- data.frame(species=rep(survspp, each=n_age_classes),
-                     agecl=rep(c(1:n_age_classes),length(survspp)),
-                     selex=rep(1.0,length(survspp)*n_age_classes))
+#survselex <- data.frame(species=rep(survspp, each=n_age_classes),
+#                     agecl=rep(c(1:n_age_classes),length(survspp)),
+#                     selex=rep(1.0,length(survspp)*n_age_classes))
+
+# for annage output
+survselex <- data.frame(species=rep(survspp, each=n_annages),
+                        agecl=rep(c(1:n_annages),length(survspp)),
+                        selex=rep(1.0,length(survspp)*n_annages))
 
 # effective sample size needed for sample_fish
 # this effective N is high but not equal to total for numerous groups

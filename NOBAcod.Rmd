@@ -2,7 +2,9 @@
 title: "Generate data for NOBA cod ensemble modeling"
 author: "Sarah Gaichas"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
+output:
+  html_document:
+    code_fold: hide
 ---
 
 ```{r setup, include=FALSE}
@@ -105,6 +107,12 @@ surveffic <- data.frame(species=survspp,
 survselex <- data.frame(species=rep(survspp, each=n_age_classes),
                      agecl=rep(c(1:n_age_classes),length(survspp)),
                      selex=rep(1.0,length(survspp)*n_age_classes))
+                     
+# WARNING!! comment above and use this for annage output
+survselex <- data.frame(species=rep(survspp, each=n_annages),
+                        agecl=rep(c(1:n_annages),length(survspp)),
+                        selex=rep(1.0,length(survspp)*n_annages))
+
 
 # effective sample size needed for sample_fish
 # this effective N is high but not equal to total for numerous groups
@@ -696,7 +704,7 @@ load_nc_annage <- function(dir = getwd(), file_nc, bps, fgs, biolprm, select_gro
 
 ```
 
-Does it work?
+Does it work? This snippet will go into `run_truth` if it does:
 
 ```{r testloadnc}
 
@@ -714,8 +722,9 @@ numsage <- load_nc_annage(dir = d.name,
                   select_groups = select_groups,
                   select_variable = "Nums",
                   check_acronyms = TRUE,
-                  bboxes = boxes)
-  if(verbose) message("Numbers read in from ANNAGEBIO.")
+                  bboxes = boxes, 
+                  verbose = TRUE)
+  #if(verbose) message("Numbers read in from ANNAGEBIO.")
 
 weightage <- load_nc_annage(dir = d.name,
                   file_nc = file_nc,
@@ -725,12 +734,13 @@ weightage <- load_nc_annage(dir = d.name,
                   select_groups = select_groups,
                   select_variable = "Weight",
                   check_acronyms = TRUE,
-                  bboxes = boxes)
-  if(verbose) message("Weight read in from ANNAGEBIO.")
+                  bboxes = boxes, 
+                  verbose = TRUE)
+  #if(verbose) message("Weight read in from ANNAGEBIO.")
 
 ```
 
-Need to aggreagate these to see if they look reasonable
+Need to aggreagate these to see if they look reasonable; this code snippet from `om_comps` with `numsage` output subsituted for `nums`. 
 
 ```{r fullagecomps-test}
   
@@ -746,7 +756,7 @@ n_reps <- 1
   # same user specifications as indices
   survey_N <- atlantisom::create_survey(dat = numsage,
                                         time = survtime,
-                                        species = select_groups,
+                                        species = survspp,
                                         boxes = survboxes,
                                         effic = surveffic,
                                         selex = survselex)
@@ -758,10 +768,42 @@ n_reps <- 1
   }
 
     # save age comps
-  if(save){
+  #if(save){
     saveRDS(age_comp_data, file.path(d.name, paste0(scenario.name, "survObsFullAgeComp.rds")))
-  }
+  #}
 
+
+```
+
+Plot full age comps, have 20 years for cod now, no longer age class but annual ages.
+
+```{r plotfullagecomp}
+
+#read in comp data
+age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsFullAgeComp.rds")))
+age_comp_data <- age_comp_data[[1]]
+
+#fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
+#fish_age_comp <- fish_age_comp[[1]]
+
+#add this to om_indices function so that this has years when read in
+#fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
+
+Natage <- filter(age_comp_data, time %in% c(55:175))
+
+Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
+    geom_point() +
+    theme_tufte() +
+    labs(subtitle = paste(scenario.name,
+                          Natage$species))
+  
+  Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+  
+```
+
+What is the weight output? Documentation only mentions numbers output. Looks like average weight at age for each time and polygon? If so, need to do weighted average weight using the numbers at age in each polygon? 
+
+```{r}
 
 ```
 
