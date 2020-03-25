@@ -803,6 +803,34 @@ Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
 
 What is the weight output? Documentation only mentions numbers output. Looks like average weight at age for each time and polygon? If so, need to do weighted average weight using the numbers at age in each polygon? 
 
+This output is described in Atlantis code, file atlantis/atphysics/atagetracerIO.c, function `writeBMAnnAgeBioData`:
+
+```
+if (propit == out_nums_id) {  // Numbers case
+                                for (b = 0; b < bm->nbox; b++) {
+                                    val[b] = 0.0;
+                                    for (k = 0; k < bm->wcnz; k++) {  // Sum over all individuals in the box
+                                        val[b] += bm->wctr[b][k][id] * FunctGroupArray[sp].boxPopRatio[b][k][cohort][ai];
+                                    }
+                                }
+                            } else  { // Size data - get weighted average of values per layer if numbers > min_dens
+                                for (b = 0; b < bm->nbox; b++) {
+                                    val[b] = 0.0;
+                                    tot = 0.0;
+                                    for (k = 0; k < bm->wcnz; k++) {  // Sum over all individuals in the box
+                                        if (bm->wctr[b][k][id] > bm->min_dens) {
+                                            val[b] += bm->wctr[b][k][id] * (bm->wctr[b][k][sn] + bm->wctr[b][k][rn]) * 5.7 * mg_2_g * FunctGroupArray[sp].boxPopRatio[b][k][cohort][ai];
+                                            tot += bm->wctr[b][k][id];
+                                        }
+                                    }
+                                    if (tot > 0.0)
+                                        val[b] /= tot;
+                                }
+                            }
+```
+
+So weight output appears to be average weight at age in grams?
+
 ```{r}
 
 ```
