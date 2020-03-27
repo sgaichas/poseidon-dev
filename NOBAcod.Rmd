@@ -740,7 +740,33 @@ So, to modify run_truth we need to add the annage output but not replace the reg
 
 Looks like the annagecatch output is only numbers and not weights.
 
+```{r loadannagecatch}
+# taken from existing load_nc
 
+file.nc <- file.path(d.name, "outputnordic_runresults_01ANNAGECATCH.nc")
+
+  # Load ATLANTIS output!
+  at_out <- RNetCDF::open.nc(con = file.nc)
+
+  # Get info from netcdf file! (Filestructure and all variable names)
+  var_names_ncdf <- sapply(seq_len(RNetCDF::file.inq.nc(at_out)$nvars - 1),
+    function(x) RNetCDF::var.inq.nc(at_out, x)$name)
+  n_timesteps <- RNetCDF::dim.inq.nc(at_out, 0)$length
+  n_boxes     <- RNetCDF::dim.inq.nc(at_out, 1)$length
+  n_layers    <- RNetCDF::dim.inq.nc(at_out, 2)$length
+
+RNetCDF::close.nc(at_out)
+```
+
+ANNAGECATCH.nc variable names (first hundred): `r var_names_ncdf[1:100]` 
+
+ANNAGECATCH.nc variable names (last hundred): `r var_names_ncdf[1590:1690]`
+
+ANNAGECATCH.nc timesteps: `r n_timesteps`
+
+ANNAGECATCH.nc boxes: `r n_boxes`
+
+ANNAGECATCH.nc layers: `r n_layers`
 
  
 
