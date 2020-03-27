@@ -9,6 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(here)
 ```
 
 ## Standard atlantisom output test (age class not age)
@@ -27,22 +28,22 @@ We need config files for the NOBA model, our surveys and fisheries. Surveys and 
 
 `NOBA2config.R` looks like this (adjusted from Alfonso's original):
 
-```{r, code = readLines("NOBA2Config.R")}
+```{r, code = readLines("./config/NOBA2Config.R"), eval=F}
 ```
 
 `omdimensions.R` standardizes timesteps, etc.:
 
-```{r, code = readLines("omdimensions.R")}
+```{r, code = readLines("./config/omdimensions.R"), eval=F}
 ```
 
 `codsurvey.R` configures the fishery independent survey and looks like this:
 
-```{r, code = readLines("codsurvey.R")}
+```{r, code = readLines("./config/codsurvey.R"), eval=F}
 ```
 
 `codfishery.R` configures the fishery dependent data and looks like this:
 
-```{r, code = readLines("codfishery.R")}
+```{r, code = readLines("./config/codfishery.R"), eval=F}
 ```
 
 ### Using the wrappers
@@ -51,7 +52,7 @@ All the config files go in the config folder and we'll try running this:
 
 ```{r full-test, message=FALSE, warning=FALSE}
 
-library(here)
+#library(here) now above
 library(tidyverse)
 library(atlantisom)
 
@@ -768,7 +769,7 @@ ANNAGECATCH.nc boxes: `r n_boxes`
 
 ANNAGECATCH.nc layers: `r n_layers`
 
-Catch file contains "IsFished" species discard at age and catch at age by fishery.
+Catch file contains "IsFished" species discard at age and catch at age by fishery in numbers. So now modifying load_nc_annage to get the fishery specific outputs, which requires additional atlantis fishery setup files and additions to the config files above.
 
 ## Write input data for specific assessment models
 
