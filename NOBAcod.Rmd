@@ -65,8 +65,8 @@ NOBAom_cod_ind <- om_index(usersurvey = here("config/codsurvey.R"),
                            n_reps = 1, 
                            save = TRUE)
 
-NOBAom_cod_comp <- om_comps(usersurvey = here("config/sardinesurvey.R"), 
-                           userfishery = here("config/sardinefishery.R"),
+NOBAom_cod_comp <- om_comps(usersurvey = here("config/codsurvey.R"), 
+                           userfishery = here("config/codfishery.R"),
                            omlist_ss = NOBAom_cod, 
                            n_reps = 1, 
                            save = TRUE)
@@ -180,7 +180,7 @@ Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
 wtage <- readRDS(file.path(d.name, paste0(scenario.name, "survObsWtAtAge.rds")))
 wtage <- wtage[[1]]
 
-wageplot <- ggplot(wtage, aes(time, wtage)) +
+wageplot <- ggplot(wtage, aes(time, atoutput)) +
   geom_line(aes(colour = factor(agecl))) +
   theme_tufte() +
   theme(legend.position = "bottom") +
@@ -760,7 +760,7 @@ RNetCDF::close.nc(at_out)
 
 ANNAGECATCH.nc variable names (first hundred): `r var_names_ncdf[1:100]` 
 
-ANNAGECATCH.nc variable names (last hundred): `r var_names_ncdf[1590:1690]`
+ANNAGECATCH.nc variable names (last hundred): `r tail(var_names_ncdf, 100)`
 
 ANNAGECATCH.nc timesteps: `r n_timesteps`
 
@@ -768,7 +768,7 @@ ANNAGECATCH.nc boxes: `r n_boxes`
 
 ANNAGECATCH.nc layers: `r n_layers`
 
-What is in the catch file?
+Catch file contains "IsFished" species discard at age and catch at age by fishery.
 
 ## Write input data for specific assessment models
 

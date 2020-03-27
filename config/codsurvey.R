@@ -26,7 +26,7 @@ survboxes <- allboxes
 # survey efficiency (q)
 # should return a perfectly efficient survey 
 surveffic <- data.frame(species=survspp,
-                     efficiency=rep(0.5,length(survspp)))
+                     efficiency=rep(1.0,length(survspp)))
 
 # survey selectivity (agecl based)
 # this is by age class, need to change to use with ANNAGEBIO output
@@ -52,5 +52,5 @@ surv_cv <- data.frame(species=survspp, cv=rep(0.1,length(survspp)))
 lenage_cv <- 0.1
 
 # max size bin for length estimation, function defaults to 150 cm if not supplied
-maxbin <- 150
+maxbin <- 200
 
