@@ -768,7 +768,7 @@ ANNAGECATCH.nc boxes: `r n_boxes`
 
 ANNAGECATCH.nc layers: `r n_layers`
 
- 
+What is in the catch file?
 
 ## Write input data for specific assessment models
 
