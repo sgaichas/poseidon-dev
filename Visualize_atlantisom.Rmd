@@ -17,6 +17,8 @@ Other possibilities:
 
 [`visNetwork`](https://github.com/datastorm-open/visNetwork)
 
+[`drake`](https://docs.ropensci.org/drake/)
+
 ```{r installation, eval=FALSE}
 
 devtools::install_github("datastorm-open/DependenciesGraphs")
@@ -26,7 +28,9 @@ devtools::install_github("datastorm-open/visNetwork") # on CRAN, this is dev ver
 
 ## `DependenciesGraphs`
 
-```{r depgraph}
+This is all the functions in `atlantisom`:
+
+```{r depgraph, message=FALSE}
 
 library(DependenciesGraphs)
 library(atlantisom)
@@ -36,4 +40,12 @@ plot(dep)
 
 ```
 
+This is just the `om_init` wrapper function:
+
+```{r depgraphominit}
+
+depominit <- funDependencies("package:atlantisom", "om_init")
+plot(depominit)
+
+```
 
