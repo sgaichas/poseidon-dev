@@ -15,6 +15,9 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/WrapperDevelopment.html" target="_blank">Automating om functions to streamline workflows, January 17, 2020 writes dat file as of March 16, 2020</a>
 
+### Visualize functions for documentation
+
+<a href="https://sgaichas.github.io/poseidon-dev/NOBAcod.html" target="_blank">Different packages to visualize `atlantisom` functions, started May 7, 2020</a>
 
 ### Demo for NEMoW meeting, December 2019
 
