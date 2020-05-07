@@ -1,0 +1,39 @@
+---
+title: "Visualize atlantisom"
+author: "Sarah Gaichas"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Relationships between `atlantsom` functions
+
+First attempt is using the package [`DependenciesGraphs`](https://github.com/datastorm-open/DependenciesGraphs).
+
+Other possibilities:
+
+[`visNetwork`](https://github.com/datastorm-open/visNetwork)
+
+```{r installation, eval=FALSE}
+
+devtools::install_github("datastorm-open/DependenciesGraphs")
+devtools::install_github("datastorm-open/visNetwork") # on CRAN, this is dev version
+
+```
+
+## `DependenciesGraphs`
+
+```{r depgraph}
+
+library(DependenciesGraphs)
+library(atlantisom)
+
+dep <- envirDependencies("package:atlantisom")
+plot(dep)
+
+```
+
+
