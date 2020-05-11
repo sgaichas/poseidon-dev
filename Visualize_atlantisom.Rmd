@@ -49,3 +49,7 @@ plot(depominit)
 
 ```
 
+While these map dependencies between functions, it would be nice to see what output of atlantis goes into atlantisom and what atlantisom outputs into SS3.
+
+
+
