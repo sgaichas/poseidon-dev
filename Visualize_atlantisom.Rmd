@@ -152,7 +152,7 @@ plotB +
 
 From Christine's ggplot_SS.R (change to Isaac's output directory name for current best fit) we get SS3 sample output using a prettier version of r4ss plot:
 
-```{r ggplotSS}
+```{r ggplotSS, results="hide"}
 
 #dir <- "./inst/extdata/Sardine_SS_Files/"
 
