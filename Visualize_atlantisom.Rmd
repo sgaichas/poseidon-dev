@@ -167,8 +167,8 @@ index_data_fits <- output_from_SS$cpue
 #r4ss::SS_plots(output_from_SS)
 
 #Plot
-require(ggthemes)
-require(ggplot2)
+#require(ggthemes)
+#require(ggplot2)
 plotB <-ggplot(index_data_fits) +
   geom_line(data=index_data_fits, aes(x=Yr,y=Exp,color="Estimated CPUE"), 
             alpha = 10/10) +
@@ -206,6 +206,73 @@ plotB <-ggplot() +
 
 plotB +
   facet_wrap(~species, scales="free") 
+
+```
+
+Putting it together into a 3 panel figure:
+
+```{r triplot, fig.asp=1}
+
+require(cowplot)
+require(viridis)
+
+mycol <- viridis(4)
+
+plotsurv <- ggplot() +
+  geom_line(data=omTrueB, aes(x=time/stepperyr,y=totB, color="True total B"), 
+            alpha = 10/10) +
+  geom_point(data=survObsBiomB, aes(x=time/stepperyr,y=atoutput, color="Survey sample B"), 
+            alpha = 10/10) +
+  xlab("") + 
+  ylab("") +
+  scale_color_manual(values=c(mycol[2], mycol[1]),
+                     guide = guide_legend(override.aes = list(
+                         linetype = c("blank", "solid"),
+                         shape = c(16, NA)))) + 
+  theme_tufte() +
+  theme(legend.position = "right") +
+  labs(colour="Atlantis-sardine")
+
+plotSSfit <- ggplot() +
+  geom_line(data=index_data_fits, aes(x=Yr,y=Exp,color="SS3 est. survey B"), 
+            alpha = 10/10, size=2) +
+  geom_pointrange(data=index_data_fits, 
+                  aes(x=Yr,y=Obs,
+                      ymin=exp(log(Obs)+qt(0.025,df=output_from_SS$survey_error[2])*SE),
+                      ymax=exp(log(Obs)+qt(0.975,df=output_from_SS$survey_error[2])*SE),
+                      fatten = .5,
+                      color="Survey B + error"),
+                  alpha = 10/10) + 
+  scale_x_continuous(limits = c(0,120), breaks = seq(0,125,25)) +
+  xlab("") + 
+  ylab("Biomass, t") +
+  scale_color_manual(values=c(mycol[3], mycol[2]),
+                     guide = guide_legend(override.aes = list(
+                         linetype = c("solid", "blank"),
+                         shape = c(NA, 16)))) + 
+  theme_tufte() +
+  theme(legend.position = "right") +
+  labs(colour="SS3-survey fit")
+
+plotSSskill <- ggplot() +
+  geom_line(data=omTrueB, aes(x=time/stepperyr,y=totB, color="True total B"), 
+            alpha = 10/10) +
+  geom_point(data=output_from_SS$timeseries, aes(x=Yr,y=Bio_all, color="SS3 est. total B"),
+             alpha = 10/10) + 
+  xlab("Year") + 
+  ylab("") +
+  scale_color_manual(values=c(mycol[3], mycol[1]),
+                     guide = guide_legend(override.aes = list(
+                         linetype = c("blank", "solid"),
+                         shape = c(16, NA)))) + 
+  theme_tufte() +
+  theme(legend.position = "right") +
+  labs(colour="SS3-biomass skill")
+
+plot_grid(plotsurv + theme(legend.justification = c(0,1)), 
+          plotSSfit + theme(legend.justification = c(0,1)), 
+          plotSSskill + theme(legend.justification = c(0,1)), 
+          ncol=1, align="v")
 
 ```
 
