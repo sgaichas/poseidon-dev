@@ -1,12 +1,16 @@
 ---
 title: "Visualize atlantisom"
-author: "Sarah Gaichas"
+author: "Sarah Gaichas and Christine Stawitz"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
+output: 
+  html_document:
+    code_fold: hide
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
 ```
 
 ## Relationships between `atlantsom` functions
@@ -51,5 +55,157 @@ plot(depominit)
 
 While these map dependencies between functions, it would be nice to see what output of atlantis goes into atlantisom and what atlantisom outputs into SS3.
 
+Try something different. Drake?
 
+```{r atlantisomdrake}
+
+#atlantis output files needed
+
+#atlantisom functions (wrappers) with user-defined inputs specifying sampling frames, observation errors
+
+#om_init oututs run_truth results and model definitions for all species
+
+#om_species cuts full output to user selected focal species--SAVE THIS OUTPUT
+
+#om_index takes user defined survey and fishery sampling and observation error specifications to make replicate indices, outputs both to session and saves
+
+#atlantisom core functions called from wrappers, can be used alone
+
+#stock assessment data rds file output
+
+#atlantisom functions to write assessment model-specific input files
+
+#future: wrapper functions to run and compare assessments with each other and truth
+
+```
+
+## Visualize results using wrappers
+
+Meanwhile lets do final plots for the ecosystem MSE paper. Want a 3 panel plot showing atlantisom sample output (our really good survey), SS3 sample output (fit to survey), and the key feature, SS3 fit to atlantis truth:
+
+From truth and saved wrapper output generated [here](https://sgaichas.github.io/poseidon-dev/WrapperDevelopment.html):
+
+```{r truth-surveyind}
+
+library(tidyverse) #fix this; build in this dependency for wrappers
+library(here)
+library(ggthemes)
+
+# skip this, here for completeness, just need directory
+#CC3om <- om_init(here("config/CC3config_sardLWcorr.R")) #initialize/read in truth
+
+source(here("config/CC3config_sardLWcorr.R"))
+
+#skip this too and now just read in the saved results
+#CC3om_sardine <- om_species(c("Pacific_sardine"), CC3om) #select just sardine
+
+# TODO make option to save this output so we dont have to run om_init to get truth 
+# every time and it doesnt sit around in memory. For now:
+
+#saveRDS(CC3om_sardine, file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+
+CC3om_sardine <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+
+# we have already run this so just read in the saved results, here for reference
+#CC3om_sard_ind <- om_index(usersurvey = here("config/sardinesurvey.R"), 
+#                           userfishery = here("config/sardinefishery.R"),
+#                           omlist_ss = CC3om_sardine, 
+#                           n_reps = 1, 
+#                           save = TRUE)
+
+CC3om_sard_ind <- readRDS(file.path(d.name, paste0(scenario.name, "surveyB.rds")))
+
+# TODO make plotting functions for atlantisom that do these comparisons
+
+# needed for plotting time dimensions 
+# TODO standardize time across outputs in these wrappers
+omlist_ss <- CC3om_sardine
+source(here("config/omdimensions.R"))
+
+txtTrueB <- CC3om_sardine$truetotbio_ss
+
+#WARNING! this is true bio at age so needs to be summed over ages--rename truebioage_ss
+omTrueB <- CC3om_sardine$truebio_ss %>%
+  group_by(species, time) %>%
+  summarise(totB = sum(atoutput)) 
+
+survObsBiomB <- CC3om_sard_ind[[1]]
+
+
+plotB <-ggplot() +
+  geom_point(data=txtTrueB, aes(x=time/365,y=atoutput, color="txt output true B"),
+             alpha = 10/10) + 
+  geom_line(data=omTrueB, aes(x=time/stepperyr,y=totB, color="survey census B"), 
+            alpha = 10/10) +
+  geom_point(data=survObsBiomB, aes(x=time/stepperyr,y=atoutput, color="survey sample B from biomass_ages"), 
+            alpha = 10/10) +
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotB +
+  facet_wrap(~species, scales="free")
+
+
+```
+
+
+From Christine's ggplot_SS.R (change to Isaac's output directory name for current best fit) we get SS3 sample output using a prettier version of r4ss plot:
+
+```{r ggplotSS}
+
+#dir <- "./inst/extdata/Sardine_SS_Files/"
+
+dir <- "./inst/extdata/AB_Lmax25_v2_ABinControl_Mlower/"
+  
+#Get SS output
+output_from_SS <- r4ss::SS_output(dir, covar=F, forecast=F) 
+
+#Extract index info
+index_data_fits <- output_from_SS$cpue
+#Commented out - only for comparing to SS output to check
+#r4ss::SS_plots(output_from_SS)
+
+#Plot
+require(ggthemes)
+require(ggplot2)
+plotB <-ggplot(index_data_fits) +
+  geom_line(data=index_data_fits, aes(x=Yr,y=Exp,color="Estimated CPUE"), 
+            alpha = 10/10) +
+  geom_pointrange(data=index_data_fits, aes(x=Yr,y=Obs, ymin=exp(log(Obs)+qt(0.025,df=output_from_SS$survey_error[2])*SE), 
+                                                                 ymax=exp(log(Obs)+qt(0.975,df=output_from_SS$survey_error[2])*SE),
+                                                                          color="Input CPUE with error"),
+             alpha = 10/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") 
+plotB
+
+
+```
+
+Add the comparison of SS3 estimated total biomass with true atlantisom tot B as started [here](https://sgaichas.github.io/poseidon-dev/SkillAssessInit.html):
+
+```{r compareB}
+
+#point this to Isaac's output dir defined above
+#replist <- r4ss::SS_output(dir = here(dir), verbose=TRUE, printstats=TRUE,covar=FALSE)
+
+#SS_plots(replist)
+
+#replist$timeseries
+names(output_from_SS$timeseries)[19]<-"Fmort"
+
+plotB <-ggplot() +
+  geom_line(data=omTrueB, aes(x=time/stepperyr,y=totB, color="True B"), 
+            alpha = 10/10) +
+  geom_point(data=output_from_SS$timeseries, aes(x=Yr,y=Bio_all, color="SS3 Est B"),
+             alpha = 10/10) + 
+  theme_tufte() +
+  theme(legend.position = "top") +
+  labs(colour=scenario.name)
+
+plotB +
+  facet_wrap(~species, scales="free") 
+
+```
 
