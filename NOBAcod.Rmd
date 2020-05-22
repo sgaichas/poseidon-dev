@@ -722,24 +722,34 @@ So weight output appears to be average weight at age in grams?
 annwtage <- weightage %>%
   group_by(species, agecl, time) %>%
   summarise(wtage = mean(atoutput)) %>%
-  filter(time %in% survtime)
+  filter(time %in% (survtime))
 
-wageplot <- ggplot(annwtage, aes(time, wtage)) +
+boxwtage <- weightage %>%
+  mutate(wtage = atoutput) %>%
+  filter(species %in% c("North_atl_cod"),
+         polygon %in% c(1,7,24,30,38,45),
+         agecl %in% c(16:20))
+
+wtagedat <- boxwtage
+
+wageplot <- ggplot(wtagedat, aes(time, wtage)) +
   geom_line(aes(colour = factor(agecl))) +
   theme_tufte() +
   theme(legend.position = "bottom") +
   xlab("model timestep (5 per year)") +
   ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
+  labs(subtitle = paste0(scenario.name, " "))
 
-wageplot + facet_wrap(c("species"), scales="free_y")
+wageplot + facet_wrap(c("polygon"), scales="free_y")
 
 
 ```
 
 So, to modify run_truth we need to add the annage output but not replace the regular output in case users want output from non-age structured groups (inverts, etc.). Also need to see if lengths can be generaged from the annage outputs, if not need to keep the full set of outputs from the .nc file for all species to generate them.
 
-Looks like the annagecatch output is only numbers and not weights.
+UPDATE: there is a difference between the annage weight at age and that calculated using 'calc_age2length'. While the results from the standard nc output look reasonable for NOBA cod, the annage weight at age is half that for the standard (and half what real cod would be). More worrisome, the oldest age classes have smaller average weight at age than some younger ones. I cannot think of why this would be. Until we are sure the annage weight output is correct, we will instead interpolate the weight at age output of 'calc_age2length" for use as assessment input. 
+
+Looks like the annagecatch output is only numbers and not weights. We don't get weight at age from fisheries usually so this is fine. 
 
 ```{r loadannagecatch}
 # taken from existing load_nc
@@ -770,6 +780,43 @@ ANNAGECATCH.nc boxes: `r n_boxes`
 ANNAGECATCH.nc layers: `r n_layers`
 
 Catch file contains "IsFished" species discard at age and catch at age by fishery in numbers. So now modifying load_nc_annage to get the fishery specific outputs, which requires additional atlantis fishery setup files and additions to the config files above.
+
+New function `load_fisheries` needed to load the fishery specification file (a .csv), similar to `load_fgs`:
+
+```{r load_fisheries}
+
+load_fisheries <- function(dir = getwd(), file_fish){
+  if (is.null(dir)) {
+    file.fish <- file_fish
+  } else {
+    file.fish <- file.path(dir, file_fish)
+  }
+  result <- read.table(file = file.fish, sep = ",",
+    header = TRUE, stringsAsFactors = FALSE)
+  return(result)
+}
+```
+
+Call `load_fisheries` within `load_nc_annage` to rename select_variable as used in ANNAGECATCH.nc:
+
+```{r addsnippet}
+
+select_variable <- c("Catch", "Discard")
+dir <- here("atlantisoutput","NOBA_march_2020")
+file_fish <- "NoBAFisheries.csv"
+
+#starting at line 115 in current load_nc_annage
+
+if(select_variable %in% c("Catch", "Discard")){
+    #read in fleet names
+    fleetnames <- load_fisheries(dir = dir, file_fish = file_fish)
+    for(i in select_variable){
+      sv <-paste0(i, "_", fleetnames$Code)
+      sv1 <- c()
+    }
+  }
+
+```
 
 ## Write input data for specific assessment models
 
