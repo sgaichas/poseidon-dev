@@ -9,7 +9,7 @@ These pages document initial testing of the atlantisom package in development at
 
 ### Apply wrapper to Norwegian Barents cod, March 2020
 
-<a href="https://sgaichas.github.io/poseidon-dev/NOBAcod.html" target="_blank">Apply and extend wrappers to get full age structure, started March 18, 2020</a>
+<a href="https://sgaichas.github.io/poseidon-dev/NOBAcod.html" target="_blank">Apply and extend wrappers to get full age structure, updated May 22, 2020</a>
 
 ### Working on wrapper functions, January 2020
 
