@@ -810,13 +810,61 @@ file_fish <- "NoBAFisheries.csv"
 if(select_variable %in% c("Catch", "Discard")){
     #read in fleet names
     fleetnames <- load_fisheries(dir = dir, file_fish = file_fish)
+    svfish <- c()
     for(i in select_variable){
       sv <-paste0(i, "_", fleetnames$Code)
-      sv1 <- c()
+      svfish <- c(svfish, sv)
     }
+    select_variable <- svfish
   }
 
 ```
+
+Test new `load_nc_annage`:
+
+```{r testfishery}
+
+source(here("R/load_nc_annage.R"))
+source(here("R/load_fisheries.R"))
+
+fgs <- NOBAom$funct.groups
+biolprm <- NOBAom$biol
+select_groups <- c('Mackerel', 'North_atl_cod', 'Capelin')
+
+file_nc <- "outputnordic_runresults_01ANNAGECATCH.nc"
+file_fish <- "NoBAFisheries.csv"
+
+fishcatchage <- load_nc_annage(dir = d.name,
+                  file_nc = file_nc,
+                  file_fish = file_fish,
+                  bps = bps,
+                  fgs = fgs,
+                  biolprm = biolprm,
+                  select_groups = select_groups,
+                  select_variable = "Catch",
+                  check_acronyms = TRUE,
+                  bboxes = boxes, 
+                  verbose = TRUE)
+
+
+fishcatchage
+
+fishdiscage <- load_nc_annage(dir = d.name,
+                  file_nc = file_nc,
+                  file_fish = file_fish,
+                  bps = bps,
+                  fgs = fgs,
+                  biolprm = biolprm,
+                  select_groups = select_groups,
+                  select_variable = "Discard",
+                  check_acronyms = TRUE,
+                  bboxes = boxes, 
+                  verbose = TRUE)
+
+fishdiscage
+```
+
+Do we want catch by fishery? No fishery column here, check what it is doing.
 
 ## Write input data for specific assessment models
 
