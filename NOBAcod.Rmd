@@ -799,7 +799,7 @@ load_fisheries <- function(dir = getwd(), file_fish){
 
 Call `load_fisheries` within `load_nc_annage` to rename select_variable as used in ANNAGECATCH.nc:
 
-```{r addsnippet}
+```{r addsnippet, eval=FALSE}
 
 select_variable <- c("Catch", "Discard")
 dir <- here("atlantisoutput","NOBA_march_2020")
@@ -820,6 +820,8 @@ if(select_variable %in% c("Catch", "Discard")){
 
 ```
 
+Also added if statements to add fleets for fisheries outputs, if statements to separate output for annage and annagecatch.
+
 Test new `load_nc_annage`:
 
 ```{r testfishery}
@@ -827,9 +829,18 @@ Test new `load_nc_annage`:
 source(here("R/load_nc_annage.R"))
 source(here("R/load_fisheries.R"))
 
-fgs <- NOBAom$funct.groups
-biolprm <- NOBAom$biol
-select_groups <- c('Mackerel', 'North_atl_cod', 'Capelin')
+source(here("config/NOBA2Config.R"))
+NOBAom_cod <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+
+fgs <- NOBAom_cod$funct.group_ss
+biolprm <- NOBAom_cod$biol
+#select_groups <- c('Mackerel', 'North_atl_cod', 'Capelin')
+select_groups <- 'North_atl_cod'
+
+bps <- load_bps(dir = d.name, fgs = functional.groups.file, file_init = biomass.pools.file)
+allboxes <- load_box(dir = d.name, file_bgm = box.file)
+boxes <- get_boundary(allboxes)
+
 
 file_nc <- "outputnordic_runresults_01ANNAGECATCH.nc"
 file_fish <- "NoBAFisheries.csv"
@@ -864,7 +875,16 @@ fishdiscage <- load_nc_annage(dir = d.name,
 fishdiscage
 ```
 
-Do we want catch by fishery? No fishery column here, check what it is doing.
+Do we want catch by fishery? Yes. No fishery column here, check what it is doing.
+fishdiscage is empty, make sure there is no discard output from NOBA for these species.
+
+Add a check for multiple fisheries per species, if only one then fleet irrelevant.
+
+NOBA has multiple fleets for cod, so add fleet column to output.
+
+Update: there is now a fleet column in output but the function is still incomplete; will not work if more than one fleet per species. 
+
+
 
 ## Write input data for specific assessment models
 
