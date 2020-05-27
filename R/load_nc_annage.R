@@ -66,6 +66,7 @@ load_nc_annage <- function(dir = getwd(), file_nc, file_fish, bps, fgs, biolprm,
   # Check input of select_variable as only one value is allowed
   select_variable <- match.arg(select_variable, several.ok = FALSE)
   
+  # select_variable gets renamed for fishery data, save input
   input_select_variable <- select_variable
 
   # Check input structure!
@@ -248,12 +249,15 @@ load_nc_annage <- function(dir = getwd(), file_nc, file_fish, bps, fgs, biolprm,
   if(input_select_variable %in% c("Catch", "Discard")){
     int_ff <- final_fleet
     # multiple fleets per species?
-    if(length(int_ff)>length(int_fs)){
-      # figure out which species
-      # increase species dimension by n fleets for that species
-    }
+    # safest: grep species code from int_ff and match to species name
+    spcode <- stringr::str_extract(int_ff, fgs$Code)
+    spcode <- table(spcode)
+    # find nfleet for that species
+    sp_nfleet <- data.frame(species = int_fs,
+                            code = fgs$Code[fgs$Name==int_fs])
+    sp_nfleet$nfleet <- spcode[names(spcode)==sp_nfleet$code]
   }
-
+  
   if (length(at_data3d) >= 1) {
     # Remove biomasspools if selected variable is "N"!
     if (select_variable == "N") {
@@ -311,14 +315,15 @@ load_nc_annage <- function(dir = getwd(), file_nc, file_fish, bps, fgs, biolprm,
     }
 
     # Order of the data in value column = "atoutput".
-    # 1. species  --> rep each with the number of
+    # 1. species  --> rep each with the number of (fleets*)
     #                 ageclasses and n_timesteps * boxes
-    # 2. age      --> rep each (1:maxage for each species) with n_timesteps * boxes
+    # 2. age      --> rep each (1:maxage for each species(*fleet)) with n_timesteps * boxes
     # 3. timestep --> rep each timestep (1:n_timesteps)
     #                 with the number of boxes and final_agecl
-    #                 (num ages per species)
+    #                 (num ages per species(*fleet))
     # 4. polygon  --> rep boxes times n_timesteps * final_agecl
-    #                 (num ages per species)
+    #                 (num ages per species(*fleet))
+    # 5. fleet    --> 
 
     if(input_select_variable %in% c("Nums", "Weight")){
       
@@ -338,26 +343,24 @@ load_nc_annage <- function(dir = getwd(), file_nc, file_fish, bps, fgs, biolprm,
       if (select_variable == "N") result2d$layer <- n_layers - 1
     }
     
+    #currently works with only 1 fleet, need to dimension properly for multiple
     if(input_select_variable %in% c("Catch", "Discard")){
-      #result2d <- NULL
-      result2d <- data.frame(species = unlist(sapply(
-        X = mapply(FUN = rep, x = int_fs, each = int_fa, SIMPLIFY = FALSE,
-                   USE.NAMES = FALSE),
+      result2d <- data.frame(species = unlist(sapply(X = mapply(FUN = rep, x = int_fs, 
+                   each = int_fa,SIMPLIFY = FALSE,USE.NAMES = FALSE),
         FUN = rep, each = length(boxes) * n_timesteps, simplify = FALSE)),
         agecl = unlist(sapply(X = sapply(X = int_fa, FUN = seq, from = 1,
                                          by = 1, simplify = FALSE, USE.NAMES = FALSE),
                               FUN = rep, each = length(boxes) * n_timesteps, simplify = FALSE)),
         polygon = unlist(sapply(X = n_timesteps * int_fa,
                                 FUN = rep, x = boxes, simplify = FALSE, USE.NAMES = FALSE)),
-        fleet = unlist(sapply(
-          X = mapply(FUN = rep, x = int_ff, each = int_fa, SIMPLIFY = FALSE,
-                     USE.NAMES = FALSE),
+        fleet = unlist(sapply(X = mapply(FUN = rep, x = int_ff, each = int_fa,
+                                         SIMPLIFY = FALSE,USE.NAMES = FALSE),
           FUN = rep, each = length(boxes) * n_timesteps, simplify = FALSE)),
         time = unlist(sapply(X = int_fa, FUN = rep, x = rep(0:(n_timesteps - 1),
                                                             each = length(boxes)), simplify = FALSE, USE.NAMES = FALSE)),
         atoutput = do.call(c, result2d),
         stringsAsFactors = F)
-      if (select_variable == "N") result2d$layer <- n_layers - 1
+      #if (select_variable == "N") result2d$layer <- n_layers - 1
     }
     
   }

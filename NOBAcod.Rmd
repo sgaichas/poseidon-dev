@@ -783,7 +783,7 @@ Catch file contains "IsFished" species discard at age and catch at age by fisher
 
 New function `load_fisheries` needed to load the fishery specification file (a .csv), similar to `load_fgs`:
 
-```{r load_fisheries}
+```{r load_fisheries, eval=FALSE}
 
 load_fisheries <- function(dir = getwd(), file_fish){
   if (is.null(dir)) {
@@ -826,8 +826,8 @@ Test new `load_nc_annage`:
 
 ```{r testfishery}
 
-source(here("R/load_nc_annage.R"))
-source(here("R/load_fisheries.R"))
+# source(here("R/load_nc_annage.R"))
+# source(here("R/load_fisheries.R"))
 
 source(here("config/NOBA2Config.R"))
 NOBAom_cod <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
@@ -845,6 +845,11 @@ boxes <- get_boundary(allboxes)
 file_nc <- "outputnordic_runresults_01ANNAGECATCH.nc"
 file_fish <- "NoBAFisheries.csv"
 
+#for testing line by line
+bboxes <- boxes
+dir <- d.name
+select_variable <- "Catch"
+
 fishcatchage <- load_nc_annage(dir = d.name,
                   file_nc = file_nc,
                   file_fish = file_fish,
@@ -858,7 +863,7 @@ fishcatchage <- load_nc_annage(dir = d.name,
                   verbose = TRUE)
 
 
-fishcatchage
+fishcatchage[1:100,]
 
 fishdiscage <- load_nc_annage(dir = d.name,
                   file_nc = file_nc,
@@ -876,15 +881,86 @@ fishdiscage
 ```
 
 Do we want catch by fishery? Yes. No fishery column here, check what it is doing.
-fishdiscage is empty, make sure there is no discard output from NOBA for these species.
+fishdiscage is empty, make sure there is no discard output from NOBA for these species (confirmed).
 
 Add a check for multiple fisheries per species, if only one then fleet irrelevant.
 
-NOBA has multiple fleets for cod, so add fleet column to output.
+NOBA has multiple fleets for cod (but they are not in output!), so add fleet column to output.
 
 Update: there is now a fleet column in output but the function is still incomplete; will not work if more than one fleet per species. 
 
+Plot catch at age; aggregate over polygons, apply sample_fish:
 
+```{r catchannage}
+
+omlist_ss<-NOBAom_cod
+source(here("/config/NOBA2Config.R"))
+source(here("/config/omdimensions.R"))
+source(here("/config/codsurvey.R"))
+source(here("/config/codfishery.R")) 
+  
+n_reps <- 1
+
+  #numbers based fishery independent survey for age and length comps
+  # same user specifications as indices
+  #fishery catch at age each observed timestep summed over observed polygons
+  # catch at age by area and timestep
+  catch_numbers <-  atlantisom::create_fishery_subset(dat = fishcatchage,
+                                                      time = fishtime,
+                                                      species = select_groups,
+                                                      boxes = fishboxes)
+  
+  # if we want replicates for obs error this sample function will generate them
+  catch_age_comp <- list()
+  for(i in 1:n_reps){
+    catch_age_comp[[i]] <- atlantisom::sample_fish(catch_numbers, fisheffN)
+  }
+  
+  # save fishery age comps
+  #if(save){
+    saveRDS(catch_age_comp, file.path(d.name, paste0(scenario.name, "fishObsFullAgeComp.rds")))
+  #}
+
+
+```
+
+NOTE that the fleet column is lost in the `atlantiom::sample_fish` function!
+
+Look at only every 10 years output (this is a sample, effN = 1000 for the year, which is 200 per timestep here; see calc below confirming):
+
+```{r plotfullcatchage}
+
+#read in comp data
+# age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsFullAgeComp.rds")))
+# age_comp_data <- age_comp_data[[1]]
+
+fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullAgeComp.rds")))
+fish_age_comp <- fish_age_comp[[1]]
+
+#add this to om_indices function so that this has years when read in
+fish_age_comp$time <- fish_age_comp$time/fstepperyr
+
+Catage <- filter(fish_age_comp, time %in% c(30.0, 40.0, 50.0, 60.0, 70.0, 79.8))
+
+Catageplot <- ggplot(Catage, aes(x=agecl, y=atoutput)) +
+    geom_point() +
+    theme_tufte() +
+    labs(subtitle = paste(scenario.name,
+                          Catage$species))
+  
+  Catageplot + facet_wrap(~time, ncol=3, scales="free_y")
+
+```
+
+```{r testeffn}
+
+fish_age_comp %>%
+  filter(time<31) %>%
+  summarise(sum(atoutput))
+
+```
+
+Appears to be working for single fleet per species now.
 
 ## Write input data for specific assessment models
 
