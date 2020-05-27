@@ -8,3 +8,5 @@ run.prm.file <- "nordic_run_v01.xml"
 scenario.name <- "nordic_runresults_01"
 bioind.file <- "outputnordic_runresults_01BiomIndx.txt"
 catch.file <- "outputnordic_runresults_01Catch.txt"
+annage <- TRUE
+fisheries.file <- "NoBAFisheries.csv"
