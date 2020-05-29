@@ -998,7 +998,7 @@ testtruth <- atlantisom::run_truth(scenario = scenario.name,
                        file_fish = fisheries.file,
                        verbose = TRUE,
                        annage = TRUE,
-                       save = FALSE
+                       save = TRUE
     )
 
 ```
