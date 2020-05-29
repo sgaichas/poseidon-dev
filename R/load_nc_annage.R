@@ -350,19 +350,19 @@ load_nc_annage <- function(dir = getwd(), file_nc, file_fish, bps, fgs, biolprm,
       if (select_variable == "N") result2d$layer <- n_layers - 1
     }
     
-    #currently works with only 1 fleet, need to dimension properly for multiple
+    #should now work properly for multiple fleets
     if(input_select_variable %in% c("Catch", "Discard")){
       result2d <- data.frame(species = unlist(sapply(X = mapply(FUN = rep, x = int_fs, 
                    each = (int_fa * int_ff),SIMPLIFY = FALSE,USE.NAMES = FALSE),
         FUN = rep, each = length(boxes) * n_timesteps, simplify = FALSE)),
-        agecl = unlist(sapply(X = sapply(X = int_fa, FUN = seq, from = 1,
+        agecl = unlist(sapply(X = sapply(X = rep(int_fa, int_ff), FUN = seq, from = 1,
                                          by = 1, simplify = FALSE, USE.NAMES = FALSE),
-                              FUN = rep, each = length(boxes) * n_timesteps, simplify = FALSE)),
+                              FUN = rep, each = (length(boxes) * n_timesteps), simplify = FALSE)),
         polygon = unlist(sapply(X = n_timesteps * int_fa * int_ff,
                                 FUN = rep, x = boxes, simplify = FALSE, USE.NAMES = FALSE)),
-        #fleet = unlist(sapply(X = mapply(FUN = rep, x = int_ff, each = int_fa,
-        #                                 SIMPLIFY = FALSE,USE.NAMES = FALSE),
-        #  FUN = rep, each = length(boxes) * n_timesteps, simplify = FALSE)),
+        fleet = unlist(sapply(X = mapply(FUN = rep, x = sp_fleet$fleet, 
+                                         each = (rep(int_fa, int_ff)),SIMPLIFY = FALSE,USE.NAMES = FALSE),
+          FUN = rep, each = (length(boxes) * n_timesteps), simplify = FALSE)),
         time = unlist(sapply(X = int_fa * int_ff , FUN = rep, x = rep(0:(n_timesteps - 1),
                                                             each = length(boxes)), simplify = FALSE, USE.NAMES = FALSE)),
         atoutput = do.call(c, result2d),
