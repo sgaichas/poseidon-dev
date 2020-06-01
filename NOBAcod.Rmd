@@ -150,7 +150,7 @@ len <- filter(len_comp_data, time %in% c(55:175))
 ```
 
 
-#### Age composition (age classes)
+#### Survey age composition (age classes)
 ```{r agecomp-1}
 
 #read in comp data
@@ -174,8 +174,8 @@ Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
   Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
 ```
 
-#### Survey weight at age (age classes)
 
+#### Survey weight at age (age classes)
 ```{r wtageclass-1}
 
 wtage <- readRDS(file.path(d.name, paste0(scenario.name, "survObsWtAtAge.rds")))
@@ -192,9 +192,59 @@ wageplot <- ggplot(wtage, aes(time, atoutput)) +
 wageplot + facet_wrap(c("species"), scales="free_y")
 ```
 
+
+#### Fishery age composition (age classes)
+```{r agecomp-1}
+
+#read in comp data
+age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsAgeComp.rds")))
+age_comp_data <- age_comp_data[[1]]
+
+fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
+fish_age_comp <- fish_age_comp[[1]]
+
+#add this to om_indices function so that this has years when read in
+fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
+
+Natage <- filter(fish_age_comp, time %in% c(55:175))
+
+Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
+    geom_point() +
+    theme_tufte() +
+    labs(subtitle = paste(scenario.name,
+                          Natage$species))
+  
+  Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+```
+
 ### {-}
 
-Wrappers work for NOBA cod using standard age classes. Now to modify the underlying code to get full age structure.
+Wrappers work for NOBA cod using standard age classes. 
+
+Visualize new annual age output for numbers at age, catch at age, and weight at age (interpolated): 
+
+### Wrapper test results for annual ages {#annageoutput}{.tabset}
+
+#### Survey age composition (annual ages)
+```{r plot-annagecomp}
+
+```
+
+#### Survey weight at age (annual ages)
+```{r plot-annwtage}
+
+```
+
+#### Fishery catch at age (annual ages)
+```{r plot-catchagecomp}
+
+```
+
+### {-}
+
+# (Annage development details below)
+
+Now to modify the underlying code to get full age structure.
 
 ## Updating functions for full age structure
 
@@ -887,7 +937,7 @@ Add a check for multiple fisheries per species, if only one then fleet irrelevan
 
 NOBA has multiple fleets for cod (but they are not in output!), so add fleet column to output.
 
-Update: there is now a fleet column in output but the function is still incomplete; will not work if more than one fleet per species. 
+Update: there is now a fleet column in output which should index correctly if a species is caught by multiple fleets. 
 
 Plot catch at age; aggregate over polygons, apply sample_fish:
 
@@ -924,7 +974,7 @@ n_reps <- 1
 
 ```
 
-NOTE that the fleet column is lost in the `atlantiom::sample_fish` function!
+NOTE that the fleet column is lost in the `atlantisom::sample_fish` function!
 
 Look at only every 10 years output (this is a sample, effN = 1000 for the year, which is 200 per timestep here; see calc below confirming):
 
@@ -964,7 +1014,7 @@ Appears to be working for single fleet per species now.
 
 Quick test of `run_truth()` with annage option turned on for NOBA:
 
-```{r testruntruth}
+```{r testruntruth, eval=FALSE}
 
 source(here("config/NOBA2Config.R"))
 
@@ -1002,6 +1052,14 @@ testtruth <- atlantisom::run_truth(scenario = scenario.name,
     )
 
 ```
+
+After much debugging to properly index multiple fleets per species in catch at annual age output, this produced a run_truth.Rdata file and took about 40 minutes to run.
+
+Now all of the wrappers need to read from annage to produce composition data. `om_init()`  now takes annage flag from the config file. `om_species()` looks for annage bio and catch output in the truth file and includes it in the species file (adding NULL if it isn't there). 
+
+Also still need the weight at age interpolation function. Incorporate this at the `om_comps()` step. Next rmd!
+
+Running om_init, om_species, om_index, om_comps in chunk above, plot the annage output [above](#annageoutput). 
 
 
 ## Write input data for specific assessment models
