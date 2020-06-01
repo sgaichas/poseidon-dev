@@ -157,13 +157,7 @@ len <- filter(len_comp_data, time %in% c(55:175))
 age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsAgeComp.rds")))
 age_comp_data <- age_comp_data[[1]]
 
-fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
-fish_age_comp <- fish_age_comp[[1]]
-
-#add this to om_indices function so that this has years when read in
-fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
-
-Natage <- filter(age_comp_data, time %in% c(55:175))
+Natage <- filter(age_comp_data, time %in% c(150:270))
 
 Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
     geom_point() +
@@ -197,16 +191,13 @@ wageplot + facet_wrap(c("species"), scales="free_y")
 ```{r agecomp-1}
 
 #read in comp data
-age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsAgeComp.rds")))
-age_comp_data <- age_comp_data[[1]]
-
 fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
 fish_age_comp <- fish_age_comp[[1]]
 
 #add this to om_indices function so that this has years when read in
-fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
+fish_age_comp$time <- fish_age_comp$time/fstepperyr
 
-Natage <- filter(fish_age_comp, time %in% c(55:175))
+Natage <- filter(fish_age_comp, time %in% c(30:53))
 
 Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
     geom_point() +
@@ -214,7 +205,7 @@ Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
     labs(subtitle = paste(scenario.name,
                           Natage$species))
   
-  Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+  Natageplot + facet_wrap(~time, ncol=6, scales="free_y")
 ```
 
 ### {-}
@@ -227,7 +218,25 @@ Visualize new annual age output for numbers at age, catch at age, and weight at 
 
 #### Survey age composition (annual ages)
 ```{r plot-annagecomp}
+#read in comp data
+annage_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsFullAgeComp.rds")))
+annage_comp_data <- annage_comp_data[[1]]
 
+#fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
+#fish_age_comp <- fish_age_comp[[1]]
+
+#add this to om_indices function so that this has years when read in
+#fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
+
+Natage <- filter(annage_comp_data, time %in% c(150:270))
+
+Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
+    geom_point() +
+    theme_tufte() +
+    labs(subtitle = paste(scenario.name,
+                          Natage$species))
+  
+  Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
 ```
 
 #### Survey weight at age (annual ages)
@@ -238,9 +247,26 @@ Visualize new annual age output for numbers at age, catch at age, and weight at 
 #### Fishery catch at age (annual ages)
 ```{r plot-catchagecomp}
 
+fish_annage_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullAgeComp.rds")))
+fish_annage_comp <- fish_annage_comp[[1]]
+
+#add this to om_indices function so that this has years when read in
+fish_annage_comp$time <- fish_annage_comp$time/fstepperyr
+
+Catage <- filter(fish_annage_comp, time %in% c(30:53))
+
+Catageplot <- ggplot(Catage, aes(x=agecl, y=atoutput)) +
+    geom_point() +
+    theme_tufte() +
+    labs(subtitle = paste(scenario.name,
+                          Catage$species))
+  
+  Catageplot + facet_wrap(~time, ncol=6, scales="free_y")
 ```
 
 ### {-}
+
+Note: NOBA doesn't seem to have a selective fishery for cod. Lots of age 1 in the catch!
 
 # (Annage development details below)
 
