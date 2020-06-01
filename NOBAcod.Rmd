@@ -20,7 +20,7 @@ Then we need to adjust the base atlantisom functions for true age classes, and d
 
 We need config files for the NOBA model, our surveys and fisheries. Surveys and fisheries are based on the ones we used for sardine in the California Current as a test. 
 
-**Special note:** *Atlantis output files usually have the prefix "output" and `atlantisom` expects this. NOBA output files use a different naming convention. I've appended "output" to the beginning of each NOBA output filename for `atlantisom` to work. Need to update `atlantisom` functions for user-specified output filenames.*
+**Special note:** *Atlantis output files formerly had the prefix "output" and `atlantisom` was coded to expect this. NOBA output files (and newer Atlantis models) do not universally use the "output" prefix naming convention. Annage branch `atlantisom` functions have been updated for user-specified output filenames.*
 
 **Special note 2:** *NOBA's nordic_groups_v04.csv file has an inFishery column, rather than the `atlantisom` expected InFishery column. I've changed the column name in the input file, but need to add robustness to atlantisom code to remove case sensitivity.*
 
@@ -46,7 +46,7 @@ We need config files for the NOBA model, our surveys and fisheries. Surveys and 
 ```{r, code = readLines("./config/codfishery.R"), eval=F}
 ```
 
-### Using the wrappers
+### Using the wrappers (now updated for annual age)
 
 All the config files go in the config folder and we'll try running this:
 
@@ -188,7 +188,7 @@ wageplot + facet_wrap(c("species"), scales="free_y")
 
 
 #### Fishery age composition (age classes)
-```{r agecomp-1}
+```{r fishagecomp-1}
 
 #read in comp data
 fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
@@ -210,11 +210,11 @@ Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
 
 ### {-}
 
-Wrappers work for NOBA cod using standard age classes. 
+Wrappers still work for NOBA cod using standard age classes. 
 
 Visualize new annual age output for numbers at age, catch at age, and weight at age (interpolated): 
 
-### Wrapper test results for annual ages {#annageoutput}{.tabset}
+### Wrapper test results for annual ages {.tabset #annageoutput}
 
 #### Survey age composition (annual ages)
 ```{r plot-annagecomp}
@@ -239,7 +239,7 @@ Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
   Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
 ```
 
-#### Survey weight at age (annual ages)
+#### Survey weight at age (annual ages) pending new function
 ```{r plot-annwtage}
 
 ```
@@ -823,7 +823,7 @@ wageplot + facet_wrap(c("polygon"), scales="free_y")
 
 So, to modify run_truth we need to add the annage output but not replace the regular output in case users want output from non-age structured groups (inverts, etc.). Also need to see if lengths can be generaged from the annage outputs, if not need to keep the full set of outputs from the .nc file for all species to generate them.
 
-UPDATE: there is a difference between the annage weight at age and that calculated using 'calc_age2length'. While the results from the standard nc output look reasonable for NOBA cod, the annage weight at age is half that for the standard (and half what real cod would be). More worrisome, the oldest age classes have smaller average weight at age than some younger ones. I cannot think of why this would be. Until we are sure the annage weight output is correct, we will instead interpolate the weight at age output of 'calc_age2length" for use as assessment input. 
+UPDATE: there is a difference between the annage weight at age and that calculated using 'calc_age2length()'. While the results from the standard nc output look reasonable for NOBA cod, the annage weight at age is half that for the standard (and half what real cod would be). More worrisome, the oldest age classes have smaller average weight at age than some younger ones. I cannot think of why this would be. Until we are sure the annage weight output is correct, we will instead interpolate the weight at age output of 'calc_age2length" for use as assessment input. 
 
 Looks like the annagecatch output is only numbers and not weights. We don't get weight at age from fisheries usually so this is fine. 
 
@@ -857,7 +857,7 @@ ANNAGECATCH.nc layers: `r n_layers`
 
 Catch file contains "IsFished" species discard at age and catch at age by fishery in numbers. So now modifying load_nc_annage to get the fishery specific outputs, which requires additional atlantis fishery setup files and additions to the config files above.
 
-New function `load_fisheries` needed to load the fishery specification file (a .csv), similar to `load_fgs`:
+New function `load_fisheries()` needed to load the fishery specification file (a .csv), similar to `load_fgs()`:
 
 ```{r load_fisheries, eval=FALSE}
 
@@ -873,7 +873,7 @@ load_fisheries <- function(dir = getwd(), file_fish){
 }
 ```
 
-Call `load_fisheries` within `load_nc_annage` to rename select_variable as used in ANNAGECATCH.nc:
+Call `load_fisheries()` within `load_nc_annage()` to rename select_variable as used in ANNAGECATCH.nc:
 
 ```{r addsnippet, eval=FALSE}
 
@@ -898,7 +898,7 @@ if(select_variable %in% c("Catch", "Discard")){
 
 Also added if statements to add fleets for fisheries outputs, if statements to separate output for annage and annagecatch.
 
-Test new `load_nc_annage`:
+Test new `load_nc_annage()`:
 
 ```{r testfishery}
 
@@ -1081,11 +1081,11 @@ testtruth <- atlantisom::run_truth(scenario = scenario.name,
 
 After much debugging to properly index multiple fleets per species in catch at annual age output, this produced a run_truth.Rdata file and took about 40 minutes to run.
 
-Now all of the wrappers need to read from annage to produce composition data. `om_init()`  now takes annage flag from the config file. `om_species()` looks for annage bio and catch output in the truth file and includes it in the species file (adding NULL if it isn't there). 
+Now all of the wrappers need to read from annage to produce composition data. `om_init()`  now takes annage flag from the config file. `om_species()` looks for annage bio and catch output in the truth file and includes it in the species file (adding NULL if it isn't there). `om_comps()` looks for annage bio and catch in the species file and adds them to the comps list if there (adding NULL if they aren't there). 
 
 Also still need the weight at age interpolation function. Incorporate this at the `om_comps()` step. Next rmd!
 
-Running om_init, om_species, om_index, om_comps in chunk above, plot the annage output [above](#annageoutput). 
+Running `om_init()`, `om_species()`, `om_index()`, `om_comps()` in chunk above to make sure the original output is preserved, then plot the annage output [above](#annageoutput). 
 
 
 ## Write input data for specific assessment models
