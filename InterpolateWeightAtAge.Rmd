@@ -52,7 +52,7 @@ annages <- NOBAom_cod$truenumsage_ss %>%
   rename(trueage = agecl) %>%
   summarise(truenatage = sum(atoutput))
   
-calc_wtTrueage <- function(wtagecl, annages, fgs) {
+#calc_wtTrueage <- function(wtagecl, annages, fgs) {
   # get number of ages per agecl from fgs.file
   #fgs <- atlantisom::load_fgs(dir=d.name, file_fgs = functional.groups.file)
   species.code <- fgs$Code
@@ -84,159 +84,63 @@ calc_wtTrueage <- function(wtagecl, annages, fgs) {
     dplyr::group_by(species, time, agecl) %>%
     dplyr::mutate(avgage = weighted.mean(trueage, truenatage))
    
+  wtage_avgage <- wtage_out %>%
+    select(species, time, agecl, avgage) %>%
+    distinct()
   
   # find weight increment for a timestep
   # muweight for agecl+1 - muweight for agecl
   wtagecl_inc <- wtagecl %>%
     dplyr::arrange(species, time, agecl) %>%
-    dplyr::left_join(multiple_ages, by = c("species" = "Name")) %>%
+    #dplyr::left_join(multiple_ages, by = c("species" = "Name")) %>%
     dplyr::group_by(species, time) %>%
     dplyr::mutate(increment = case_when(
       agecl==1 ~ atoutput,
       agecl>1 ~ atoutput - dplyr::lag(atoutput)
       )) %>%
-    dplyr::mutate(agewtinc = increment/NumAgeClassSize)
+    dplyr::left_join(wtage_avgage) %>%
+    dplyr::mutate(avgageinc = case_when(
+      agecl==1 ~ avgage,
+      agecl>1 ~ avgage - dplyr::lag(avgage)
+      )) 
   
-  # last line above does this: divide weight increment by number of ages per agecl 
-  # definitely wrong, especially at younger ages, for two reasons:
-  #  - assumes each agecl has equal numbers of its constituent ages
-  #  - assumes linear growth between age classes
-  # (could decay with increasing age, but how different from equal increment?)
-  # avgWtAge for agecl 1 = (n age1 * avgwt age1) + (n age2 * avgwt age2)
+  # complex, but works for 2 ages/agecl, need to test, need to fix oldest
+  wtage_out <- wtage_out %>%
+    dplyr::select(species, time, trueage, agecl, avgage) %>%
+    dplyr::left_join(wtagecl_inc) %>%
+    dplyr::group_by(species, time) %>%
+    dplyr::mutate(wtIntage = case_when(
+      trueage==1 ~ trueage/avgage*increment,
+      (trueage>1 & trueage<avgage) ~ 
+        (1-(avgage-trueage)/avgageinc)*increment + lag(atoutput),
+      (trueage>1 & trueage>avgage) ~ 
+        ((trueage-avgage)/lead(avgageinc))*lead(increment) + atoutput
+        ))
   
 
-  # recursive: add increment to agecl until hitting agecl+1
-
-  # reunumber agecl 1 to 10*number of ages per agecl
+  # plot this--how bad would piecewise linear interpolation be?
+  wtageclann <- ggplot(wtagecl_inc, aes(avgage, atoutput)) +
+    geom_point() +
+    geom_line(aes(colour = factor(time))) + 
+    scale_x_continuous(minor_breaks = c(0:20)) +
+    theme_tufte() +
+    theme(legend.position = "none",
+          panel.grid.minor.x = element_line(colour = "grey50"),
+          panel.grid.major.x = element_line(colour = "grey50"))
+  
+  wtageclann + geom_point(data = wtage_out, 
+             mapping = aes(trueage, wtIntage))
+  # maybe not so bad
 
   # output full set of muweight at newly created agecl
 
-}
+#}
 ```
 
-Plot interpolated results for NOBA species:
+Plot interpolated results for more NOBA species:
 
 ```{r interp-wtage-test1}
 
 ```
 
 
-## Quick test with saved CCA census output
-
-Here we check the CCA model (Atlantis Summit Common Scenario 1) saved length and weight census output for small species at Isaac's suggestion (all three of the following are true age classes, NumAgeClassSize=1 per Atlantis agecl bin:
-
-```{r loadCCAlengthcomp, echo=TRUE}
-
-source(here("config/CCConfig.R"))
-
-length_censussurvsamp <- readRDS(file.path(d.name, paste0(scenario.name, "length_censussurvsamp.rds")))
-
-```
-
-```{r apply-inter-pwtage-CCA}
-
-```
-
-Plots for species with 1 true age per agecl should not be different:
-
-Sardine:  
-```{r plotCCAsardine}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Pacific_sardine")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-Anchovy:  
-```{r plotCCAanchovy}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Anchovy")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-Herring:  
-```{r plotCCAherring}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Herring")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-How do these three look? Identical I hope.
-
-Now for some CCA groups with multiple true ages interpolated per stage.
-
-Pacific hake, 2 true ages per class (20 total):  
-```{r plotCCAhake}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Mesopel_M_Fish")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-Bocaccio rockfish, 5 true ages per age class (50 total):
-```{r plotCCAbocaccio}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Bocaccio_rockfish")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-Yelloweye rockfish, most extreme at 12 true ages per age class (120 total):
-```{r plotCCAYelloweye}
-censuswt <- length_censussurvsamp$muweight %>%
-  filter(species == "Yelloweye_rockfish")
-
-wageplot <- ggplot(censuswt, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (1 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year survey"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-```
-
-Yelloweye should be a good test...
