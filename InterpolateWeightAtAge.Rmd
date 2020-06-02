@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(here)
 library(tidyverse)
 library(atlantisom)
+library(ggthemes)
 
 ```
 
@@ -46,8 +47,12 @@ If we were to do simple interpolation on this output, we can approximate weight 
 # a function to go into atlantisom, sketched here, reuse calc_stage2age as possible
 
 wtagecl <- wtage
+annages <- NOBAom_cod$truenumsage_ss %>%
+  group_by(species, time, agecl) %>%
+  rename(trueage = agecl) %>%
+  summarise(truenatage = sum(atoutput))
   
-calc_wtTrueage <- function(wtagecl, fgs) {
+calc_wtTrueage <- function(wtagecl, annages, fgs) {
   # get number of ages per agecl from fgs.file
   #fgs <- atlantisom::load_fgs(dir=d.name, file_fgs = functional.groups.file)
   species.code <- fgs$Code
@@ -69,13 +74,36 @@ calc_wtTrueage <- function(wtagecl, fgs) {
   ntimesteps <- length(unique(wtagecl$time))
 
   # make a dataframe the right dimensions for all age classes
-  wtage_out <- data.frame()
+  # has species, time from wtage and trueage, truenatage from annages
+  # add agecl column
+  # finds the average age of each agecl each timestep based on truenatage
+  wtage_out <- annages %>%
+    dplyr::semi_join(wtagecl, by = c("species", "time")) %>%
+    dplyr::left_join(multiple_ages, by = c("species" = "Name")) %>%
+    dplyr::mutate(agecl = as.integer(ceiling(trueage/NumAgeClassSize))) %>%
+    dplyr::group_by(species, time, agecl) %>%
+    dplyr::mutate(avgage = weighted.mean(trueage, truenatage))
+   
   
   # find weight increment for a timestep
   # muweight for agecl+1 - muweight for agecl
+  wtagecl_inc <- wtagecl %>%
+    dplyr::arrange(species, time, agecl) %>%
+    dplyr::left_join(multiple_ages, by = c("species" = "Name")) %>%
+    dplyr::group_by(species, time) %>%
+    dplyr::mutate(increment = case_when(
+      agecl==1 ~ atoutput,
+      agecl>1 ~ atoutput - dplyr::lag(atoutput)
+      )) %>%
+    dplyr::mutate(agewtinc = increment/NumAgeClassSize)
   
-
-  # divide weight increment by number of ages per agecl (could decay with increasing age, but how different from equal increment?)
+  # last line above does this: divide weight increment by number of ages per agecl 
+  # definitely wrong, especially at younger ages, for two reasons:
+  #  - assumes each agecl has equal numbers of its constituent ages
+  #  - assumes linear growth between age classes
+  # (could decay with increasing age, but how different from equal increment?)
+  # avgWtAge for agecl 1 = (n age1 * avgwt age1) + (n age2 * avgwt age2)
+  
 
   # recursive: add increment to agecl until hitting agecl+1
 
