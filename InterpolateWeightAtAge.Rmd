@@ -144,11 +144,207 @@ annages <- NOBAom_cod$truenumsage_ss %>%
 #}
 ```
 
-Plot interpolated results for more NOBA species:
+Run wrappers and plot interpolated results for multiple NOBA species:
 
 ```{r interp-wtage-test1}
+
+NOBAom <- om_init(here("config/NOBA2config.R"))
+
+# 3 species: 40, 20, 6 age classes
+NOBAom_redcodcap <- om_species(c("Redfish", "North_atl_cod", "Capelin"), NOBAom)
+
+rm(NOBAom) #free some memory
+
+```
+
+Fix bug in omdimensions.R; need to vectorize:
+
+```{r omdimensions-bugfix}
+
+omlist_ss <- NOBAom_redcodcap # multispecies call
+
+n_age_classes <- omlist_ss$funct.group_ss$NumCohorts # works
+age_classes <- 1:n_age_classes # nope, only first spp, needed in SS3 writing?
+
+age_classes <- sapply(n_age_classes, seq)
+names(age_classes)<-survspp
+
+n_annages <- n_age_classes * omlist_ss$funct.group_ss$NumAgeClassSize # works
+annages <- 1:n_annages # nope, only first spp, needed in SS3 writing?
+
+annages <- sapply(n_annages, seq)
+names(annages)<-survspp
+
+# dimensioning survey in 3sppsurvey.R
+survspp <- omlist_ss$species_ss # works
+surveffic <- data.frame(species=survspp,
+                     efficiency=rep(1.0,length(survspp)))  # works
+survselex <- data.frame(species=rep(survspp, each=n_annages), # nope! 
+                        agecl=rep(c(1:n_annages),length(survspp)),
+                        selex=rep(1.0,length(survspp)*n_annages))
+surveffN <- data.frame(species=survspp, effN=rep(1000, length(survspp))) # works
+surv_cv <- data.frame(species=survspp, cv=rep(0.1,length(survspp))) # works
+
+#dimensioned for annual ages rather than age classes
+survselex <- data.frame(species=rep(survspp, n_annages), #  
+                        agecl=unlist(sapply(n_annages,seq)),
+                        selex=rep(1.0,sum(n_annages)))
+
+```
+
+New config files needed for multispecies pulls:
+
+`3sppsurvey.R` configures the fishery independent survey and looks like this:
+
+```{r, code = readLines("./config/3sppsurvey.R"), eval=F}
+```
+
+`3sppfishery.R` configures the fishery dependent data and looks like this:
+
+```{r, code = readLines("./config/3sppfishery.R"), eval=F}
+```
+
+Fix multispecies bug in om_index function:
+```{r omindex-bugfix}
+
+# original  
+wtage <- data.frame(species=rep(survspp, each=max(age_classes)), #nope
+                      agecl=rep(c(1:max(age_classes)),length(survspp)), #nope
+                      wtAtAge=rep(1000.0,length(survspp)*max(age_classes))) #nope
+
+# age_classes is now a list 1:n_age_classes by species
+# this is still dimensioned by agecl not true age
+wtage <- data.frame(species=rep(survspp, n_age_classes), 
+                      agecl=unlist(sapply(n_age_classes,seq)), 
+                      wtAtAge=rep(1000.0,sum(n_age_classes))) 
 
 
 ```
 
+
+Try index step again:
+
+```{r indcomp-test}
+
+NOBAom_redcodcap_ind <- om_index(usersurvey = here("config/3sppsurvey.R"), 
+                           userfishery = here("config/3sppfishery.R"),
+                           omlist_ss = NOBAom_redcodcap, 
+                           n_reps = 1, 
+                           save = TRUE)
+
+
+```
+
+om_index works, om_comps runs for survey and produces age, length, weight output, produces fishery age output, but fails calling the age2length function.
+
+check fishery observed age comp:
+
+```{r debugcomps, eval=FALSE}
+
+catch_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
+catch_age_comp <- catch_age_comp[[1]]
+
+filter(catch_age_comp, species=="North_atl_cod")
+filter(catch_age_comp, species=="Redfish")
+filter(catch_age_comp, species=="Capelin")
+
+#snippets from calc_age2length
+nums <- filter(catch_age_comp, species=="Capelin")
+#calculate mean length at age
+mulen <- nums
+muweight <- nums
+
+#needed stuff from om_comps
+#Get catch weights for length comp calc
+  # aggregate true resn per fishery subset design
+  catch_aggresnss <- atlantisom::aggregateDensityData(dat = omlist_ss$trueresn_ss,
+                                                      time = fishtime,
+                                                      species = survspp,
+                                                      boxes = fishboxes)
+
+  # aggregate true structn fishery subsetdesign
+  catch_aggstructnss <- atlantisom::aggregateDensityData(dat = omlist_ss$truestructn_ss,
+                                                         time = fishtime,
+                                                         species = survspp,
+                                                         boxes = fishboxes)
+
+  #dont sample these, just aggregate them using median
+  structn <- atlantisom::sample_fish(catch_aggstructnss, fisheffN, sample = FALSE)
+
+  resn <- atlantisom::sample_fish(catch_aggresnss, fisheffN, sample = FALSE)
+  
+  # more snippets from calc_age2length
+  # extract rows from structn and resn that match the rows in nums, which are only non-zeroes
+resn.ind <- with(resn,paste(species,'.',agecl,'.',polygon,'.',layer,'.',time,sep=""))
+num.ind <- with(nums,paste(species,'.',agecl,'.',polygon,'.',layer,'.',time,sep=""))
+pick <- match(num.ind,resn.ind)
+SRN <- resn$atoutput[pick] + structn$atoutput[pick]
+
+# get weight-length parameters
+li_a_use <- biolprm$wl[match(fgs$Code[match(nums$species,fgs$Name)],biolprm$wl[, 1]), 2]
+li_b_use <- biolprm$wl[match(fgs$Code[match(nums$species,fgs$Name)],biolprm$wl[, 1]), 3]
+
+#calc mean length and weight at age
+mulen$atoutput <- ((biolprm$kgw2d*biolprm$redfieldcn*SRN)/(1000*li_a_use))^(1/li_b_use)
+muweight$atoutput <- li_a_use*mulen$atoutput^li_b_use
+
+upper.bins <- 1:maxbin
+lower.bins <- c(0,upper.bins[-length(upper.bins)])
+lenfreq <- NULL
+
+# well, match does return NA for capelin, and this is what breaks the comparison using 
+# the max function (returns NA). adding na.rm=TRUE to line 86
+if(maxbin<max(mulen$atoutput)){
+  print("Warning: maximum bin size is smaller than the longest fish in the sample. Fish above the maximum bin size will be removed from length compositions.")
+}
+
+groups <- unique(as.factor(structn$species)) 
+CVlenage = 0.1
+# but will NAs break the following?
+for (irow in 1:nrow(mulen))
+#for (irow in 1:500)
+  {
+  group <- nums$species[irow]
+  igroup <- which(groups==group)
+  box <- nums$polygon[irow]
+  layer <- nums$layer[irow]
+  time <- nums$time[irow]
+  age <- nums$agecl[irow]
+
+  sigma = sqrt(log((CVlenage^2)+1))
+  muuse <- log(mulen$atoutput[irow]) - 0.5*(sigma^2)
+  CumFracperbin <- plnorm(upper.bins,muuse,sigma)
+  Fracperbin <- c(CumFracperbin[1],diff(CumFracperbin))
+  natlength = Fracperbin*nums$atoutput[irow]
+  results <- cbind(mulen[irow,],lower.bins,upper.bins, row.names = NULL) # add row.names = NULL?
+  results$atoutput <- round(natlength,0)
+  #results <- results[results$atoutput>0,]
+  lenfreq <- rbind(lenfreq,results) # add row.names = NULL?
+}
+
+remove.zeroes = TRUE
+#get rid of zero rows.
+if (remove.zeroes) lenfreq <- lenfreq[lenfreq$atoutput>0,]
+
+#output. natlength now has additional columns because of need to store length bin info
+lenout <- NULL
+lenout$mulen <- mulen
+lenout$muweight <- muweight
+lenout$natlength <- lenfreq
+
+# ok, works but adds NA for Capelin age classes where no numbers were sampled.
+# could crank up sample size or just live with this.
+
+```
+
+Try om_comps step again:
+
+```{r comps-redo}
+
+NOBAom_redcodcap_comp <- om_comps(usersurvey = here("config/3sppsurvey.R"), 
+                           userfishery = here("config/3sppfishery.R"),
+                           omlist_ss = NOBAom_redcodcap, 
+                           n_reps = 1, 
+                           save = TRUE)
+```
 
