@@ -104,7 +104,7 @@ annages <- NOBAom_cod$truenumsage_ss %>%
       agecl>1 ~ avgage - dplyr::lag(avgage)
       )) 
   
-  # complex, but works for 2 ages/agecl, need to test, need to fix oldest
+  # complex, but works for 2 ages/agecl, need to test more, need to fix oldest
   wtage_out <- wtage_out %>%
     dplyr::select(species, time, trueage, agecl, avgage) %>%
     dplyr::left_join(wtagecl_inc) %>%
@@ -132,6 +132,13 @@ annages <- NOBAom_cod$truenumsage_ss %>%
              mapping = aes(trueage, wtIntage))
   # maybe not so bad
 
+  # fix oldest age
+
+  #clean up to have only standard columns
+  finaldata <- data.frame("species" = wtage_out$species,
+                          "agecl" = wtage_out$trueage, "polygon" = NA, "layer" = NA,
+                          "time" = wtage_out$time, "atoutput" = wtage_out$wtIntage)
+
   # output full set of muweight at newly created agecl
 
 #}
@@ -140,6 +147,7 @@ annages <- NOBAom_cod$truenumsage_ss %>%
 Plot interpolated results for more NOBA species:
 
 ```{r interp-wtage-test1}
+
 
 ```
 
