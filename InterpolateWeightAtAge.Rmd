@@ -27,7 +27,8 @@ fgs <- NOBAom_cod$funct.group_ss
 biolprm <- NOBAom_cod$biol
 
 wtage <- readRDS(file.path(d.name, paste0(scenario.name, "survObsWtAtAge.rds")))
-wtage <- wtage[[1]]
+wtage <- wtage[[1]] %>%
+  filter(species == "North_atl_cod")
 
 wageplot <- ggplot(wtage, aes(time, atoutput)) +
   geom_line(aes(colour = factor(agecl))) +
@@ -43,11 +44,12 @@ wageplot + facet_wrap(c("species"), scales="free_y")
 
 If we were to do simple interpolation on this output, we can approximate weight at true age class:
 
-```{r interpolate-wtage}
+```{r interpolate-wtage-dev}
 # a function to go into atlantisom, sketched here, reuse calc_stage2age as possible
 
 wtagecl <- wtage
 annages <- NOBAom_cod$truenumsage_ss %>%
+  filter(species == "North_atl_cod") %>%
   group_by(species, time, agecl) %>%
   rename(trueage = agecl) %>%
   summarise(truenatage = sum(atoutput))
@@ -159,7 +161,7 @@ rm(NOBAom) #free some memory
 
 Fix bug in omdimensions.R; need to vectorize:
 
-```{r omdimensions-bugfix}
+```{r omdimensions-bugfix, eval=FALSE}
 
 omlist_ss <- NOBAom_redcodcap # multispecies call
 
@@ -192,6 +194,10 @@ survselex <- data.frame(species=rep(survspp, n_annages), #
 
 ```
 
+New omdimensions file:
+```{r, code = readLines("./config/omdimenstions.R"), eval=F}
+```
+
 New config files needed for multispecies pulls:
 
 `3sppsurvey.R` configures the fishery independent survey and looks like this:
@@ -205,7 +211,7 @@ New config files needed for multispecies pulls:
 ```
 
 Fix multispecies bug in om_index function:
-```{r omindex-bugfix}
+```{r omindex-bugfix, eval=FALSE}
 
 # original  
 wtage <- data.frame(species=rep(survspp, each=max(age_classes)), #nope
@@ -337,14 +343,65 @@ lenout$natlength <- lenfreq
 
 ```
 
-Try om_comps step again:
+Try om_comps step again (now works by allowing NA in max comparison of `calc_age2length()`:
 
-```{r comps-redo}
+```{r comps-redo, message=FALSE}
 
 NOBAom_redcodcap_comp <- om_comps(usersurvey = here("config/3sppsurvey.R"), 
                            userfishery = here("config/3sppfishery.R"),
                            omlist_ss = NOBAom_redcodcap, 
                            n_reps = 1, 
                            save = TRUE)
+```
+
+What do the interpolated weight at ages look like? Diagnostic plots from function look the same as above for cod (good), blank for Capelin (good? didnt need extrapolation but may have other problems), and bad for Redfish between true ages 2-15; lots of overestimation. 
+
+```{r vis-interpolate-1, warning=FALSE}
+
+# plot portion, just redfish, capelin is blank and cod looks the same
+library(ggforce)
+NOBAom_redcodcap_comp$survObsFullWtAtAge[[1]][[2]] + facet_wrap_paginate(~species, ncol=1, nrow = 1, page=3, scales = "free")
+
+```
+
+
+Compare ObsWtAtAge with ObsFullWtAtAge outputs by species:
+
+```{r vis-interpolate-2}
+
+# dataframe portion
+intwtCod <- NOBAom_redcodcap_comp$survObsFullWtAtAge[[1]][[1]] %>%
+  filter(species == "North_atl_cod")
+
+intwtRed <- NOBAom_redcodcap_comp$survObsFullWtAtAge[[1]][[1]] %>%
+  filter(species == "Redfish")
+
+intwtCap <- NOBAom_redcodcap_comp$survObsFullWtAtAge[[1]][[1]] %>%
+  filter(species == "Capelin") #empty
+
+wtageCod <- NOBAom_redcodcap_comp$survObsWtAtAge[[1]] %>%
+  filter(species == "North_atl_cod")
+
+wtageRed <- NOBAom_redcodcap_comp$survObsWtAtAge[[1]] %>%
+  filter(species == "Redfish")
+
+wtageCap <- NOBAom_redcodcap_comp$survObsWtAtAge[[1]] %>%
+  filter(species == "Capelin")
+
+# handmade plots:
+
+wtagecl <- wtageCap
+
+  wtagep <- ggplot(wtagecl, aes(agecl, atoutput)) +
+    geom_point() +
+    geom_line(aes(colour = factor(time))) + 
+    scale_x_continuous(minor_breaks = c(0:max(agecl))) +
+    theme_tufte() +
+    theme(legend.position = "none",
+          panel.grid.minor.x = element_line(colour = "grey50"),
+          panel.grid.major.x = element_line(colour = "grey50"))
+
+
+
 ```
 
