@@ -35,9 +35,9 @@ surveffic <- data.frame(species=survspp,
 #                     selex=rep(1.0,length(survspp)*n_age_classes))
 
 # for annage output
-survselex <- data.frame(species=rep(survspp, each=n_annages),
-                        agecl=rep(c(1:n_annages),length(survspp)),
-                        selex=rep(1.0,length(survspp)*n_annages))
+survselex <- data.frame(species=rep(survspp, n_annages), #  
+                        agecl=unlist(sapply(n_annages,seq)),
+                        selex=rep(1.0,sum(n_annages)))
 
 # effective sample size needed for sample_fish
 # this effective N is high but not equal to total for numerous groups

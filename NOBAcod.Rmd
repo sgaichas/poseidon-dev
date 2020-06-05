@@ -55,6 +55,7 @@ All the config files go in the config folder and we'll try running this:
 #library(here) now above
 library(tidyverse)
 library(atlantisom)
+library(ggthemes)
 
 NOBAom <- om_init(here("config/NOBA2config.R"))
 
@@ -80,7 +81,6 @@ NOBAom_cod_comp <- om_comps(usersurvey = here("config/codsurvey.R"),
 #### Biomass index
 ```{r bioind-1}
 
-library(ggthemes)
 omlist_ss <- NOBAom_cod
 source(here("config/omdimensions.R"))
 
@@ -239,8 +239,22 @@ Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
   Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
 ```
 
-#### Survey weight at age (annual ages) pending new function
+#### Survey iterpolated weight at age (annual ages) 
 ```{r plot-annwtage}
+
+wtage <- readRDS(file.path(d.name, paste0(scenario.name, "survObsFullWtAtAge.rds")))
+wtage <- wtage[[1]] #this still has second list component, diagnostic plot
+wtage <- wtage[[1]]
+
+wageplot <- ggplot(wtage, aes(time, atoutput)) +
+  geom_line(aes(colour = factor(agecl))) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  xlab("model timestep (5 per year)") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
 
 ```
 
@@ -262,6 +276,25 @@ Catageplot <- ggplot(Catage, aes(x=agecl, y=atoutput)) +
                           Catage$species))
   
   Catageplot + facet_wrap(~time, ncol=6, scales="free_y")
+```
+
+#### Fishery iterpolated weight at age (annual ages) 
+```{r plot-fishannwtage}
+
+wtage <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullWtAtAge.rds")))
+wtage <- wtage[[1]] #this still has second list component, diagnostic plot
+wtage <- wtage[[1]]
+
+wageplot <- ggplot(wtage, aes(time, atoutput)) +
+  geom_line(aes(colour = factor(agecl))) +
+  theme_tufte() +
+  theme(legend.position = "bottom") +
+  xlab("model timestep (5 per year)") +
+  ylab("average individual weight (g)") +
+  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
+
+wageplot + facet_wrap(c("species"), scales="free_y")
+
 ```
 
 ### {-}
