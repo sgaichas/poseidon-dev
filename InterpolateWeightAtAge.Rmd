@@ -1,5 +1,5 @@
 ---
-title: "Interpolate the weight at agecl output to annual age"
+title: "Interpolate weight at agecl output to annual age"
 author: "Sarah Gaichas"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
@@ -13,6 +13,7 @@ library(here)
 library(tidyverse)
 library(atlantisom)
 library(ggthemes)
+library(ggforce)
 
 ```
 
@@ -370,7 +371,7 @@ NOBAom_redcodcap <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.r
 ```{r vis-interpolate-1, warning=FALSE}
 
 # plot portion, just redfish, capelin is blank and cod looks the same
-library(ggforce)
+#library(ggforce)
 survObsFullWtAtAge[[1]][[2]] + facet_wrap_paginate(~species, ncol=1, nrow = 1, page=3, scales = "free")
 
 ```
@@ -453,7 +454,7 @@ annageCap <- NOBAom_redcodcap$truenumsage_ss %>%
 
 annages <- annageRed
 wtagecl <- wtageRed
-fgs <- fgs
+fgs <- NOBAom_redcodcap$funct.group_ss
 
   annages <- annages %>%
     group_by(species, time, agecl) %>%
@@ -504,6 +505,7 @@ fgs <- fgs
   # for more than 2 ages/agecl need to have a bigger lead/lag
   # achieved by faking a scalar for lead/lag n using max() function
   # should be ceiling I think for odd NumAgeClassSize, but not sure?
+  # for oldest age(s), perhaps default=last(x) in lead statement
   wtage_out <- wtage_out %>%
     dplyr::select(species, time, trueage, NumAgeClassSize, agecl, avgage) %>%
     dplyr::left_join(wtagecl_inc) %>%
@@ -512,12 +514,11 @@ fgs <- fgs
       (agecl==1 & trueage<avgage) ~ (1-(avgage-trueage)/avgageinc)*increment,
       (agecl>1 & trueage<avgage) ~
         (1-(avgage-trueage)/avgageinc)*increment +
-        lag(atoutput, ceiling(max(NumAgeClassSize)/2)),
+        dplyr::lag(atoutput, ceiling(max(NumAgeClassSize)/2)),
       (trueage>avgage) ~
-        ((trueage-avgage)/lead(avgageinc, ceiling(max(NumAgeClassSize)/2)))*lead(increment, ceiling(max(NumAgeClassSize)/2)) + atoutput
+        (trueage-avgage)/dplyr::lead(avgageinc, ceiling(max(NumAgeClassSize)/2), default=last(avgageinc))*dplyr::lead(increment, ceiling(max(NumAgeClassSize)/2), default=last(increment)) + atoutput
     ))
 
-  # fix oldest age
 
   # diagnostic plot--are interpolations where we expect them?
   wtageclann <- ggplot(wtagecl_inc, aes(avgage, atoutput)) +
@@ -541,7 +542,7 @@ fgs <- fgs
 
 ```
 
-Try the updated function again, any bugs with multiple species? OK so far.
+Try the updated function again, any bugs with multiple species? Is it getting the weight at max age for both? OK so far.
 
 ```{r test-correctedinterp, warning=FALSE, message=FALSE}
 
@@ -559,5 +560,5 @@ interp_survWtAtAge[[2]] + facet_wrap_paginate(~species, ncol=1, nrow = 1, page=3
 
 ```
 
-Last issue is extrapolating the oldest wt at age. Linear from the last one?
+Extrapolating the oldest wt at age is now linear from the last agecl weight at age using default=last() in the dplyr::lead() calls. 
 
