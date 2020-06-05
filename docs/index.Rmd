@@ -11,7 +11,7 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/NOBAcod.html" target="_blank">Apply and extend wrappers to get full age structure, updated June 1, 2020</a>
 
-<a href="https://sgaichas.github.io/poseidon-dev/InterpolateWeightAtAge.html" target="_blank">Interpolate to get average weight at true age, June 2, 2020</a>
+<a href="https://sgaichas.github.io/poseidon-dev/InterpolateWeightAtAge.html" target="_blank">Interpolate to get average weight at true age, June 4, 2020</a>
 
 ### Working on wrapper functions, January 2020
 
