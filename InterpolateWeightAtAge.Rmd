@@ -148,7 +148,7 @@ annages <- NOBAom_cod$truenumsage_ss %>%
 
 Run wrappers and plot interpolated results for multiple NOBA species:
 
-```{r interp-wtage-test1}
+```{r interp-wtage-test1, eval=FALSE}
 
 NOBAom <- om_init(here("config/NOBA2config.R"))
 
@@ -195,7 +195,7 @@ survselex <- data.frame(species=rep(survspp, n_annages), #
 ```
 
 New omdimensions file:
-```{r, code = readLines("./config/omdimenstions.R"), eval=F}
+```{r, code = readLines("./config/omdimensions.R"), eval=F}
 ```
 
 New config files needed for multispecies pulls:
@@ -230,7 +230,7 @@ wtage <- data.frame(species=rep(survspp, n_age_classes),
 
 Try index step again:
 
-```{r indcomp-test}
+```{r indcomp-test, eval=FALSE}
 
 NOBAom_redcodcap_ind <- om_index(usersurvey = here("config/3sppsurvey.R"), 
                            userfishery = here("config/3sppfishery.R"),
@@ -345,7 +345,7 @@ lenout$natlength <- lenfreq
 
 Try om_comps step again (now works by allowing NA in max comparison of `calc_age2length()`:
 
-```{r comps-redo, message=FALSE}
+```{r comps-redo, message=FALSE, eval=FALSE}
 
 NOBAom_redcodcap_comp <- om_comps(usersurvey = here("config/3sppsurvey.R"), 
                            userfishery = here("config/3sppfishery.R"),
@@ -356,11 +356,22 @@ NOBAom_redcodcap_comp <- om_comps(usersurvey = here("config/3sppsurvey.R"),
 
 What do the interpolated weight at ages look like? Diagnostic plots from function look the same as above for cod (good), blank for Capelin (good? didnt need extrapolation but may have other problems), and bad for Redfish between true ages 2-15; lots of overestimation. 
 
+```{r readin-savedoutput}
+
+survObsFullWtAtAge <- readRDS(file.path(d.name, paste0(scenario.name, "survObsFullWtAtAge.rds")))
+
+survObsWtAtAge <- readRDS(file.path(d.name, paste0(scenario.name, "survObsWtAtAge.rds")))
+
+NOBAom_redcodcap <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+
+```
+
+
 ```{r vis-interpolate-1, warning=FALSE}
 
 # plot portion, just redfish, capelin is blank and cod looks the same
 library(ggforce)
-NOBAom_redcodcap_comp$survObsFullWtAtAge[[1]][[2]] + facet_wrap_paginate(~species, ncol=1, nrow = 1, page=3, scales = "free")
+survObsFullWtAtAge[[1]][[2]] + facet_wrap_paginate(~species, ncol=1, nrow = 1, page=3, scales = "free")
 
 ```
 
@@ -370,22 +381,22 @@ Compare ObsWtAtAge with ObsFullWtAtAge outputs by species:
 ```{r vis-interpolate-2}
 
 # dataframe portion
-intwtCod <- NOBAom_redcodcap_comp$survObsFullWtAtAge[[1]][[1]] %>%
+intwtCod <- survObsFullWtAtAge[[1]][[1]] %>%
   filter(species == "North_atl_cod")
 
-intwtRed <- NOBAom_redcodcap_comp$survObsFullWtAtAge[[1]][[1]] %>%
+intwtRed <- survObsFullWtAtAge[[1]][[1]] %>%
   filter(species == "Redfish")
 
-intwtCap <- NOBAom_redcodcap_comp$survObsFullWtAtAge[[1]][[1]] %>%
-  filter(species == "Capelin") #empty
+intwtCap <- survObsFullWtAtAge[[1]][[1]] %>%
+  filter(species == "Capelin") #empty, no need for interpolation, but make intelligent
 
-wtageCod <- NOBAom_redcodcap_comp$survObsWtAtAge[[1]] %>%
+wtageCod <- survObsWtAtAge[[1]] %>%
   filter(species == "North_atl_cod")
 
-wtageRed <- NOBAom_redcodcap_comp$survObsWtAtAge[[1]] %>%
+wtageRed <- survObsWtAtAge[[1]] %>%
   filter(species == "Redfish")
 
-wtageCap <- NOBAom_redcodcap_comp$survObsWtAtAge[[1]] %>%
+wtageCap <- survObsWtAtAge[[1]] %>%
   filter(species == "Capelin")
 
 # handmade plots:
@@ -395,13 +406,158 @@ wtagecl <- wtageCap
   wtagep <- ggplot(wtagecl, aes(agecl, atoutput)) +
     geom_point() +
     geom_line(aes(colour = factor(time))) + 
-    scale_x_continuous(minor_breaks = c(0:max(agecl))) +
+    scale_x_continuous(minor_breaks = c(0:max(wtagecl$agecl))) +
     theme_tufte() +
     theme(legend.position = "none",
           panel.grid.minor.x = element_line(colour = "grey50"),
           panel.grid.major.x = element_line(colour = "grey50"))
 
-
+wtagep
 
 ```
+
+Capelin is fine with WtAtAge output because it has age classes = true ages!
+Maybe just warn that a species with fgs$NumAgeClassSize = 1 will have NA output of interpolation functions, which will run if there is output for that species in the ANNAGEBIO.nc and ANNAGECATCH.nc files. 
+
+Redfish appear to have *decreasing* average weight at age as they get older:
+
+```{r redfish-1}
+
+wtagecl <- wtageRed
+
+  wtagep <- ggplot(wtagecl, aes(agecl, atoutput)) +
+    geom_point() +
+    geom_line(aes(colour = factor(time))) + 
+    scale_x_continuous(minor_breaks = c(0:max(wtagecl$agecl))) +
+    theme_tufte() +
+    theme(legend.position = "none",
+          panel.grid.minor.x = element_line(colour = "grey50"),
+          panel.grid.major.x = element_line(colour = "grey50"))
+
+wtagep
+
+```
+
+Diagnose Redfish problem (it was not negative increments, but inadequate lagging and leading):
+
+```{r redfishdebug, message=FALSE}
+
+annageRed <- NOBAom_redcodcap$truenumsage_ss %>%
+  filter(species == "Redfish")
+
+annageCod <- NOBAom_redcodcap$truenumsage_ss %>%
+  filter(species == "North_atl_cod")
+
+annageCap <- NOBAom_redcodcap$truenumsage_ss %>%
+  filter(species == "Capelin")
+
+annages <- annageRed
+wtagecl <- wtageRed
+fgs <- fgs
+
+  annages <- annages %>%
+    group_by(species, time, agecl) %>%
+    rename(trueage = agecl) %>%
+    summarise(truenatage = sum(atoutput))
+
+  # assuming fgs is data object already been read in by load_fgs elsewhere
+  # Figure out the groups that have multiple ages classes in each stage (or
+  # cohort)
+  multiple_ages <- fgs[fgs$NumAgeClassSize>1, c(1,4,10)]
+
+  # match species in wtagecl_data to those species in the fgs file
+  sppwt <- levels(wtagecl$species)
+  multiple_ages <- multiple_ages[multiple_ages$Name %in% sppwt, ]
+
+  # make a dataframe the right dimensions for all age classes
+  # has species, time from wtage and trueage, truenatage from annages
+  # add agecl column
+  # finds the average age of each agecl each timestep based on truenatage
+  wtage_out <- annages %>%
+    dplyr::semi_join(wtagecl, by = c("species", "time")) %>%
+    dplyr::inner_join(multiple_ages, by = c("species" = "Name")) %>%
+    dplyr::mutate(agecl = as.integer(ceiling(trueage/NumAgeClassSize))) %>%
+    dplyr::group_by(species, time, agecl) %>%
+    dplyr::mutate(avgage = weighted.mean(trueage, truenatage))
+
+  wtage_avgage <- wtage_out %>%
+    select(species, time, agecl, avgage) %>%
+    distinct()
+  
+  # find weight increment for a timestep
+  # muweight for agecl+1 - muweight for agecl
+  wtagecl_inc <- wtagecl %>%
+    dplyr::arrange(species, time, agecl) %>%
+    #dplyr::left_join(multiple_ages, by = c("species" = "Name")) %>%
+    dplyr::group_by(species, time) %>%
+    dplyr::mutate(increment = case_when(
+      agecl==1 ~ atoutput,
+      agecl>1 ~ atoutput - dplyr::lag(atoutput)
+    )) %>%
+    dplyr::left_join(wtage_avgage) %>%
+    dplyr::mutate(avgageinc = case_when(
+      agecl==1 ~ avgage,
+      agecl>1 ~ avgage - dplyr::lag(avgage)
+    ))
+
+  # complex, but works for 2 ages/agecl, need to test more, need to fix oldest
+  # for more than 2 ages/agecl need to have a bigger lead/lag
+  # achieved by faking a scalar for lead/lag n using max() function
+  # should be ceiling I think for odd NumAgeClassSize, but not sure?
+  wtage_out <- wtage_out %>%
+    dplyr::select(species, time, trueage, NumAgeClassSize, agecl, avgage) %>%
+    dplyr::left_join(wtagecl_inc) %>%
+    dplyr::group_by(species, time) %>%
+    dplyr::mutate(wtIntage = case_when(
+      (agecl==1 & trueage<avgage) ~ (1-(avgage-trueage)/avgageinc)*increment,
+      (agecl>1 & trueage<avgage) ~
+        (1-(avgage-trueage)/avgageinc)*increment +
+        lag(atoutput, ceiling(max(NumAgeClassSize)/2)),
+      (trueage>avgage) ~
+        ((trueage-avgage)/lead(avgageinc, ceiling(max(NumAgeClassSize)/2)))*lead(increment, ceiling(max(NumAgeClassSize)/2)) + atoutput
+    ))
+
+  # fix oldest age
+
+  # diagnostic plot--are interpolations where we expect them?
+  wtageclann <- ggplot(wtagecl_inc, aes(avgage, atoutput)) +
+    geom_point() +
+    geom_line(aes(colour = factor(time))) +
+    scale_x_continuous(minor_breaks = c(0:max(wtage_out$trueage))) +
+    theme_tufte() +
+    theme(legend.position = "none",
+          panel.grid.minor.x = element_line(colour = "grey50"),
+          panel.grid.major.x = element_line(colour = "grey50"))
+
+  diag.p <- wtageclann + geom_point(data = wtage_out,
+                          mapping = aes(trueage, wtIntage))
+
+  # #clean up to have only standard columns
+  # finaldata <- data.frame("species" = wtage_out$species,
+  #                         "agecl" = wtage_out$trueage, "polygon" = NA, "layer" = NA,
+  #                         "time" = wtage_out$time, "atoutput" = wtage_out$wtIntage)
+
+  diag.p
+
+```
+
+Try the updated function again, any bugs with multiple species? OK so far.
+
+```{r test-correctedinterp, warning=FALSE, message=FALSE}
+
+omlist_ss <- NOBAom_redcodcap
+
+interp_survWtAtAge <- calc_avgwtstage2age(wtagecl = survObsWtAtAge[[1]],
+                                                     annages = omlist_ss$truenumsage_ss,
+                                                     fgs = omlist_ss$funct.group_ss)
+
+interp_survWtAtAge[[2]] + facet_wrap_paginate(~species, ncol=1, nrow = 1, page=1, scales = "free")
+
+interp_survWtAtAge[[2]] + facet_wrap_paginate(~species, ncol=1, nrow = 1, page=2, scales = "free")
+
+interp_survWtAtAge[[2]] + facet_wrap_paginate(~species, ncol=1, nrow = 1, page=3, scales = "free")
+
+```
+
+Last issue is extrapolating the oldest wt at age. Linear from the last one?
 
