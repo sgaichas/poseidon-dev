@@ -1,0 +1,273 @@
+---
+title: "atlantisom: simulated ecosystem datasets for assessment model performance testing"
+author: "Sarah Gaichas, Christine Stawitz, Kelli Johnson, Alexander Keth, Allan Hicks, Sean Lucey, Emma Hodgson, and Gavin Fay"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+
+htmltools::img(src = knitr::image_uri(here::here("docs/images/atlantis-logo2.jpg")), 
+               alt = 'logo', 
+               style = 'position:absolute; top:0; right:0; height:175px; padding-right:20px;')
+
+knitr::opts_chunk$set(echo = F,
+                      warning = F,
+                      message = F)
+#Plotting and data libraries
+library(tidyverse)
+library(here)
+library(ggrepel)
+library(stringr)
+
+library(atlantisom)
+
+data.dir <- here::here("data")
+
+```
+
+## Overview
+
+The purpose of `atlantisom` is to use existing [Atlantis](https://github.com/Atlantis-Ecosystem-Model/Atlantis_example_and_instructions) ecosystem model output to generate input datasets for a variety of simpler population models, so that the performance of these models can be evaluated against known (simulated) ecosystem dynamics. Atlantis models simulate a wide range of physical and ecological processes, include a full food web, and can be run using different climate forcing, fishing, and other scenarios. 
+
+Users of `atlantisom` specify fishery independent and fishery dependent sampling in space and time, as well as species-specific catchability, selectivty, and other observation processes to simulate survey and fishery "data" from stored Atlantis scenario output. `atlantisom` outputs internally consistent multispecies and ecosystem datasets with known observation error characteristics for use in individual model performance testing, comparing performance of alternative models, and performance testing of model ensembles against “true” Atlantis outputs. 
+
+Development of `atlantisom` began at the [2015 Atlantis Summit](https://research.csiro.au/atlantis/atlantis-summit/) in Honolulu, Hawaii, USA. Substantial progress since then was made possible by a NOAA NMFS International Fellowship and the Institute of Marine Research in Bergen, Norway.
+
+## Get `atlantisom`  https://github.com/r4atlantis/atlantisom
+
+```{r getit, echo=TRUE, eval=FALSE}
+# install.packages("devtools")
+devtools::install_github("r4atlantis/atlantisom")
+```
+
+## Background
+
+![A wide range of models exist to address potential fishery management questions](docs/images/ecomods.png)
+
+### How do we know our models are right?
+
+ * Fits to historical data (hindcast)
+ 
+ * Influence of data over time (retrospective diagnostics)
+ 
+ * Keep as simple and focused as possible
+ 
+ * Simulation testing
+
+But what if data are noisy? What if we need to model complex interactions? What if conditions change over time?
+
+### End-to-end ecosystem operating models as dataset generators
+
+Atlantis is a spatially resolved mechanistic end-to-end ecosystem modeling framework: [Fulton et al. 2011](https://onlinelibrary.wiley.com/doi/full/10.1111/j.1467-2979.2011.00412.x), [Fulton and Smith 2004](https://www.ajol.info/index.php/ajms/article/view/33182). Atlantis models have been implemented for regional ecosystems around the world, including:
+
+
+**Norwegian-Barents Sea**
+
+[Hansen et al. 2016](https://www.imr.no/filarkiv/2016/04/fh-2-2016_noba_atlantis_model_til_web.pdf/nn-no), 
+[2018](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0210419)
+
+![NoBa model areas](docs/images/journal.pone.0210419.g001.png)
+
+
+**California Current**
+
+[Marshall et al. 2017](https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.13594), 
+[Kaplan et al. 2017](https://www.sciencedirect.com/science/article/pii/S0304380016308262?via%3Dihub)
+
+![CCA model areas](docs/images/CCAspatial.png)
+
+
+
+
+Atlantis models can incoroporate physical drivers from global change projections and simulate complex biological responses throughout the ecosystem:  [Hodgson et al. 2018](https://www.sciencedirect.com/science/article/pii/S0304380018301856?via%3Dihub), 
+[Olsen et al. 2018](https://www.frontiersin.org/articles/10.3389/fmars.2018.00064/full)
+
+
+## Why use Atlantis?
+
+-  Mechanistic processes create internally consistent "truth"
+-  Include cumulative effects of multiple processes:
+    -  Climate drivers
+    -  Species interactions 
+    -  Spatial and seasonal variability
+    -  Fisheries
+    -  Oil spills, red tide, anything else Atlantis can do
+-  Implemented for many ecosystems worldwide
+
+## Why generate datasets instead of simulating within Atlantis?
+
+-  Not all analyses need computationally expensive model interaction
+-  Faster! 
+-  Test many models or model configurations with the same dataset
+-  Many dataset realizations from same "truth"; compare:
+    -  Different observation error and bias
+    -  Changing temporal and spatial survey coverage 
+    -  Improved or degraded fishery observations
+
+
+### Illustration: Climate impacts in the operating model 
+![Changing sardine habitat](docs/images/sardinetempIsaac.png)
+
+Hodgson, E. E., Kaplan, I. C., Marshall, K. N., Leonard, J., Essington, T. E., Busch, D. S., Fulton, E. A., et al. 2018. Consequences of spatially variable ocean acidification in the California Current: Lower pH drives strongest declines in benthic species in southern regions while greatest economic impacts occur in northern regions. Ecological Modelling, 383: 106–117.
+
+Marshall, K. N., Kaplan, I. C., Hodgson, E. E., Hermann, A., Busch, D. S., McElhany, P., Essington, T. E., et al. 2017. Risks of ocean acidification in the California Current food web and fisheries: ecosystem model projections. Global Change Biology, 23: 1525–1539.
+
+
+### Illustration: Climate + cumulative impacts in the operating model 
+![Habitat changes lead to changes in both populations and community interactions over time](docs/images/guildbioIsaac.png)
+
+
+## How does this affect the "data" for stock assessments?
+
+The atlantisom user must specify uncertainty in assessment "data":
+
+1. Survey specification:
+
+    1. timing and spatial coverage?
+
+    1. which species are captured?
+
+    1. species-specific survey efficiency ("q")?
+
+    1. selectivity at age for each species?
+
+1. Survey uncertainty:
+
+    1. additional observation error (survey cv for index)?
+    
+    1. effective sample size for biological samples?
+    
+1. Fishery uncertainty:
+    
+    1. additional observation error (catch cv for total)?
+    
+    1. catch sampled for length/age in all areas?
+    
+    1. effective sample size for biological samples?
+
+
+## Make Atlantis output into assessment model input
+
+Example atlantisom workflows: 
+
+1. Get true biomass, abundance, age composition, length composition, weight at age, fishery catch, fishery catch at age, fishery length composition, and fishery weight age age for a "sardine-like species": https://sgaichas.github.io/poseidon-dev/FullSardineTruthEx.html
+
+1. Format these outputs and get other life history parameters for input into a stock assessment model ([Stock Synthesis](https://www.sciencedirect.com/science/article/abs/pii/S0165783612003293), using [`r4ss`](https://github.com/r4ss)):
+https://sgaichas.github.io/poseidon-dev/CreateStockSynthesis.html
+
+1. Get true and observed input data, format inputs, and run the assessment model: https://sgaichas.github.io/poseidon-dev/SardinesHakeatlantisom2SStest.html
+
+1. In progress: compare assessment results with truth:
+https://sgaichas.github.io/poseidon-dev/SkillAssessInit.html
+
+1. Simplified dataset extraction with wrapper functions:
+https://sgaichas.github.io/poseidon-dev/NOBAcod.html
+
+
+## What can atlantisom do so far?
+
+Survey census test NOBA 
+```{r ex-output1, echo = F, warning = F, message=F, fig.align = "center"}
+knitr::include_graphics("docs/images/NOBAcensus.png")
+```
+
+True length composition NOBA
+```{r ex-output3, echo = F, warning = F, message=F, fig.align = "center"}
+knitr::include_graphics("docs/images/NOBAherringtruelf.png")
+```
+
+
+Standard survey test CCA
+```{r ex-output2, echo = F, warning = F, message=F, fig.align = "center"}
+knitr::include_graphics("docs/images/CCsurveyex.png")
+```
+
+Survey length composition CCA
+```{r ex-output4, echo = F, warning = F, message=F, fig.align = "center"}
+knitr::include_graphics("docs/images/CCV3herringlfcomp.png")
+```
+
+
+
+## A "sardine" assessment
+
+Need: assessment model data inputs and life history parameters
+
+*(model based on actual Sardine assessment in Stock Synthesis 3)*
+
+Data: 
+
+  * survey biomass index 
+  * survey length composition 
+  * survey age composition (conditional catch at age)
+  * fishery catch (tons) 
+  * fishery length composition 
+  * fishery age composition
+
+
+Parameters:
+
+  * natural mortality (from total mortality)
+  * growth curve (from survey length at age)
+  * maturity at age (true)
+  * unfished recruitment and steepness (true)
+  * weight-length curve (true)
+
+
+
+## A "sardine" assessment: setup
+
+  * California Current Atlantis run with and without climate signal
+  * Input data generated (e.g. sardine survey, below in green)
+  * Parameters derived; simpler recruitment distribution
+
+```{r sardsurv, echo = F, warning = F, message=F, out.width = "90%", fig.align = "left"}
+knitr::include_graphics("docs/images/CCsurvObsBiom.png")
+```
+
+
+
+## A "sardine" assessment: fits to data
+
+
+![survey index fit](docs/images/index2_cpuefit_Survey.png)
+
+![length fit](docs/images/comp_lenfit_flt2mkt0_page1.png)
+
+![catch at age fit 1](docs/images/comp_agefit_flt1mkt0_page1.png)
+![catch at age fit 2](docs/images/comp_agefit_flt1mkt0_page2.png)
+
+
+
+## A "sardine" assessment: skill? (proof of concept)
+
+Biomass
+```{r skillB, echo = F, warning = F, message=F, fig.align = "center"}
+knitr::include_graphics("docs/images/trueBss3B.png")
+```
+
+Fishing mortality
+```{r skillF, echo = F, warning = F, message=F, fig.align = "center"}
+knitr::include_graphics("docs/images/trueFss3F.png")
+```
+
+Recruitment
+```{r skillR, echo = F, warning = F, message=F, fig.align = "center"}
+knitr::include_graphics("docs/images/trueRss3R.png")
+```
+
+Key: <span style="color:teal">True</span> <span style="color:red">SS3 estimate</span>
+
+## External Resources
+
+* [Atlantis Model Documentation](https://github.com/Atlantis-Ecosystem-Model/Atlantis_example_and_instructions)
+
+* [atlantisom R package](https://github.com/r4atlantis/atlantisom)
+
+* [Testing atlantisom](https://github.com/sgaichas/poseidon-dev)
+
+
