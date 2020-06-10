@@ -44,6 +44,38 @@ Development of `atlantisom` began at the [2015 Atlantis Summit](https://research
 devtools::install_github("r4atlantis/atlantisom")
 ```
 
+## Detailed data flow
+
+Have these Atlantis input files in a directory:
+
+- The .bgm file defining model geometry
+- The initial conditions/biomass pools .nc 
+- The functional groups .csv
+- The fishery groups .csv
+- The biology .prm
+- The run prm (.xml version)
+
+
+At present,`atlantisom` uses the following Atlantis output files, where [...] is a model-specific prefix. They should be in the same directory as the input files above:
+
+- [...]BiomIndx.txt
+- [...]Catch.txt
+- [...]CatchPerFishery.txt
+- [...]DietCheck.txt
+- [...]YOY.txt
+- [...].nc
+- [...]CATCH.nc
+- [...]PROD.nc
+- [...]ANNAGEBIO.nc (if available)
+- [...]ANNAGECATCH.nc (if available)
+
+
+Get the truth:
+![](docs/images/atlantisomDataFlow_truth-link.png)
+
+Generate the data:
+![](docs/images/atlantisomDataFlow_data.png)
+
 ## Background
 
 Assessing the ability of models to predict key processes is essential if the models are to be used in decision-making dependent on those processes. Skill assessment compares model predictions with observations; good agreement between predictions and observations indicates high skill (see, e.g. [Stow et al 2009](https://www.sciencedirect.com/science/article/abs/pii/S0924796308001103)). However, in many natural resrouce management contexts, the observations themselves are highly uncertain, so assessing model skill can be difficult. In these cases, creating an observational dataset with a simulation model can provide alternative information for model skill assessment.
@@ -240,7 +272,7 @@ knitr::include_graphics("docs/images/trueRss3R.png")
 
 Key: <span style="color:teal">True</span> <span style="color:red">SS3 estimate</span>
 
-## External Resources
+## More information
 
 * [Atlantis Model Documentation](https://github.com/Atlantis-Ecosystem-Model/Atlantis_example_and_instructions)
 
