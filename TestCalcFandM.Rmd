@@ -573,7 +573,7 @@ annbioF <- merge(annbio, anncatch) %>%
 
 This annual biomass based estimate of F is not scaled down from the input F (show in points in the plot), unlike in the CCA.
 
-```{r F_estplot}
+```{r nobaF_estplot}
 
 plotannbioF <- ggplot(data=annbioF, aes(x=yr, y=annbioF)) +
   geom_line() +
@@ -589,7 +589,7 @@ NOBA numbers based F
 
 This should be numbers caught divided by total numbers (of fully selected fish) from the previous timestep. 
 
-```{r catchnums, eval=FALSE}
+```{r nobacatchnums, eval=FALSE}
 
 truecatchnums <- create_fishery_subset(dat = truth$catch,
                                  time = timeall,
@@ -604,9 +604,9 @@ saveRDS(catch_numsss, file.path(d.name, paste0(scenario.name, "truecatch_nums_Ns
 
 ```
 
-```{r Fnums}
+```{r nobaFnums}
 
-catch_numsss <- readRDS(file.path(d.name, paste0(scenario.name, "truecatchnums_Nssh.rds")))
+catch_numsss <- readRDS(file.path(d.name, paste0(scenario.name, "truecatch_nums_Nssh.rds")))
 
 totnum <- readRDS(file.path(d.name, paste0(scenario.name, "Natageclcensus.rds"))) 
 
@@ -794,7 +794,7 @@ annZ2 <- fullresZ %>%
 
 ```
 
-```{r isthisM, message=FALSE, warning=FALSE}
+```{r nobaisthisM, message=FALSE, warning=FALSE}
 
 annbioF <- select(annbioF, yr, annbioF)
 
