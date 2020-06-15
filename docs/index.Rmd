@@ -23,7 +23,7 @@ Also bug fixed config files for multispecies dataset. Interpolate wtage includes
 
 ### Visualize functions for documentation
 
-<a href="https://sgaichas.github.io/poseidon-dev/Visualize_atlantisom.html" target="_blank">Different packages to visualize `atlantisom` functions, updated May 21, 2020</a>
+<a href="https://sgaichas.github.io/poseidon-dev/Visualize_atlantisom.html" target="_blank">Different packages to visualize `atlantisom` functions, updated June 15, 2020</a>
 
 ### Demo for NEMoW meeting, December 2019
 

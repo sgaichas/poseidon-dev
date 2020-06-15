@@ -79,6 +79,14 @@ Try something different. Drake?
 
 ```
 
+So I wound up doing this by hand using online flowchart software Lucidchart (see original [here](https://app.lucidchart.com/documents/edit/7af8dad3-0bc6-4000-9668-9bc1add809ba/0_0)):
+
+Get the truth:
+![](docs/images/atlantisomDataFlow_truth-link.png)
+
+Generate the data:
+![](docs/images/atlantisomDataFlow_data.png)
+
 ## Visualize results using wrappers
 
 Meanwhile lets do final plots for the ecosystem MSE paper. Want a 3 panel plot showing atlantisom sample output (our really good survey), SS3 sample output (fit to survey), and the key feature, SS3 fit to atlantis truth:
@@ -229,6 +237,7 @@ plotsurv <- ggplot() +
                      guide = guide_legend(override.aes = list(
                          linetype = c("blank", "solid"),
                          shape = c(16, NA)))) + 
+  xlim(0,80) +
   theme_tufte() +
   theme(legend.position = "right") +
   labs(colour="Atlantis-sardine")
@@ -250,6 +259,7 @@ plotSSfit <- ggplot() +
                      guide = guide_legend(override.aes = list(
                          linetype = c("solid", "blank"),
                          shape = c(NA, 16)))) + 
+  xlim(0,80) +
   theme_tufte() +
   theme(legend.position = "right") +
   labs(colour="SS3-survey fit")
@@ -265,6 +275,7 @@ plotSSskill <- ggplot() +
                      guide = guide_legend(override.aes = list(
                          linetype = c("blank", "solid"),
                          shape = c(16, NA)))) + 
+  xlim(0,80) +
   theme_tufte() +
   theme(legend.position = "right") +
   labs(colour="SS3-biomass skill")
