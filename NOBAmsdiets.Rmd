@@ -147,9 +147,38 @@ plist$Polar_cod
 
 ### Interactions among these species
 
+Do our selected species eat each other? What proportion of each species diet comes from species in our selected group?
+
+This table shows the proportion of diet for each species and age class where only our selected species are considered as prey. The statistics are across all time steps in this model run, and *do not* include timesteps where the diet composition was 0.
 
 
-## Generating the dataset *(PLACEHOLDER; not done yet June 19 2020)*
+```{r prop-in-group}
+
+prop <- ms_diet %>%
+  filter(prey %in% unique(species)) %>%
+  select(species, agecl, time.days, prey, atoutput) %>%
+  group_by(species, agecl, time.days) %>%
+  summarise(mspreyprop = sum(atoutput)) #sum over prey each timestep
+  
+range <- prop %>%
+  group_by(species, agecl) %>%
+  summarise(minprop = min(mspreyprop),
+         medprop = median(mspreyprop),
+         meanprop = mean(mspreyprop),
+         maxprop = max(mspreyprop))
+
+#knitr::kable(range)
+library(DT)
+datatable(range, rownames = FALSE, options = list(pageLength = 25))
+
+```
+
+Mature age classes of cod and redfish average over a third of their diet compositions from other species in the selected group, suggesting fairly strong predation interactions. 
+
+Many of the selected species share zooplankton prey, so there may be species interactions via prey as well. 
+
+## Generating the dataset 
+*(PLACEHOLDER; not done yet June 19 2020)*
 
 Now to get a range of data:
 
