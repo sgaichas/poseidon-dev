@@ -9,6 +9,11 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/atlantisom_landingpage.html" target="_blank">Draft atlantisom landing page for review, June 9, 2020</a>
 
+### Full age structured dataset for multispecies modeling, June 2020
+
+<a href="https://sgaichas.github.io/poseidon-dev/NOBAmsdiets.html" target="_blank">Explore NOBA diet comps, June 19, 2020</a>
+
+
 ### Full age structured dataset for Norwegian Barents cod, March-June 2020
 
 <a href="https://sgaichas.github.io/poseidon-dev/NOBAcod.html" target="_blank">Apply and extend wrappers to get full age structure, updated June 5, 2020</a>
