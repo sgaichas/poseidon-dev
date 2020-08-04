@@ -177,6 +177,47 @@ Mature age classes of cod and redfish average over a third of their diet composi
 
 Many of the selected species share zooplankton prey, so there may be species interactions via prey as well. 
 
+### Total consumption time series
+
+The true data can be generated without updated config files (once I fix missing diets in wrappers!):
+
+```{r OMtruth}
+
+NOBAom <- om_init(here("config/NOBA2config.R")) #run and saved June 19,
+# run again 3 August to update biomass_eaten
+
+#NOBAom_ms <- om_species(sppsubset$Name, NOBAom) #run and saved June 19
+# run again 3 August to test new wrapper that should save biomass_eaten
+NOBAom_ms <- om_species(sppsubset$Name, NOBAom, diet=TRUE)
+
+#source(here("config", "NOBA2config.R"))
+
+# diet data are not in here, need to revise wrapper
+#NOBAom_ms <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+
+# get from full truth run--big file
+#truth <- get(load(file.path(d.name,
+#                                paste0(scenario.name, "run_truth.RData"))))
+
+# questions: does biomass_eaten have some diet comp info as dietcheck.txt?
+# load dietcheck with om_init using a switch in config file?
+# add or pass along switch to keep biomass_eaten truth output in species file
+# is biomass_eaten correct?
+#   revised load_diet_comp to *not include* NAs that merge poorly
+# polygon specific total mg N consumed per unit volume times volume of polygon
+# then split to prey using global diet fraction (and converted to t)
+
+#bioeaten_ss <- truth$biomass_eaten %>%
+#  filter(species %in% sppsubset$Name) 
+
+# compare ms_diet$atoutput to bioeaten_ss$dietfrac
+# should match for species, agecl, time.days, prey
+
+
+
+```
+
+
 ## Generating the dataset 
 *(PLACEHOLDER; not done yet June 19 2020)*
 
@@ -213,9 +254,11 @@ All the config files go in the config folder and we'll try running this:
 
 ```{r full-test, message=FALSE, warning=FALSE, eval=FALSE}
 
-NOBAom <- om_init(here("config/NOBA2config.R"))
+#NOBAom <- om_init(here("config/NOBA2config.R"))
 
-NOBAom_ms <- om_species(sppsubset$Name, NOBAom)
+#NOBAom_ms <- om_species(sppsubset$Name, NOBAom)
+
+NOBAom_ms <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
 
 NOBAom_ms_ind <- om_index(usersurvey = here("config/mssurvey.R"), 
                            userfishery = here("config/msfishery.R"),
