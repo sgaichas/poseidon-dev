@@ -179,9 +179,15 @@ Many of the selected species share zooplankton prey, so there may be species int
 
 ### Total consumption time series
 
-The true data can be generated without updated config files (once I fix missing diets in wrappers!):
+The true data can be generated without updated config files (once I fix missing diets in wrappers!).
 
-```{r OMtruth}
+UPDATE: added an option to bring in biomass_eaten in the om_species wrapper. However, the way this is calculated is probably inappropriate for what we want. biomass_eaten is the output of box specific total tons consumed by predators from PROD.nc split by global diet comp from DietCheck.txt. This means predators will have the same diet comp in all boxes, whether prey were there or not.
+
+To do diet sampling using our survey design, we need to retain actual box-specific diet. This is found in the DetailedDietCheck.txt file, which outputs tons consumed since last timestep for each predator by box, layer, and prey. Because there is no conversion needed for tons, we can just read this in, get rid of all the zero diet comp values to make it a (possibly) manageable size, and apply the survey from there. A new function `load_detailed_diet_comp.R` is developed below.  
+
+Bottom line is don't use biomass_eaten; maybe we should take it out of `run_truth()` output. 
+
+```{r OMtruth, eval=FALSE}
 
 NOBAom <- om_init(here("config/NOBA2config.R")) #run and saved June 19,
 # run again 3 August to update biomass_eaten
@@ -212,6 +218,74 @@ NOBAom_ms <- om_species(sppsubset$Name, NOBAom, diet=TRUE)
 
 # compare ms_diet$atoutput to bioeaten_ss$dietfrac
 # should match for species, agecl, time.days, prey
+
+cod5.365 <- NOBAom_ms$truebioeaten_ss %>%
+  filter(species=="North_atl_cod",
+         agecl==5,
+         time.days==365, 
+         polygon==4)
+
+cod5.365.check <- ms_diet %>%
+  filter(species=="North_atl_cod",
+         agecl==5,
+         time.days==365)
+  
+#it does, but I think we need this by box
+#it makes no sense to apply global diet comp to boxes, not all prey 
+#may be in the box
+#DetailedDietCheck.txt is the file to read for using survey sampling.
+
+#this file is huge, try data.table::fread
+detaileddiettest <- data.table::fread(file.path(here("atlantisoutput", "NOBAwithAnnAgeOutput"), "outputnordic_runresults_01DetailedDietCheck.txt"),
+                                      data.table=FALSE
+                                      #nrows = 200
+                                      )
+
+diet <- detaileddiettest
+
+#remove rows that are all 0 prey
+#diet <- diet[apply(diet[,-c(1:5)], 1, function(x) !all(x==0)),]
+  
+#should do the same thing faster
+diet <- diet[as.logical(abs(as.matrix(diet[,-c(1:5)])) %*% rep(1L,ncol(diet[,-c(1:5)]))), ]
+
+#test pieces of new load_detailed_diet function
+  if(length(grep("Group",colnames(diet)))>0)
+    colnames(diet) <- gsub("Group","Predator",colnames(diet))
+
+  # Change column order
+  diet <- diet[, c("Predator", "Cohort", "Time", "Box", "Layer",
+    names(diet)[which(!names(diet) %in% c("Predator", "Cohort", "Time", "Box", "Layer"))])]
+
+  # Convert to tidy dataframe to allow joining/merging with other dataframes.
+  diet <- tidyr::gather_(data = diet, key_col = "prey", value_col = "dietcomp",
+    #gather_cols = names(diet)[(which(names(diet) == "Updated") + 1):NCOL(diet)])
+    gather_cols = names(diet)[(which(names(diet) %in% fgs$Code))]) 
+  
+  # Get rid of 0 dietcomp rows to make manageable size
+  diet <- filter(diet, dietcomp>0)
+
+  names(diet) <- tolower(names(diet))
+
+  diet$prey <- as.character(diet$prey)
+  diet$predator <- as.character(diet$predator)
+  
+  # Change species acronyms to actual names.
+  species_names <- fgs[, c("Name", "Code")]
+  diet$species <- species_names$Name[match(diet$predator, species_names$Code)]
+  diet$prey <- species_names$Name[match(diet$prey, species_names$Code)]
+  
+  # diet outputs are not all divisible by toutinc, leave in days
+  diet$time.days <- diet$time #/ toutinc
+
+  #fix cohort to agecl
+  
+  diet <- diet %>%
+    dplyr::mutate(agecl = cohort + 1)
+  
+  # drop redundant columns and reorder
+  diet <- diet[,c("species", "agecl", "time.days", "box", "layer", "prey", "dietcomp")]
+
 
 
 

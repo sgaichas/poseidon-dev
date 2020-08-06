@@ -2887,7 +2887,7 @@ summary {
 
 <h1 class="title toc-ignore">Generate data for multispecies modeling, including diet!</h1>
 <h4 class="author">Sarah Gaichas</h4>
-<h4 class="date">19 June, 2020</h4>
+<h4 class="date">06 August, 2020</h4>
 
 </div>
 
@@ -3088,10 +3088,113 @@ range &lt;- prop %&gt;%
 #knitr::kable(range)
 library(DT)
 datatable(range, rownames = FALSE, options = list(pageLength = 25))</code></pre>
-<div id="htmlwidget-e3d29f2e7e71abfbfe42" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-e3d29f2e7e71abfbfe42">{"x":{"filter":"none","data":[["Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Green_halibut","Green_halibut","Green_halibut","Green_halibut","Green_halibut","Green_halibut","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","Norwegian_ssh","Norwegian_ssh","Norwegian_ssh","Redfish","Redfish","Redfish","Redfish","Redfish","Redfish","Redfish","Redfish","Saithe","Saithe","Saithe","Saithe","Saithe","Saithe","Saithe"],[2,3,4,5,6,7,8,9,10,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2,3,3,4,5,6,7,8,9,10,4,5,6,7,8,9,10],[2.467218e-08,0.00159302369,0.0018610868,0.0018421235,0.0018140903,0.0017865518,0.0016088841,0.0017037464,0.0017657733,0.024081279,0.0288731524,0.0337587299,0.037282871,0.0364907355,0.0349818398,0.00184418663,0.0023250706,0.0026231871141,0.014942837566,0.014793038777,0.015099302372,0.015187135229,0.015448706173,0.015765026712,0.015911653147,4.691568e-08,2.943186e-06,0.0008006793,0.002493564,0.0033134411,0.003928487,0.0047734491,0.0057258014,0.0056983772,0.0048678974,0.01139113548334,0.01516559492479,0.0175750488044,0.0456440869,0.04556915355,0.04592327075,0.04604716385,0.04608891419,0.04611977023,0.04620880381,0.001864992,0.00544653,0.005644308,0.0224893548,0.06443358,0.08014992,0.08511254,0.08511254,0.08511254,0.08511254,0.08511254,0.0026007345,0.0030522929,0.0049830289,0.0052918536,0.0056830504,0.005718349,0.0059988059],[7.855102e-07,0.02883976895,0.031025202554,0.0316655823,0.032125870545,0.03247634575,0.03250774655,0.03263573165,0.03275168957,0.0496414904,0.056390876115,0.0629113063,0.06791433635,0.06441730314,0.061740225,0.011445606865,0.02366389114245,0.0263144317774,0.049964441895,0.0493168485625,0.0513313518426,0.052433336428,0.0547076104485,0.0572536474625,0.05874919,4.1074485e-05,0.00167046288,0.00251371827225,0.00716991466,0.0098602186,0.009971279,0.01024268465,0.0142306227,0.0189428955,0.019940988185,0.0346555016640227,0.039425667324326,0.0405109452453523,0.368349240565,0.368571066,0.3863598503,0.3930191336,0.39334102005,0.39449588538,0.396579233335,0.032408765,0.04342405,0.04406173,0.1283877,0.17919557748,0.281796096,0.31567883435,0.3155951367,0.315552162,0.315552702,0.31555311815,0.03473259646,0.0341133072,0.03594044135,0.03650142655,0.0365762234,0.0359589208,0.03555736615],[3.14391777406852e-06,0.0261364201960764,0.0288439832646667,0.0300969706078306,0.0310558983711167,0.0317094378978514,0.0316461583105,0.0319008150217403,0.0321785684345667,0.0503601740784722,0.0569187791722917,0.063742925732,0.0684014051445556,0.0650502693610139,0.0627301852474861,0.0134245401661167,0.0257327101892502,0.0284717370420216,0.0552015416531816,0.0547285805790941,0.0570510941807363,0.0577988713217826,0.0598514230620521,0.0624275306148261,0.0640666621658126,0.000151010336244056,0.00217474256182746,0.00335807163574508,0.00811751525354167,0.0109391822884903,0.0108034549866208,0.0109555406435368,0.0158429213157226,0.0213637288274347,0.0225081744801722,0.0375531579734522,0.0436094705136736,0.0449452285531258,0.352774097707211,0.35606705163739,0.375644104352451,0.380698492312324,0.381201486534594,0.381723435877057,0.384151600774396,0.0524141887172702,0.0622530753125,0.0634860371319445,0.149467603974208,0.204454092827975,0.298671695364361,0.328897320293972,0.328871953332806,0.328869991256042,0.328824820331861,0.328790989621917,0.0479492126849361,0.0473488645093597,0.0502171558938556,0.0509150649139861,0.0510047725356806,0.0502118217894167,0.0498719912450417],[0.0001437388939,0.1192049362,0.1157009031,0.1039136,0.1085347251,0.1047836581,0.0900518996,0.0970094933,0.103995156,0.0784844312,0.088063113,0.097797337,0.104107124,0.098371656,0.094022467,0.09242969931,0.1282488958818,0.1397217165724,0.186784242983,0.185465821311,0.188222133427,0.189117987344,0.191456375613,0.19413948905,0.19531755591,0.002035943,0.01777143,0.02001200195,0.14466901785,0.163283329,0.161479204,0.149222307,0.15776389928,0.17400719418,0.1778850937,0.67054521979622,0.6787483532707,0.67865690070715,0.86186168128,0.8588122126,0.8430483425,0.8353035903,0.8344853447,0.8328866144,0.8280245295,0.2411637,0.2453837,0.2460891,0.4285657,0.4960724,0.5946725873,0.6225338,0.6225307,0.6227184,0.6227646,0.6228722,0.19527699669,0.193930914687,0.19476937612,0.19484159578,0.19482477266,0.19446604019,0.19412947093]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th>species<\/th>\n      <th>agecl<\/th>\n      <th>minprop<\/th>\n      <th>medprop<\/th>\n      <th>meanprop<\/th>\n      <th>maxprop<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"pageLength":25,"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-8500e5df3a4db32219bc" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-8500e5df3a4db32219bc">{"x":{"filter":"none","data":[["Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Blue_whiting","Green_halibut","Green_halibut","Green_halibut","Green_halibut","Green_halibut","Green_halibut","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Haddock","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","Long_rough_dab","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","North_atl_cod","Norwegian_ssh","Norwegian_ssh","Norwegian_ssh","Redfish","Redfish","Redfish","Redfish","Redfish","Redfish","Redfish","Redfish","Saithe","Saithe","Saithe","Saithe","Saithe","Saithe","Saithe"],[2,3,4,5,6,7,8,9,10,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2,3,3,4,5,6,7,8,9,10,4,5,6,7,8,9,10],[2.467218e-08,0.00159302369,0.0018610868,0.0018421235,0.0018140903,0.0017865518,0.0016088841,0.0017037464,0.0017657733,0.024081279,0.0288731524,0.0337587299,0.037282871,0.0364907355,0.0349818398,0.00184418663,0.0023250706,0.0026231871141,0.014942837566,0.014793038777,0.015099302372,0.015187135229,0.015448706173,0.015765026712,0.015911653147,4.691568e-08,2.943186e-06,0.0008006793,0.002493564,0.0033134411,0.003928487,0.0047734491,0.0057258014,0.0056983772,0.0048678974,0.01139113548334,0.01516559492479,0.0175750488044,0.0456440869,0.04556915355,0.04592327075,0.04604716385,0.04608891419,0.04611977023,0.04620880381,0.001864992,0.00544653,0.005644308,0.0224893548,0.06443358,0.08014992,0.08511254,0.08511254,0.08511254,0.08511254,0.08511254,0.0026007345,0.0030522929,0.0049830289,0.0052918536,0.0056830504,0.005718349,0.0059988059],[7.855102e-07,0.02883976895,0.031025202554,0.0316655823,0.032125870545,0.03247634575,0.03250774655,0.03263573165,0.03275168957,0.0496414904,0.056390876115,0.0629113063,0.06791433635,0.06441730314,0.061740225,0.011445606865,0.02366389114245,0.0263144317774,0.049964441895,0.0493168485625,0.0513313518426,0.052433336428,0.0547076104485,0.0572536474625,0.05874919,4.1074485e-05,0.00167046288,0.00251371827225,0.00716991466,0.0098602186,0.009971279,0.01024268465,0.0142306227,0.0189428955,0.019940988185,0.0346555016640227,0.039425667324326,0.0405109452453523,0.368349240565,0.368571066,0.3863598503,0.3930191336,0.39334102005,0.39449588538,0.396579233335,0.032408765,0.04342405,0.04406173,0.1283877,0.17919557748,0.281796096,0.31567883435,0.3155951367,0.315552162,0.315552702,0.31555311815,0.03473259646,0.0341133072,0.03594044135,0.03650142655,0.0365762234,0.0359589208,0.03555736615],[3.14391777406852e-06,0.0261364201960764,0.0288439832646667,0.0300969706078306,0.0310558983711167,0.0317094378978514,0.0316461583105,0.0319008150217403,0.0321785684345667,0.0503601740784722,0.0569187791722917,0.063742925732,0.0684014051445556,0.0650502693610139,0.0627301852474861,0.0134245401661167,0.0257327101892502,0.0284717370420216,0.0552015416531816,0.0547285805790941,0.0570510941807363,0.0577988713217826,0.0598514230620521,0.0624275306148261,0.0640666621658126,0.000151010336244056,0.00217474256182746,0.00335807163574508,0.00811751525354167,0.0109391822884903,0.0108034549866208,0.0109555406435368,0.0158429213157226,0.0213637288274347,0.0225081744801722,0.0375531579734522,0.0436094705136736,0.0449452285531258,0.352774097707211,0.35606705163739,0.375644104352451,0.380698492312324,0.381201486534594,0.381723435877057,0.384151600774396,0.0524141887172702,0.0622530753125,0.0634860371319445,0.149467603974208,0.204454092827975,0.298671695364361,0.328897320293972,0.328871953332806,0.328869991256042,0.328824820331861,0.328790989621917,0.0479492126849361,0.0473488645093597,0.0502171558938556,0.0509150649139861,0.0510047725356806,0.0502118217894167,0.0498719912450417],[0.0001437388939,0.1192049362,0.1157009031,0.1039136,0.1085347251,0.1047836581,0.0900518996,0.0970094933,0.103995156,0.0784844312,0.088063113,0.097797337,0.104107124,0.098371656,0.094022467,0.09242969931,0.1282488958818,0.1397217165724,0.186784242983,0.185465821311,0.188222133427,0.189117987344,0.191456375613,0.19413948905,0.19531755591,0.002035943,0.01777143,0.02001200195,0.14466901785,0.163283329,0.161479204,0.149222307,0.15776389928,0.17400719418,0.1778850937,0.67054521979622,0.6787483532707,0.67865690070715,0.86186168128,0.8588122126,0.8430483425,0.8353035903,0.8344853447,0.8328866144,0.8280245295,0.2411637,0.2453837,0.2460891,0.4285657,0.4960724,0.5946725873,0.6225338,0.6225307,0.6227184,0.6227646,0.6228722,0.19527699669,0.193930914687,0.19476937612,0.19484159578,0.19482477266,0.19446604019,0.19412947093]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th>species<\/th>\n      <th>agecl<\/th>\n      <th>minprop<\/th>\n      <th>medprop<\/th>\n      <th>meanprop<\/th>\n      <th>maxprop<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"pageLength":25,"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 <p>Mature age classes of cod and redfish average over a third of their diet compositions from other species in the selected group, suggesting fairly strong predation interactions.</p>
 <p>Many of the selected species share zooplankton prey, so there may be species interactions via prey as well.</p>
+</div>
+<div id="total-consumption-time-series" class="section level3">
+<h3>Total consumption time series</h3>
+<p>The true data can be generated without updated config files (once I fix missing diets in wrappers!).</p>
+<p>UPDATE: added an option to bring in biomass_eaten in the om_species wrapper. However, the way this is calculated is probably inappropriate for what we want. biomass_eaten is the output of box specific total tons consumed by predators from PROD.nc split by global diet comp from DietCheck.txt. This means predators will have the same diet comp in all boxes, whether prey were there or not.</p>
+<p>To do diet sampling using our survey design, we need to retain actual box-specific diet. This is found in the DetailedDietCheck.txt file, which outputs tons consumed since last timestep for each predator by box, layer, and prey. Because there is no conversion needed for tons, we can just read this in, get rid of all the zero diet comp values to make it a (possibly) manageable size, and apply the survey from there. A new function <code>load_detailed_diet_comp.R</code> is developed below.</p>
+<p>Bottom line is don’t use biomass_eaten; maybe we should take it out of <code>run_truth()</code> output.</p>
+<pre class="r"><code>NOBAom &lt;- om_init(here(&quot;config/NOBA2config.R&quot;)) #run and saved June 19,
+# run again 3 August to update biomass_eaten
+
+#NOBAom_ms &lt;- om_species(sppsubset$Name, NOBAom) #run and saved June 19
+# run again 3 August to test new wrapper that should save biomass_eaten
+NOBAom_ms &lt;- om_species(sppsubset$Name, NOBAom, diet=TRUE)
+
+#source(here(&quot;config&quot;, &quot;NOBA2config.R&quot;))
+
+# diet data are not in here, need to revise wrapper
+#NOBAom_ms &lt;- readRDS(file.path(d.name, paste0(scenario.name, &quot;omlist_ss.rds&quot;)))
+
+# get from full truth run--big file
+#truth &lt;- get(load(file.path(d.name,
+#                                paste0(scenario.name, &quot;run_truth.RData&quot;))))
+
+# questions: does biomass_eaten have some diet comp info as dietcheck.txt?
+# load dietcheck with om_init using a switch in config file?
+# add or pass along switch to keep biomass_eaten truth output in species file
+# is biomass_eaten correct?
+#   revised load_diet_comp to *not include* NAs that merge poorly
+# polygon specific total mg N consumed per unit volume times volume of polygon
+# then split to prey using global diet fraction (and converted to t)
+
+#bioeaten_ss &lt;- truth$biomass_eaten %&gt;%
+#  filter(species %in% sppsubset$Name) 
+
+# compare ms_diet$atoutput to bioeaten_ss$dietfrac
+# should match for species, agecl, time.days, prey
+
+cod5.365 &lt;- NOBAom_ms$truebioeaten_ss %&gt;%
+  filter(species==&quot;North_atl_cod&quot;,
+         agecl==5,
+         time.days==365, 
+         polygon==4)
+
+cod5.365.check &lt;- ms_diet %&gt;%
+  filter(species==&quot;North_atl_cod&quot;,
+         agecl==5,
+         time.days==365)
+  
+#it does, but I think we need this by box
+#it makes no sense to apply global diet comp to boxes, not all prey 
+#may be in the box
+#DetailedDietCheck.txt is the file to read for using survey sampling.
+
+#this file is huge, try data.table::fread
+detaileddiettest &lt;- data.table::fread(file.path(here(&quot;atlantisoutput&quot;, &quot;NOBAwithAnnAgeOutput&quot;), &quot;outputnordic_runresults_01DetailedDietCheck.txt&quot;),
+                                      data.table=FALSE
+                                      #nrows = 200
+                                      )
+
+diet &lt;- detaileddiettest
+
+#remove rows that are all 0 prey
+#diet &lt;- diet[apply(diet[,-c(1:5)], 1, function(x) !all(x==0)),]
+  
+#should do the same thing faster
+diet &lt;- diet[as.logical(abs(as.matrix(diet[,-c(1:5)])) %*% rep(1L,ncol(diet[,-c(1:5)]))), ]
+
+#test pieces of new load_detailed_diet function
+  if(length(grep(&quot;Group&quot;,colnames(diet)))&gt;0)
+    colnames(diet) &lt;- gsub(&quot;Group&quot;,&quot;Predator&quot;,colnames(diet))
+
+  # Change column order
+  diet &lt;- diet[, c(&quot;Predator&quot;, &quot;Cohort&quot;, &quot;Time&quot;, &quot;Box&quot;, &quot;Layer&quot;,
+    names(diet)[which(!names(diet) %in% c(&quot;Predator&quot;, &quot;Cohort&quot;, &quot;Time&quot;, &quot;Box&quot;, &quot;Layer&quot;))])]
+
+  # Convert to tidy dataframe to allow joining/merging with other dataframes.
+  diet &lt;- tidyr::gather_(data = diet, key_col = &quot;prey&quot;, value_col = &quot;dietcomp&quot;,
+    #gather_cols = names(diet)[(which(names(diet) == &quot;Updated&quot;) + 1):NCOL(diet)])
+    gather_cols = names(diet)[(which(names(diet) %in% fgs$Code))]) 
+  
+  # Get rid of 0 dietcomp rows to make manageable size
+  diet &lt;- filter(diet, dietcomp&gt;0)
+
+  names(diet) &lt;- tolower(names(diet))
+
+  diet$prey &lt;- as.character(diet$prey)
+  diet$predator &lt;- as.character(diet$predator)
+  
+  # Change species acronyms to actual names.
+  species_names &lt;- fgs[, c(&quot;Name&quot;, &quot;Code&quot;)]
+  diet$species &lt;- species_names$Name[match(diet$predator, species_names$Code)]
+  diet$prey &lt;- species_names$Name[match(diet$prey, species_names$Code)]
+  
+  # diet outputs are not all divisible by toutinc, leave in days
+  diet$time.days &lt;- diet$time #/ toutinc
+
+  #fix cohort to agecl
+  
+  diet &lt;- diet %&gt;%
+    dplyr::mutate(agecl = cohort + 1)
+  
+  # drop redundant columns and reorder
+  diet &lt;- diet[,c(&quot;species&quot;, &quot;agecl&quot;, &quot;time.days&quot;, &quot;box&quot;, &quot;layer&quot;, &quot;prey&quot;, &quot;dietcomp&quot;)]</code></pre>
 </div>
 </div>
 <div id="generating-the-dataset" class="section level2">
@@ -3301,9 +3404,11 @@ fish_cv &lt;- data.frame(species=survspp, cv=rep(0.01,length(survspp)))</code></
 <div id="using-the-wrappers-now-updated-for-annual-age" class="section level3">
 <h3>Using the wrappers (now updated for annual age)</h3>
 <p>All the config files go in the config folder and we’ll try running this:</p>
-<pre class="r"><code>NOBAom &lt;- om_init(here(&quot;config/NOBA2config.R&quot;))
+<pre class="r"><code>#NOBAom &lt;- om_init(here(&quot;config/NOBA2config.R&quot;))
 
-NOBAom_ms &lt;- om_species(sppsubset$Name, NOBAom)
+#NOBAom_ms &lt;- om_species(sppsubset$Name, NOBAom)
+
+NOBAom_ms &lt;- readRDS(file.path(d.name, paste0(scenario.name, &quot;omlist_ss.rds&quot;)))
 
 NOBAom_ms_ind &lt;- om_index(usersurvey = here(&quot;config/mssurvey.R&quot;), 
                            userfishery = here(&quot;config/msfishery.R&quot;),
