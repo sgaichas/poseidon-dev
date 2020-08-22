@@ -196,7 +196,7 @@ NOBAom <- om_init(here("config/NOBA2config.R")) #run and saved June 19,
 # run again 3 August to test new wrapper that should save biomass_eaten
 NOBAom_ms <- om_species(sppsubset$Name, NOBAom, diet=TRUE)
 
-#source(here("config", "NOBA2config.R"))
+source(here("config", "NOBA2config.R"))
 
 # diet data are not in here, need to revise wrapper
 #NOBAom_ms <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
@@ -291,6 +291,66 @@ diet <- diet[as.logical(abs(as.matrix(diet[,-c(1:5)])) %*% rep(1L,ncol(diet[,-c(
 
 ```
 
+Try reading in the box-specific diet in weight and see if the proportions match dietcheck.txt outputs:
+
+Oy, have to deal with filesize first. Try stripping out all the 0 lines:
+
+Even running a "bash" chunk here is still running R `system2()`; I don't think this is worth it. Cant even count the columns without the fans kicking up.
+
+The awk code, for the record, is this, executed in terminal from the directory with the .gz file in it:
+```
+zcat < nordic_runresults_01DetailedDietCheck.txt.gz | awk 'NR > 1{s=0; for (i=6;i<=NF;i++) s+=$i; if (s!=0)print}' | gzip > DetDiet.gz
+```
+On linux it would just say zcat filename; macOS needs zcat < filename to work.
+The awk statement is saying after the header row (NR>1), sum up the values from column 6 to the last column and keep the row if they are >0.
+The last pipe sends the new file to a zip file.
+
+Links consulted: 
+[awk is the right thing](https://www.tim-dennis.com/data/tech/2016/08/09/using-awk-filter-rows.html)
+[awk to delete lines summing to 0](https://unix.stackexchange.com/questions/170588/delete-lines-that-sum-to-zero)  
+[awk a compressed file leaving it compressed](https://unix.stackexchange.com/questions/498587/how-to-extract-information-using-awk-on-gz-files-without-storing-the-uncompress)  
+
+Started command at 5:35 pm. Finished at 6:58. Maybe I can fread the output smaller file?
+
+I can but it stripped off the header. So I need to grab that and cat it back together. cat works on two gzipped files, so check it with first line, make the zip version with second, and concatenate them with third.
+
+```
+zcat < nordic_runresults_01DetailedDietCheck.txt.gz | head -n1 > DetDietHead.txt
+zcat < nordic_runresults_01DetailedDietCheck.txt.gz | head -n1 | gzip > DetDietHead.gz
+cat DetDietHead.gz DetDiet.gz > NOBADetDiet.gz
+```
+
+
+```{r comparediets, eval=FALSE}
+
+#keeps failing with vector memory exhausted (limit reached?)
+#gets to the step of eliminating 0 rows
+#try awk in a system command
+# this test works but R overhead isnt worth it, faster run from terminal
+#system("zcat < atlantisoutput/NOBA_march_2020/nordic_runresults_01DetailedDietCheck.txt.gz | awk '{print NF}' | uniq")
+
+
+
+detaileddiettest <- load_detailed_diet_comp(here("atlantisoutput",
+                                                 "NOBA_march_2020"), 
+                           "NOBADetDiet.gz", 
+                           fgs = fgs)
+
+# detaileddiettest <- load_detailed_diet_comp(here("atlantisoutput",
+#                                                  "NOBA_march_2020"), 
+#                            "nordic_runresults_01DetailedDietCheck.txt.gz", 
+#                            fgs = fgs)
+
+# detailedpartdt <- data.table::fread(file.path(here("atlantisoutput",
+#                                                  "NOBA_march_2020"), 
+#                            "nordic_runresults_01DetailedDietCheck.txt.gz"),
+#                            nrows = 20000
+#                            )
+
+ms_detaileddiet <- detaileddiettest %>%
+  filter(species %in% sppsubset$Name)
+
+```
 
 ## Generating the dataset 
 *(PLACEHOLDER; not done yet June 19 2020)*
