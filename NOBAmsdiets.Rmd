@@ -329,12 +329,84 @@ cat DetDietHead.gz DetDiet.gz > NOBADetDiet.gz
 # this test works but R overhead isnt worth it, faster run from terminal
 #system("zcat < atlantisoutput/NOBA_march_2020/nordic_runresults_01DetailedDietCheck.txt.gz | awk '{print NF}' | uniq")
 
+diet <- data.table::fread(file.path(here("atlantisoutput",
+                                                  "NOBA_march_2020"), 
+                                                "NOBADetDiet.gz"))
+
+  # remove all 0 prey rows--done with awk statement first, file is too big for R to do this
+  #diet <- diet[as.logical(rowSums(diet[,-c(1:5)] != 0)), ]
 
 
-detaileddiettest <- load_detailed_diet_comp(here("atlantisoutput",
-                                                 "NOBA_march_2020"), 
-                           "NOBADetDiet.gz", 
-                           fgs = fgs)
+  # SKG June 2020: changing to the other way around. more new models now,
+  # only one diet function to change, and "Predator" seems clearer for users.
+  if(length(grep("Group",colnames(diet)))>0)
+    colnames(diet) <- gsub("Group","Predator",colnames(diet))
+
+  # Change column order--NOT DATA TABLE SAFE
+  #diet <- diet[, c("Predator", "Cohort", "Time", "Box", "Layer",
+  #  names(diet)[which(!names(diet) %in% c("Predator", "Cohort", "Time", "Box", "Layer"))])]
+  
+  data.table::setcolorder(diet, c("Predator", "Cohort", "Time", "Box", "Layer"))
+
+  #remove rows that are all 0 prey
+  #diet <- diet[apply(diet[,-c(1:5)], 1, function(x) !all(x==0)),]
+
+  #should do the same thing faster
+  #diet <- diet[as.logical(abs(as.matrix(diet[,-c(1:5)])) %*% rep(1L,ncol(diet[,-c(1:5)]))), ]
+
+  # dataframe
+  #diet <- as.data.frame(diet)
+
+  diet <- data.table::melt(diet, id = 1:5,
+               variable.name="prey",
+               value.name = "dietcomp")
+
+  # Get rid of 0 dietcomp rows to make manageable size
+  diet <- diet[dietcomp>0]
+  #diet <- filter(diet, dietcomp>0)
+
+  names(diet) <- tolower(names(diet))
+
+  diet$prey <- as.character(diet$prey)
+  diet$predator <- as.character(diet$predator)
+
+  # Change species acronyms to actual names.
+  species_names <- fgs[, c("Name", "Code")]
+  diet$species <- species_names$Name[match(diet$predator, species_names$Code)]
+  diet$prey <- species_names$Name[match(diet$prey, species_names$Code)]
+  #diet <- diet[, -which(colnames(diet) == "predator")]
+
+  # diet outputs are not all divisible by toutinc, leave in days
+  diet$time.days <- diet$time #/ toutinc
+
+  #fix cohort to agecl
+  # diet <- diet %>%
+  #   dplyr::mutate(agecl = cohort + 1)
+  diet <- diet[, agecl := cohort + 1]
+
+  # drop redundant columns and reorder NOT DATA TABLE SAFE
+  #diet <- diet[,c("species", "agecl", "time.days", "box", "layer", "prey", "dietcomp")]
+
+  #leave layer info for now, this is a load function
+
+  #does the Update column matter? this assumes it doesn't
+  #in SETAS_Example, it doesn't make extra comps
+
+  dietcompwt <- data.frame(species = diet$species,
+                         agecl = diet$agecl,
+                         time.days = diet$time.days,
+                         polygon = diet$box,
+                         layer = diet$layer,
+                         atoutput = diet$dietcomp,
+                         prey = diet$prey)
+
+
+  
+# function not working so test piecewise again
+# detaileddiettest <- load_detailed_diet_comp(here("atlantisoutput",
+#                                                  "NOBA_march_2020"), 
+#                            "NOBADetDiet.gz", 
+#                            fgs = fgs)
 
 # detaileddiettest <- load_detailed_diet_comp(here("atlantisoutput",
 #                                                  "NOBA_march_2020"), 
@@ -347,7 +419,18 @@ detaileddiettest <- load_detailed_diet_comp(here("atlantisoutput",
 #                            nrows = 20000
 #                            )
 
-ms_detaileddiet <- detaileddiettest %>%
+```
+
+Still having problems with the function after editing
+
+```{r detdiettest, eval=FALSE}
+  
+# still not working but works line by line
+detdiet <- load_detailed_diet_comp(here("atlantisoutput","NOBA_march_2020"), 
+                                   "NOBADetDiet.gz", 
+                                   fgs = fgs)
+
+ms_detaileddiet <- detdiet %>%
   filter(species %in% sppsubset$Name)
 
 ```
