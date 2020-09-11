@@ -431,16 +431,58 @@ saveRDS(ms_detaileddiet, file.path(d.name, paste0(scenario.name, "ms_detaileddie
 
 All this was just to see what the regional diet data looks like compared with global diet comps from DietCheck.txt.
 
-```{r detdiet-vis}
+```{r detdiet-vis1}
 
 # look at a single species/age combo from above
+#    agecl 5 (age 9-10) cod
+cod5det <- ms_detaileddiet %>%
+  filter(species=="North_atl_cod",
+         agecl==5)
 
 # how many polygons included? how many layers per polygon have data?
+cod5det %>% group_by(time.days, polygon, layer) %>% tally()
 
 # are there differences by layer within a polygon?
+#    polygons 12 and 19 are on the slope, have most layers with agecl 5 cod
+cod5det1219 <- cod5det %>%
+  filter(polygon %in% c(12,19))
 
+plist2 = lapply(split(cod5det1219, cod5det1219$polygon), function(d) {
+  ggplot(d, aes(time.days/365, atoutput, fill=prey)) + 
+    geom_bar(stat = "identity") +
+    facet_wrap(polygon~layer) +
+    xlab("year") +
+    ylab("diet tons") +
+    theme_tufte() +
+    theme(legend.position="bottom")
+})
+```
+
+### Diets by polygon and layer {.tabset}
+
+#### Cod agecl 5 polygon 12
+```{r, fig.width=9, fig.height=9}
+plist2$'12'
+```
+
+#### Cod agecl 5 polygon 19
+```{r, fig.width=9, fig.height=9}
+plist2$'19'
+```
+
+```{r detdiet-vis2}
 # are there differences by polygon? (aggregate layers)
+cod5det_agg <- cod5det %>%
+  group_by(species, agecl, time.days, polygon, prey) %>%
+  summarise(polytons = sum(atoutput))
 
+ggplot(cod5det_agg, aes(time.days/365, polytons, fill=prey)) + 
+    geom_bar(stat = "identity") +
+    facet_wrap(polygon) +
+    xlab("year") +
+    ylab("diet tons") +
+    theme_tufte() +
+    theme(legend.position="bottom")
 
 ```
 
