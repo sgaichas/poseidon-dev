@@ -306,8 +306,10 @@ The awk statement is saying after the header row (NR>1), sum up the values from 
 The last pipe sends the new file to a zip file.
 
 Links consulted: 
-[awk is the right thing](https://www.tim-dennis.com/data/tech/2016/08/09/using-awk-filter-rows.html)
-[awk to delete lines summing to 0](https://unix.stackexchange.com/questions/170588/delete-lines-that-sum-to-zero)  
+[awk is the right thing](https://www.tim-dennis.com/data/tech/2016/08/09/using-awk-filter-rows.html)  
+
+[awk to delete lines summing to 0](https://unix.stackexchange.com/questions/170588/delete-lines-that-sum-to-zero) 
+
 [awk a compressed file leaving it compressed](https://unix.stackexchange.com/questions/498587/how-to-extract-information-using-awk-on-gz-files-without-storing-the-uncompress)  
 
 Started command at 5:35 pm. Finished at 6:58. Maybe I can fread the output smaller file?
@@ -319,7 +321,7 @@ zcat < nordic_runresults_01DetailedDietCheck.txt.gz | head -n1 > DetDietHead.txt
 zcat < nordic_runresults_01DetailedDietCheck.txt.gz | head -n1 | gzip > DetDietHead.gz
 cat DetDietHead.gz DetDiet.gz > NOBADetDiet.gz
 ```
-
+Now we diagnose the load function again and try to optimize with data.table functions.
 
 ```{r comparediets, eval=FALSE}
 
@@ -328,10 +330,17 @@ cat DetDietHead.gz DetDiet.gz > NOBADetDiet.gz
 #try awk in a system command
 # this test works but R overhead isnt worth it, faster run from terminal
 #system("zcat < atlantisoutput/NOBA_march_2020/nordic_runresults_01DetailedDietCheck.txt.gz | awk '{print NF}' | uniq")
+# see notes above for preprocessing step, here debug new load_detailed_diet function
 
-diet <- data.table::fread(file.path(here("atlantisoutput",
-                                                  "NOBA_march_2020"), 
-                                                "NOBADetDiet.gz"))
+dir <- here("atlantisoutput","NOBA_march_2020") 
+file_diet <-  "NOBADetDiet.gz"
+
+  if (is.null(dir)) {
+    diet.file <- file_diet
+  } else {
+    diet.file <- file.path(dir, file_diet)
+  }
+  diet <- data.table::fread(diet.file)
 
   # remove all 0 prey rows--done with awk statement first, file is too big for R to do this
   #diet <- diet[as.logical(rowSums(diet[,-c(1:5)] != 0)), ]
@@ -342,24 +351,21 @@ diet <- data.table::fread(file.path(here("atlantisoutput",
   if(length(grep("Group",colnames(diet)))>0)
     colnames(diet) <- gsub("Group","Predator",colnames(diet))
 
-  # Change column order--NOT DATA TABLE SAFE
+  # Change column order NOT DATA TABLE SAFE
   #diet <- diet[, c("Predator", "Cohort", "Time", "Box", "Layer",
   #  names(diet)[which(!names(diet) %in% c("Predator", "Cohort", "Time", "Box", "Layer"))])]
-  
+
+  # Change column order
   data.table::setcolorder(diet, c("Predator", "Cohort", "Time", "Box", "Layer"))
-
-  #remove rows that are all 0 prey
-  #diet <- diet[apply(diet[,-c(1:5)], 1, function(x) !all(x==0)),]
-
-  #should do the same thing faster
-  #diet <- diet[as.logical(abs(as.matrix(diet[,-c(1:5)])) %*% rep(1L,ncol(diet[,-c(1:5)]))), ]
-
-  # dataframe
-  #diet <- as.data.frame(diet)
 
   diet <- data.table::melt(diet, id = 1:5,
                variable.name="prey",
                value.name = "dietcomp")
+
+  # # Convert to tidy dataframe to allow joining/merging with other dataframes.
+  # diet <- tidyr::gather_(data = diet, key_col = "prey", value_col = "dietcomp",
+  #   #gather_cols = names(diet)[(which(names(diet) == "Updated") + 1):NCOL(diet)])
+  #   gather_cols = names(diet)[(which(names(diet) %in% fgs$Code))])
 
   # Get rid of 0 dietcomp rows to make manageable size
   diet <- diet[dietcomp>0]
@@ -401,31 +407,17 @@ diet <- data.table::fread(file.path(here("atlantisoutput",
                          prey = diet$prey)
 
 
-  
-# function not working so test piecewise again
-# detaileddiettest <- load_detailed_diet_comp(here("atlantisoutput",
-#                                                  "NOBA_march_2020"), 
-#                            "NOBADetDiet.gz", 
-#                            fgs = fgs)
-
-# detaileddiettest <- load_detailed_diet_comp(here("atlantisoutput",
-#                                                  "NOBA_march_2020"), 
-#                            "nordic_runresults_01DetailedDietCheck.txt.gz", 
-#                            fgs = fgs)
-
-# detailedpartdt <- data.table::fread(file.path(here("atlantisoutput",
-#                                                  "NOBA_march_2020"), 
-#                            "nordic_runresults_01DetailedDietCheck.txt.gz"),
-#                            nrows = 20000
-#                            )
 
 ```
 
-Still having problems with the function after editing
+Using `data.table` improves speed for the `atantisom::load_detailed_diet_comp()` function. But it turns out you need to import data.table within a package in *both* the DESCRIPTION and NAMESPACE files [instructions!](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-importing.html) and now this beast of a function works.
+
+It takes minutes to load the detailed diet, even with pre-processing with awk as above, so saving the output is a good idea. We save only for our 10 species to streamline things a bit.
 
 ```{r detdiettest, eval=FALSE}
   
-# still not working but works line by line
+# still not working but works line by line--fixed
+# N.B. data.table wants to be in both imports and namespace within a function!
 detdiet <- load_detailed_diet_comp(here("atlantisoutput","NOBA_march_2020"), 
                                    "NOBADetDiet.gz", 
                                    fgs = fgs)
@@ -433,7 +425,25 @@ detdiet <- load_detailed_diet_comp(here("atlantisoutput","NOBA_march_2020"),
 ms_detaileddiet <- detdiet %>%
   filter(species %in% sppsubset$Name)
 
+saveRDS(ms_detaileddiet, file.path(d.name, paste0(scenario.name, "ms_detaileddiet.rds")))
+
 ```
+
+All this was just to see what the regional diet data looks like compared with global diet comps from DietCheck.txt.
+
+```{r detdiet-vis}
+
+# look at a single species/age combo from above
+
+# how many polygons included? how many layers per polygon have data?
+
+# are there differences by layer within a polygon?
+
+# are there differences by polygon? (aggregate layers)
+
+
+```
+
 
 ## Generating the dataset 
 *(PLACEHOLDER; not done yet June 19 2020)*
