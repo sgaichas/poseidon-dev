@@ -431,6 +431,15 @@ saveRDS(ms_detaileddiet, file.path(d.name, paste0(scenario.name, "ms_detaileddie
 
 All this was just to see what the regional diet data looks like compared with global diet comps from DietCheck.txt.
 
+```{r}
+# read in the saved file
+source(here("config", "NOBA2config.R"))
+
+ms_detaileddiet <- readRDS(file.path(d.name, paste0(scenario.name, "ms_detaileddiet.rds")))
+
+```
+
+
 ```{r detdiet-vis1}
 
 # look at a single species/age combo from above
@@ -440,12 +449,13 @@ cod5det <- ms_detaileddiet %>%
          agecl==5)
 
 # how many polygons included? how many layers per polygon have data?
-cod5det %>% group_by(time.days, polygon, layer) %>% tally()
+#cod5det %>% group_by(time.days, polygon, layer) %>% tally()
+# why are layers -1 and 0 included (must have trace data if 0 diet was eliminated)
 
 # are there differences by layer within a polygon?
 #    polygons 12 and 19 are on the slope, have most layers with agecl 5 cod
 cod5det1219 <- cod5det %>%
-  filter(polygon %in% c(12,19))
+  filter(polygon %in% c(1,6,7,12,19,25,29,37))
 
 plist2 = lapply(split(cod5det1219, cod5det1219$polygon), function(d) {
   ggplot(d, aes(time.days/365, atoutput, fill=prey)) + 
@@ -458,7 +468,24 @@ plist2 = lapply(split(cod5det1219, cod5det1219$polygon), function(d) {
 })
 ```
 
-### Diets by polygon and layer {.tabset}
+As suspected, diet composition varies greatly by model area and layer. 
+
+### Consumption by polygon and layer {.tabset}
+
+#### Cod agecl 5 polygon 1
+```{r, fig.width=9, fig.height=9}
+plist2$'1'
+```
+
+#### Cod agecl 5 polygon 6
+```{r, fig.width=9, fig.height=9}
+plist2$'6'
+```
+
+#### Cod agecl 5 polygon 7
+```{r, fig.width=9, fig.height=9}
+plist2$'7'
+```
 
 #### Cod agecl 5 polygon 12
 ```{r, fig.width=9, fig.height=9}
@@ -470,22 +497,84 @@ plist2$'12'
 plist2$'19'
 ```
 
-```{r detdiet-vis2}
+#### Cod agecl 5 polygon 25
+```{r, fig.width=9, fig.height=9}
+plist2$'25'
+```
+
+#### Cod agecl 5 polygon 29
+```{r, fig.width=9, fig.height=9}
+plist2$'29'
+```
+
+#### Cod agecl 5 polygon 37
+```{r, fig.width=9, fig.height=9}
+plist2$'37'
+```
+
+
+```{r detdiet-poly}
 # are there differences by polygon? (aggregate layers)
-cod5det_agg <- cod5det %>%
+coddet_agg <- as.data.frame(
+  ms_detaileddiet %>%
+  filter(species=="North_atl_cod") %>%
   group_by(species, agecl, time.days, polygon, prey) %>%
   summarise(polytons = sum(atoutput))
+)
 
-ggplot(cod5det_agg, aes(time.days/365, polytons, fill=prey)) + 
+coddet_agg2 <- atlantisom::aggregateData(dat = ms_detaileddiet, 
+                                        time = unique(ms_detaileddiet$time.days), 
+                                        species = "North_atl_cod", 
+                                        boxes = unique(ms_detaileddiet$polygon),
+  keepColumns = c("species", "agecl", "polygon", "time.days", "prey"))
+
+names(coddet_agg2)[names(coddet_agg2)=="numAtAge"] <- "polytons"
+
+plist3 = lapply(split(coddet_agg2, coddet_agg2$agecl), function(d) {
+  ggplot(d, aes(time.days/365, polytons, fill=prey)) + 
     geom_bar(stat = "identity") +
-    facet_wrap(polygon) +
+    facet_wrap(species~polygon) +
     xlab("year") +
     ylab("diet tons") +
     theme_tufte() +
     theme(legend.position="bottom")
+})
 
 ```
 
+
+#### Cod agecl 5 all polygons
+```{r, fig.width=9, fig.height=9}
+plist3$'5'
+```
+
+#### Cod agecl 10 all polygons
+```{r, fig.width=9, fig.height=9}
+plist3$'10'
+```
+
+### {-}
+
+Aggregate across layers and polygons, compare to aggreate diet comp output (proportion) and biomass_eaten estimate:
+
+```{r detdiet-all, fig.width=9, fig.height=9}
+# are there differences by polygon? (aggregate layers)
+coddet_aggall <- as.data.frame(
+  coddet_agg %>%
+  filter(species=="North_atl_cod") %>%
+  group_by(species, agecl, time.days, prey) %>%
+  summarise(tottons = sum(polytons))
+)
+
+  ggplot(coddet_aggall, aes(time.days/365, tottons, fill=prey)) + 
+    #geom_bar(stat = "identity") +
+    geom_bar(position = "fill", stat = "identity") +
+    facet_wrap(species~agecl) +
+    xlab("year") +
+    ylab("diet tons") +
+    theme_tufte() +
+    theme(legend.position="bottom")
+```
 
 ## Generating the dataset 
 *(PLACEHOLDER; not done yet June 19 2020)*
