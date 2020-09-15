@@ -555,7 +555,7 @@ plist3$'10'
 
 ### {-}
 
-Aggregate across layers and polygons, compare to aggreate diet comp output (proportion) and biomass_eaten estimate:
+Aggregate detailed diet across layers and polygons, compare to aggreate diet comp output (proportion). This looks identical to the DietCheck output:
 
 ```{r detdiet-all, fig.width=9, fig.height=9}
 # are there differences by polygon? (aggregate layers)
@@ -575,6 +575,80 @@ coddet_aggall <- as.data.frame(
     theme_tufte() +
     theme(legend.position="bottom")
 ```
+
+This is detailed diet aggregated across layers and polygons in absolute tons consumed by age class (y axes are different--most consumption from age class 1):
+
+```{r, fig.width=9, fig.height=9}
+
+  ggplot(coddet_aggall, aes(time.days/365, tottons, fill=prey)) + 
+    geom_bar(stat = "identity") +
+    #geom_bar(position = "fill", stat = "identity") +
+    facet_wrap(species~agecl, scales = "free_y") +
+    xlab("year") +
+    ylab("diet tons") +
+    theme_tufte() +
+  
+    theme(legend.position="bottom")
+```
+
+This is the output of biomass_eaten in absolute tons--a short cut that applies global diet comp to polygon-specific tons consumed. First we compare diet by polygon for age class 5 as above. As expected, the diet comp doesn't match DetailedDietCheck by polygon, but the amounts are also vastly different by polygon:
+
+```{r, fig.width=9, fig.height=9}
+
+NOBAom_ms <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+
+codbioeaten <- NOBAom_ms$truebioeaten_ss %>%
+  filter(species=="North_atl_cod")
+
+plist4 = lapply(split(codbioeaten, codbioeaten$agecl), function(d) {
+  ggplot(d, aes(time.days/365, bio_eaten, fill=prey)) + 
+    geom_bar(stat = "identity") +
+    facet_wrap(species~polygon) +
+    xlab("year") +
+    ylab("diet tons") +
+    theme_tufte() +
+    theme(legend.position="bottom")
+})
+
+plist4$'5'
+
+```
+
+Aggregate proportion from biomass_eaten should match, because diet proportions come from DietCheck:
+
+```{r, fig.width=9, fig.height=9}
+
+ggplot(codbioeaten, aes(time.days/365, bio_eaten, fill=prey)) + 
+    #geom_bar(stat = "identity") +
+    geom_bar(position = "fill", stat = "identity") +
+    facet_wrap(species~agecl) +
+    xlab("year") +
+    ylab("diet tons") +
+    theme_tufte() +
+    theme(legend.position="bottom")
+
+```
+
+Total biomass consumed from bio_eaten calculation is about a factor of 10 higher than from DetailedDietCheck. Patterns look a bit different too:
+
+```{r fig.width=9, fig.height=9}
+
+ggplot(codbioeaten, aes(time.days/365, bio_eaten, fill=prey)) + 
+    geom_bar(stat = "identity") +
+    #geom_bar(position = "fill", stat = "identity") +
+    facet_wrap(species~agecl, scales = "free_y") +
+    xlab("year") +
+    ylab("diet tons") +
+    theme_tufte() +
+    theme(legend.position="bottom")
+
+```
+
+Bottom line: biomass_eaten won't work for our purposes in generating truth for survey data that will select polygons for sampling. Also, I'm not sure why consumption estimates are an order of magnitude higher.
+
+So I'll make some functions for diet survey sampling that work on the beastly DetailedDietCheck. I won't try to bring this into run_truth due to the size of the file, and I will remove biomass_eaten from the run_truth output until I can troubleshoot the estimates. 
+
+
 
 ## Generating the dataset 
 *(PLACEHOLDER; not done yet June 19 2020)*
