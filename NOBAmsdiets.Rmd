@@ -190,11 +190,16 @@ Bottom line is don't use biomass_eaten; maybe we should take it out of `run_trut
 ```{r OMtruth, eval=FALSE}
 
 NOBAom <- om_init(here("config/NOBA2config.R")) #run and saved June 19,
-# run again 3 August to update biomass_eaten
+# run again 3 August to update biomass_eaten 
+# and output archived with _bio_eaten suffix
+# run again 15 Sept to get rid of biomass_eaten
 
 #NOBAom_ms <- om_species(sppsubset$Name, NOBAom) #run and saved June 19
 # run again 3 August to test new wrapper that should save biomass_eaten
-NOBAom_ms <- om_species(sppsubset$Name, NOBAom, diet=TRUE)
+#NOBAom_ms <- om_species(sppsubset$Name, NOBAom, diet=TRUE)
+# and output archived with _bio_eaten suffix
+# run again 15 Sept to get rid of biomass eaten
+NOBAom_ms <- om_species(sppsubset$Name, NOBAom)
 
 source(here("config", "NOBA2config.R"))
 
@@ -595,9 +600,9 @@ This is the output of biomass_eaten in absolute tons--a short cut that applies g
 
 ```{r, fig.width=9, fig.height=9}
 
-NOBAom_ms <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+NOBAom_ms_be <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss_bio_eaten.rds")))
 
-codbioeaten <- NOBAom_ms$truebioeaten_ss %>%
+codbioeaten <- NOBAom_ms_be$truebioeaten_ss %>%
   filter(species=="North_atl_cod")
 
 plist4 = lapply(split(codbioeaten, codbioeaten$agecl), function(d) {
