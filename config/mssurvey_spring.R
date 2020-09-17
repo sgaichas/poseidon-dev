@@ -3,6 +3,9 @@
 # Also now happens in "spring" and "fall"
 # Need to define survey season, area, efficiency, selectivity
 
+# Survey name
+survey.name="BTS_spring_allbox_effic1"
+
 #Atlantis model timestep corresponding to the true output--now from census_spec.R
 timestep <- stepperyr #5
 
@@ -43,7 +46,7 @@ survselex <- data.frame(species=rep(survspp, n_annages), #
 
 # effective sample size needed for sample_fish
 # this effective N is high but not equal to total for numerous groups
-surveffN <- data.frame(species=survspp, effN=rep(1000, length(survspp)))
+surveffN <- data.frame(species=survspp, effN=rep(100000, length(survspp)))
 
 # survey index cv needed for sample_survey_xxx
 # cv = 0.1
