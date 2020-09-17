@@ -655,8 +655,7 @@ So I'll make some functions for diet survey sampling that work on the beastly De
 
 
 
-## Generating the dataset 
-*(PLACEHOLDER; not done yet June 19 2020)*
+## Generating the dataset (September 2020)
 
 Now to get a range of data:
 
@@ -664,25 +663,25 @@ Now to get a range of data:
 
 `NOBA2config.R` looks like this (adjusted from Alfonso's original):
 
-```{r, code = readLines("./config/NOBA2Config.R"), eval=F}
+```{r, code = readLines("./config/NOBA2Config.R")}
 ```
 
 `omdimensions.R` standardizes timesteps, etc. (this is part of atlantisom and should not need to be changed by the user):
 
-```{r, code = readLines("./config/omdimensions.R"), eval=F}
+```{r, code = readLines("./config/omdimensions.R")}
 ```
 
-`mssurvey_spring.R` and `mssurvey_fall.R` configure the fishery independent surveys:
+`mssurvey_spring.R` and `mssurvey_fall.R` configure the fishery independent surveys (in this test, surveys sample all model polygons in all years and have efficiency of 1 for all species, with no size selectivity):
 
-```{r, code = readLines("./config/mssurvey_spring.R"), eval=F}
+```{r, code = readLines("./config/mssurvey_spring.R")}
 ```
 
-```{r, code = readLines("./config/mssurvey_fall.R"), eval=F}
+```{r, code = readLines("./config/mssurvey_fall.R")}
 ```
 
 `msfishery.R` configures the fishery dependent data:
 
-```{r, code = readLines("./config/msfishery.R"), eval=F}
+```{r, code = readLines("./config/msfishery.R")}
 ```
 
 ### Using the wrappers (now updated for annual age)
@@ -697,13 +696,18 @@ All the config files go in the config folder and we'll try running this:
 
 NOBAom_ms <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
 
-NOBAom_ms_ind <- om_index(usersurvey = here("config/mssurvey.R"), 
+# new wrapper for multiple surveys saves survey output separately
+# but returns a list with all surveys, not ideal; make consistent
+
+NOBAom_ms_ind <- om_index(usersurvey = c(here("config/mssurvey_spring.R"), 
+                                         here("config/mssurvey_fall.R")), 
                            userfishery = here("config/msfishery.R"),
                            omlist_ss = NOBAom_ms, 
                            n_reps = 1, 
                            save = TRUE)
 
-NOBAom_ms_comp <- om_comps(usersurvey = here("config/mssurvey.R"), 
+NOBAom_ms_comp <- om_comps(usersurvey = c(here("config/mssurvey_spring.R"), 
+                                         here("config/mssurvey_fall.R")), 
                            userfishery = here("config/msfishery.R"),
                            omlist_ss = NOBAom_ms, 
                            n_reps = 1, 
@@ -717,13 +721,16 @@ NOBAom_ms_comp <- om_comps(usersurvey = here("config/mssurvey.R"),
 #### Biomass index
 ```{r bioind-1, eval=FALSE}
 
-omlist_ss <- NOBAom_cod
+omlist_ss <- NOBAom_ms
 source(here("config/omdimensions.R"))
 
-#read time series data
-survObsBiom <- readRDS(file.path(d.name, paste0(scenario.name, "surveyB.rds")))
+#read time series data--now needs survey name from config files
+survname <- c("BTS_spring_allbox_effic1", "BTS_fall_allbox_effic1")
 
-survObsBiom <- survObsBiom[[1]]
+#need plotting/visualization wrappers
+#survObsBiom <- readRDS(file.path(d.name, paste0(scenario.name, "surveyB.rds")))
+
+survObsBiom <- NOBAom_ms$survObsBiom[[survname]]
 
 plotB <-ggplot() +
   geom_line(data=survObsBiom, aes(x=time/stepperyr,y=atoutput, color="survey Biomass"), 
