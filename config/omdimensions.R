@@ -16,7 +16,7 @@ fstepperyr <- if(omlist_ss$runpar$outputstepunit=="days") 365/omlist_ss$runpar$t
 # survey selectivity (agecl based)
 # should return all age classes fully sampled (Atlantis output is 10 age groups per spp)
 n_age_classes <- omlist_ss$funct.group_ss$NumCohorts
-# changed below for multiple species
+# changed below for multiple species WRONG not in species order!! PULL ALL AT ONCE
 age_classes <- sapply(n_age_classes, seq)
 names(age_classes)<-survspp
 

@@ -663,25 +663,25 @@ Now to get a range of data:
 
 `NOBA2config.R` looks like this (adjusted from Alfonso's original):
 
-```{r, code = readLines("./config/NOBA2Config.R")}
+```{r, code = readLines("./config/NOBA2Config.R"), eval=F}
 ```
 
 `omdimensions.R` standardizes timesteps, etc. (this is part of atlantisom and should not need to be changed by the user):
 
-```{r, code = readLines("./config/omdimensions.R")}
+```{r, code = readLines("./config/omdimensions.R"), eval=F}
 ```
 
 `mssurvey_spring.R` and `mssurvey_fall.R` configure the fishery independent surveys (in this test, surveys sample all model polygons in all years and have efficiency of 1 for all species, with no size selectivity):
 
-```{r, code = readLines("./config/mssurvey_spring.R")}
+```{r, code = readLines("./config/mssurvey_spring.R"), eval=F}
 ```
 
-```{r, code = readLines("./config/mssurvey_fall.R")}
+```{r, code = readLines("./config/mssurvey_fall.R"), eval=F}
 ```
 
 `msfishery.R` configures the fishery dependent data:
 
-```{r, code = readLines("./config/msfishery.R")}
+```{r, code = readLines("./config/msfishery.R"), eval=F}
 ```
 
 ### Using the wrappers (now updated for annual age)
@@ -725,23 +725,43 @@ omlist_ss <- NOBAom_ms
 source(here("config/omdimensions.R"))
 
 #read time series data--now needs survey name from config files
-survname <- c("BTS_spring_allbox_effic1", "BTS_fall_allbox_effic1")
 
 #need plotting/visualization wrappers
 #survObsBiom <- readRDS(file.path(d.name, paste0(scenario.name, "surveyB.rds")))
 
-survObsBiom <- NOBAom_ms$survObsBiom[[survname]]
+survObsBiom <- NOBAom_ms_ind$survObsBiom
 
-plotB <-ggplot() +
-  geom_line(data=survObsBiom, aes(x=time/stepperyr,y=atoutput, color="survey Biomass"), 
-            alpha = 10/10) +
-  theme_tufte() +
-  theme(legend.position = "top") +
-  labs(colour=scenario.name)
+plotB <- function(dat){
+  
+    ggplot() +
+    geom_line(data=dat, aes(x=time/stepperyr,y=atoutput, color="survey Biomass"), 
+              alpha = 10/10) +
+    theme_tufte() +
+    theme(legend.position = "top") +
+    labs(colour=scenario.name) +
+    facet_wrap(~species, scales="free") 
+  
+}
 
-plotB +
-  facet_wrap(~species, scales="free") 
+# why is herring missing from both?
+herring <- NOBAom_ms$truebio_ss %>%
+  filter(species %in% c("Norwegian_ssh")) %>%
+  group_by(species, time) %>%
+  summarise(totB = sum(atoutput))
+  
+# problem--omdimensions is doing species age accounting wrong
+# species alphabetical pulled separately but ages not
+# pull species name, n age classes and n ages all at once to avoid bad sorting
+```
 
+##### `r names(survObsBiom)[1]`
+``` {r}
+map(survObsBiom$BTS_spring_allbox_effic1, plotB)[[1]]
+```
+
+##### `r names(survObsBiom)[2]`
+```{r}
+map(survObsBiom$BTS_fall_allbox_effic1, plotB)[[1]]
 ```
 
 
