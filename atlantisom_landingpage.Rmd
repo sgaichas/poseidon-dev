@@ -1,6 +1,5 @@
 ---
 title: "atlantisom: simulated ecosystem datasets for assessment model performance testing"
-author: "Sarah Gaichas, Christine Stawitz, Kelli Johnson, Alexander Keth, Allan Hicks, Sean Lucey, Emma Hodgson, and Gavin Fay"
 date: "`r Sys.Date()`"
 output:
   prettydoc::html_pretty:
@@ -36,6 +35,10 @@ The purpose of `atlantisom` is to use existing [Atlantis](https://github.com/Atl
 Users of `atlantisom` specify fishery independent and fishery dependent sampling in space and time, as well as species-specific catchability, selectivty, and other observation processes to simulate survey and fishery "data" from stored Atlantis scenario output. `atlantisom` outputs internally consistent multispecies and ecosystem datasets with known observation error characteristics for use in individual model performance testing, comparing performance of alternative models, and performance testing of model ensembles against “true” Atlantis outputs. 
 
 Development of `atlantisom` began at the [2015 Atlantis Summit](https://research.csiro.au/atlantis/atlantis-summit/) in Honolulu, Hawaii, USA. Substantial progress since then was made possible by a NOAA NMFS International Fellowship and the Institute of Marine Research in Bergen, Norway.
+
+## Credits
+
+Sarah Gaichas, Christine Stawitz, Kelli Johnson, Alexander Keth, Allan Hicks, Sean Lucey, Emma Hodgson, and Gavin Fay
 
 ## Get `atlantisom`  https://github.com/r4atlantis/atlantisom
 
@@ -279,5 +282,3 @@ Key: <span style="color:teal">True</span> <span style="color:red">SS3 estimate</
 * [atlantisom R package](https://github.com/r4atlantis/atlantisom)
 
 * [Testing atlantisom](https://github.com/sgaichas/poseidon-dev)
-
-
