@@ -35,12 +35,12 @@ surveffic <- data.frame(species=survspp,
 
 # survey selectivity (agecl based)
 # this is by age class, need to change to use with ANNAGEBIO output
-#survselex <- data.frame(species=rep(survspp, each=n_age_classes),
+#survselex <- data.frame(species=rep(names(age_classes), each=n_age_classes),
 #                     agecl=rep(c(1:n_age_classes),length(survspp)),
 #                     selex=rep(1.0,length(survspp)*n_age_classes))
 
-# for annage output
-survselex <- data.frame(species=rep(survspp, n_annages), #  
+# for annage output uses names(annages) NOT alphabetical survspp
+survselex <- data.frame(species=rep(names(annages), n_annages), #  
                         agecl=unlist(sapply(n_annages,seq)),
                         selex=rep(1.0,sum(n_annages)))
 

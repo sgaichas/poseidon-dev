@@ -40,7 +40,7 @@ surveffic <- data.frame(species=survspp,
 #                     selex=rep(1.0,length(survspp)*n_age_classes))
 
 # for annage output
-survselex <- data.frame(species=rep(survspp, n_annages), #  
+survselex <- data.frame(species=rep(names(annages), n_annages), #  
                         agecl=unlist(sapply(n_annages,seq)),
                         selex=rep(1.0,sum(n_annages)))
 
