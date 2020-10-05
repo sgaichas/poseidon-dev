@@ -719,9 +719,9 @@ NOBAom_ms_comp <- om_comps(usersurvey = c(here("config/mssurvey_spring.R"),
 ### Wrapper test results {.tabset}
 
 #### Biomass index
-```{r bioind-1, eval=FALSE}
+```{r bioind-1}
 
-omlist_ss <- NOBAom_ms
+omlist_ss <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
 source(here("config/omdimensions.R"))
 
 #read time series data--now needs survey name from config files
@@ -729,7 +729,17 @@ source(here("config/omdimensions.R"))
 #need plotting/visualization wrappers
 #survObsBiom <- readRDS(file.path(d.name, paste0(scenario.name, "surveyB.rds")))
 
-survObsBiom <- NOBAom_ms_ind$survObsBiom
+# object in memory is no longer the same as saved files, need to read back into same configuration
+# list of files in directory with surveyB.rds ending
+# append to survObsBiom
+survs <- list.files(path=d.name, pattern = "*surveyB.rds", full.names = TRUE)
+survey.name <-  
+survObsBiom <- lapply(survs, readRDS)
+
+#survObsBiom <- NOBAom_ms_ind$survObsBiom
+
+# survey.name="BTS_fall_allbox_effic1"
+# fallsurv <- readRDS(file.path(d.name, paste0(scenario.name, "_",survey.name,"surveyB.rds")))
 
 plotB <- function(dat){
   
@@ -752,6 +762,7 @@ herring <- NOBAom_ms$truebio_ss %>%
 # problem--omdimensions is doing species age accounting wrong
 # species alphabetical pulled separately but ages not
 # pull species name, n age classes and n ages all at once to avoid bad sorting
+# also fix same problem in om_index with wtatage hack!
 ```
 
 ##### `r names(survObsBiom)[1]`
@@ -766,7 +777,7 @@ map(survObsBiom$BTS_fall_allbox_effic1, plotB)[[1]]
 
 
 #### Catch time series
-```{r catchind-1, eval=FALSE}
+```{r catchind-1}
 #read time series data
 catchbio_ss <- readRDS(file.path(d.name, paste0(scenario.name, "fishCatch.rds")))
 
