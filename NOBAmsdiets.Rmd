@@ -732,9 +732,11 @@ source(here("config/omdimensions.R"))
 # object in memory is no longer the same as saved files, need to read back into same configuration
 # list of files in directory with surveyB.rds ending
 # append to survObsBiom
+# apply survey name from filename
 survs <- list.files(path=d.name, pattern = "*surveyB.rds", full.names = TRUE)
-survey.name <-  
+survey.name <-  str_match(survs, paste0(scenario.name,"_\\s*(.*?)\\s*surveyB.rds"))[,2]
 survObsBiom <- lapply(survs, readRDS)
+names(survObsBiom) <- survey.name
 
 #survObsBiom <- NOBAom_ms_ind$survObsBiom
 
@@ -754,10 +756,10 @@ plotB <- function(dat){
 }
 
 # why is herring missing from both?
-herring <- NOBAom_ms$truebio_ss %>%
-  filter(species %in% c("Norwegian_ssh")) %>%
-  group_by(species, time) %>%
-  summarise(totB = sum(atoutput))
+# herring <- NOBAom_ms$truebio_ss %>%
+#   filter(species %in% c("Norwegian_ssh")) %>%
+#   group_by(species, time) %>%
+#   summarise(totB = sum(atoutput))
   
 # problem--omdimensions is doing species age accounting wrong
 # species alphabetical pulled separately but ages not
