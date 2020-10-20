@@ -684,9 +684,11 @@ Now to get a range of data:
 ```{r, code = readLines("./config/msfishery.R"), eval=F}
 ```
 
-### Using the wrappers (now updated for annual age)
+### Using the wrappers (now updated for annual age, multiple surveys, and multispecies)
 
 All the config files go in the config folder and we'll try running this:
+
+Run notes: om_comps output took 4 hours for this group of 11 species with 2 surveys and 1 fishery.
 
 ```{r full-test, message=FALSE, warning=FALSE, eval=FALSE}
 
@@ -716,6 +718,48 @@ NOBAom_ms_comp <- om_comps(usersurvey = c(here("config/mssurvey_spring.R"),
 
 ```
 
+Now need a function to read survey-specific output files back into a single object with named surveys.
+
+```{r readsurvs-function}
+
+readsurvs <- function(path, type){
+  
+  datlook <- data.frame(dattype = c('survB', 'survAge', 'survLen', 'survWtage', 'survAnnAge', 'survAnnWtage'),
+                        pattern = c("*surveyB.rds", "*survObsAgeComp.rds", "*survObsLenComp.rds", "*survObsWtAtAge.rds",
+                                    "*survObsFullAgeComp.rds", "*survObsFullWtAtAge.rds"),
+                        datname = c('survObsBiom', 'age_comp_data', 'len_comp_data', 'wtage', 'annage_comp_data', 'wtannage'))
+  
+  survs <- list.files(path=path, pattern = as.character(datlook$pattern[datlook$dattype %in% type]), full.names = TRUE)
+  
+  survey.name <-  str_match(survs, paste0(scenario.name,"_\\s*(.*?)\\s",datlook$pattern[datlook$dattype==type]))[,2]
+  
+  datname <- lapply(survs, readRDS)
+  
+  names(datname) <- survey.name
+  
+  return(datname)
+}
+
+```
+
+
+Testing--read in the data for plotting:
+
+```{r test-readurvs}
+
+survObsBiom <- readsurvs(d.name, 'survB')
+age_comp_data <- readsurvs(d.name, 'survAge')
+len_comp_data <- readsurvs(d.name, 'survLen')
+wtage <- readsurvs(d.name, 'survWtage')
+annage_comp_data <- readsurvs(d.name, 'survAnnAge')
+annage_wtage <- readsurvs(d.name, 'survAnnWtage')
+
+```
+
+Also need new plot functions and updated input file-writing functions that expect this structure.
+
+
+
 ### Wrapper test results {.tabset}
 
 #### Biomass index
@@ -733,10 +777,10 @@ source(here("config/omdimensions.R"))
 # list of files in directory with surveyB.rds ending
 # append to survObsBiom
 # apply survey name from filename
-survs <- list.files(path=d.name, pattern = "*surveyB.rds", full.names = TRUE)
-survey.name <-  str_match(survs, paste0(scenario.name,"_\\s*(.*?)\\s*surveyB.rds"))[,2]
-survObsBiom <- lapply(survs, readRDS)
-names(survObsBiom) <- survey.name
+# survs <- list.files(path=d.name, pattern = "*surveyB.rds", full.names = TRUE)
+# survey.name <-  str_match(survs, paste0(scenario.name,"_\\s*(.*?)\\s*surveyB.rds"))[,2]
+# survObsBiom <- lapply(survs, readRDS)
+# names(survObsBiom) <- survey.name
 
 #survObsBiom <- NOBAom_ms_ind$survObsBiom
 
@@ -800,29 +844,72 @@ plotC +
 
 
 #### Survey length composition
-```{r lencomp-1, eval=FALSE}
+```{r lencomp-1}
+
 
 #length comps
-len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsLenComp.rds")))
+#len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsLenComp.rds")))
+
+# now using readsurvs function above
+# survs <- list.files(path=d.name, pattern = "*survObsLenComp.rds", full.names = TRUE)
+# survey.name <-  str_match(survs, paste0(scenario.name,"_\\s*(.*?)\\s*survObsLenComp.rds"))[,2]
+# len_comp_data <- lapply(survs, readRDS)
+# names(len_comp_data) <- survey.name
+
 fish_len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsLenComp.rds")))
 
-len_comp_data <- len_comp_data[[1]]
+#len_comp_data <- len_comp_data[[1]]
 fish_len_comp_data <- fish_len_comp_data[[1]]
 
 #add this to om_indices function so that this has years when read in
 fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time/fstepperyr))
 
-len <- filter(len_comp_data, time %in% c(55:175))
-
-  lfplot <- ggplot(len, aes(upper.bins)) +
+plotlen <- function(dat){
+  
+    ggplot(dat, aes(upper.bins)) +
     geom_bar(aes(weight = atoutput)) +
     theme_tufte() +
     labs(subtitle = paste(scenario.name,
-                          len$species))
-  
-  lfplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+                          dat$species)) +
+    facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+
+}
+
+# len <- filter(len_comp_data, time %in% c(55:175))
+# 
+#   lfplot <- ggplot(len, aes(upper.bins)) +
+#     geom_bar(aes(weight = atoutput)) +
+#     theme_tufte() +
+#     labs(subtitle = paste(scenario.name,
+#                           len$species))
+#   
+#   lfplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
 
 
+```
+
+##### `r names(len_comp_data)[1]`
+``` {r, fig.show='hold'}
+lcompsub <- as.data.frame(len_comp_data$BTS_fall_allbox_effic1[1]) %>% filter(time %in% c(55:175)) %>%
+  group_by(species) %>%
+  group_map(~ plotlen(.x), keep = TRUE)
+
+for(i in 1:length(lcompsub)) {
+  print(lcompsub[[i]])
+}
+
+#map(len_comp_data$BTS_fall_allbox_effic1 %>% keep(time %in% c(55:175)), plotlen)[[1]]
+```
+
+##### `r names(len_comp_data)[2]`
+``` {r}
+lcompsub <- as.data.frame(len_comp_data$BTS_spring_allbox_effic1[1]) %>% filter(time %in% c(55:175)) %>%
+  group_by(species) %>%
+  group_map(~ plotlen(.x), keep = TRUE)
+
+for(i in 1:length(lcompsub)) {
+  print(lcompsub[[i]])
+}
 ```
 
 
