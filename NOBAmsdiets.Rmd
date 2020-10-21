@@ -756,8 +756,7 @@ annage_wtage <- readsurvs(d.name, 'survAnnWtage')
 
 ```
 
-Also need new plot functions and updated input file-writing functions that expect this structure.
-
+Also need new plot functions and updated input file-writing functions that expect this structure. Preliminary plot functions below.
 
 
 ### Wrapper test results {.tabset}
@@ -914,7 +913,7 @@ for(i in 1:length(lcompsub)) {
 
 
 #### Survey age composition (age classes)
-```{r agecomp-1, eval=FALSE}
+```{r agecomp-1}
 
 #read in comp data--now done above with function
 # age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsAgeComp.rds")))
@@ -922,7 +921,7 @@ for(i in 1:length(lcompsub)) {
 
 #Natage <- filter(age_comp_data, time %in% c(150:270))
 
-Natageplot <- <- function(dat){
+Natageplot <- function(dat){
   ggplot(dat, aes(x=agecl, y=atoutput)) +
     geom_point() +
     theme_tufte() +
@@ -934,22 +933,57 @@ Natageplot <- <- function(dat){
 #Natageplot 
 ```
 
+##### `r names(age_comp_data)[1]`
+``` {r}
+acompsub <- as.data.frame(age_comp_data$BTS_spring_allbox_effic1[1]) %>% filter(time %in% c(150:270)) %>%
+  group_by(species) %>%
+  group_map(~ Natageplot(.x), keep = TRUE)
+
+for(i in 1:length(acompsub)) {
+  print(acompsub[[i]])
+}
+```
+
+##### `r names(age_comp_data)[2]`
+``` {r}
+acompsub <- as.data.frame(age_comp_data$BTS_spring_allbox_effic1[1]) %>% filter(time %in% c(150:270)) %>%
+  group_by(species) %>%
+  group_map(~ Natageplot(.x), keep = TRUE)
+
+for(i in 1:length(acompsub)) {
+  print(acompsub[[i]])
+}
+```
 
 #### Survey weight at age (age classes)
-```{r wtageclass-1, eval=FALSE}
+```{r wtageclass-1}
 
-wtage <- readRDS(file.path(d.name, paste0(scenario.name, "survObsWtAtAge.rds")))
-wtage <- wtage[[1]]
+# now done with function above
+# wtage <- readRDS(file.path(d.name, paste0(scenario.name, "survObsWtAtAge.rds")))
+# wtage <- wtage[[1]]
 
-wageplot <- ggplot(wtage, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (5 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
+wageplot <- function(dat){
+  ggplot(dat, aes(time, atoutput)) +
+    geom_line(aes(colour = factor(agecl))) +
+    theme_tufte() +
+    theme(legend.position = "bottom") +
+    xlab("model timestep (5 per year)") +
+    ylab("average individual weight (g)") +
+    labs(subtitle = paste0(scenario.name)) +
+    facet_wrap(c("species"), scales="free_y")
+}
 
-wageplot + facet_wrap(c("species"), scales="free_y")
+#wageplot 
+```
+
+##### `r names(wtage)[1]`
+``` {r}
+map(wtage$BTS_fall_allbox_effic1, wageplot)[[1]]
+```
+
+##### `r names(wtage)[2]`
+``` {r}
+map(wtage$BTS_spring_allbox_effic1, wageplot)[[1]]
 ```
 
 #### Fishery length composition
@@ -964,7 +998,7 @@ for(i in 1:length(lcompsub)) {
 ```
 
 #### Fishery age composition (age classes)
-```{r fishagecomp-1, eval=FALSE}
+```{r fishagecomp-1}
 
 #read in comp data
 fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
@@ -973,15 +1007,14 @@ fish_age_comp <- fish_age_comp[[1]]
 #add this to om_indices function so that this has years when read in
 fish_age_comp$time <- fish_age_comp$time/fstepperyr
 
-Natage <- filter(fish_age_comp, time %in% c(30:53))
+acompsub <- as.data.frame(age_comp_data$BTS_spring_allbox_effic1[1]) %>% filter(time %in% c(150:270)) %>%
+  group_by(species) %>%
+  group_map(~ Natageplot(.x), keep = TRUE)
 
-Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
-    geom_point() +
-    theme_tufte() +
-    labs(subtitle = paste(scenario.name,
-                          Natage$species))
-  
-  Natageplot + facet_wrap(~time, ncol=6, scales="free_y")
+for(i in 1:length(acompsub)) {
+  print(acompsub[[i]])
+}
+
 ```
 
 ### {-}
