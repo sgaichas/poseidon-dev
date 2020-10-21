@@ -813,12 +813,12 @@ plotB <- function(dat){
 
 ##### `r names(survObsBiom)[1]`
 ``` {r}
-map(survObsBiom$BTS_spring_allbox_effic1, plotB)[[1]]
+map(survObsBiom$BTS_fall_allbox_effic1, plotB)[[1]]
 ```
 
 ##### `r names(survObsBiom)[2]`
 ```{r}
-map(survObsBiom$BTS_fall_allbox_effic1, plotB)[[1]]
+map(survObsBiom$BTS_spring_allbox_effic1, plotB)[[1]]
 ```
 
 
@@ -916,19 +916,22 @@ for(i in 1:length(lcompsub)) {
 #### Survey age composition (age classes)
 ```{r agecomp-1, eval=FALSE}
 
-#read in comp data
-age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsAgeComp.rds")))
-age_comp_data <- age_comp_data[[1]]
+#read in comp data--now done above with function
+# age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsAgeComp.rds")))
+# age_comp_data <- age_comp_data[[1]]
 
-Natage <- filter(age_comp_data, time %in% c(150:270))
+#Natage <- filter(age_comp_data, time %in% c(150:270))
 
-Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
+Natageplot <- <- function(dat){
+  ggplot(dat, aes(x=agecl, y=atoutput)) +
     geom_point() +
     theme_tufte() +
     labs(subtitle = paste(scenario.name,
-                          Natage$species))
+                          dat$species)) + 
+    facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+}
   
-  Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+#Natageplot 
 ```
 
 
@@ -949,6 +952,16 @@ wageplot <- ggplot(wtage, aes(time, atoutput)) +
 wageplot + facet_wrap(c("species"), scales="free_y")
 ```
 
+#### Fishery length composition
+``` {r}
+lcompsub <- as.data.frame(fish_len_comp_data) %>% filter(time %in% c(55:175)) %>%
+  group_by(species) %>%
+  group_map(~ plotlen(.x), keep = TRUE)
+
+for(i in 1:length(lcompsub)) {
+  print(lcompsub[[i]])
+}
+```
 
 #### Fishery age composition (age classes)
 ```{r fishagecomp-1, eval=FALSE}
