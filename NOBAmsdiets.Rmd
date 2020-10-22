@@ -861,7 +861,7 @@ fish_len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsLe
 fish_len_comp_data <- fish_len_comp_data[[1]]
 
 #add this to om_indices function so that this has years when read in
-fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time/fstepperyr))
+#fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time/fstepperyr))
 
 plotlen <- function(dat){
   
@@ -1005,9 +1005,9 @@ fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp
 fish_age_comp <- fish_age_comp[[1]]
 
 #add this to om_indices function so that this has years when read in
-fish_age_comp$time <- fish_age_comp$time/fstepperyr
+#fish_age_comp$time <- fish_age_comp$time/fstepperyr
 
-acompsub <- as.data.frame(age_comp_data$BTS_spring_allbox_effic1[1]) %>% filter(time %in% c(150:270)) %>%
+acompsub <- as.data.frame(fish_age_comp) %>% filter(time %in% c(150:270)) %>%
   group_by(species) %>%
   group_map(~ Natageplot(.x), keep = TRUE)
 
