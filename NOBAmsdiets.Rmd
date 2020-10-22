@@ -1017,6 +1017,16 @@ for(i in 1:length(acompsub)) {
 
 ```
 
+#### Fishery weight at age (age classes)
+```{r}
+fishwtage <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsWtAtAge.rds")))
+fishwtage <- fishwtage[[1]]
+
+wageplot(fishwtage)
+
+```
+
+
 ### {-}
 
 Wrappers still work for NOBA cod using standard age classes. 
@@ -1026,49 +1036,39 @@ Visualize new annual age output for numbers at age, catch at age, and weight at 
 ### Wrapper test results for annual ages {.tabset #annageoutput}
 
 #### Survey age composition (annual ages)
-```{r plot-annagecomp, eval=FALSE}
-#read in comp data
-annage_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsFullAgeComp.rds")))
-annage_comp_data <- annage_comp_data[[1]]
+```{r plot-annagecomp, results="asis"}
 
-#fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
-#fish_age_comp <- fish_age_comp[[1]]
+# annage_comp_data read in above, apply plot function, quit hardcoding survey names
 
-#add this to om_indices function so that this has years when read in
-#fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
-
-Natage <- filter(annage_comp_data, time %in% c(150:270))
-
-Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
-    geom_point() +
-    theme_tufte() +
-    labs(subtitle = paste(scenario.name,
-                          Natage$species))
+for(s in names(annage_comp_data)){
+  cat("  \n##### ",  s,"  \n")
+  acompsub <- as.data.frame(annage_comp_data[[s]][[1]]) %>% filter(time %in% c(150:270)) %>%
+    group_by(species) %>%
+    group_map(~ Natageplot(.x), keep = TRUE)
   
-  Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+  for(i in 1:length(acompsub)) {
+    print(acompsub[[i]])
+  }
+  cat("  \n")
+}
 ```
 
 #### Survey iterpolated weight at age (annual ages) 
-```{r plot-annwtage, eval=FALSE}
+```{r plot-annwtage, results='asis'}
 
-wtage <- readRDS(file.path(d.name, paste0(scenario.name, "survObsFullWtAtAge.rds")))
-wtage <- wtage[[1]] #this still has second list component, diagnostic plot
-wtage <- wtage[[1]]
+# annage_wtage read in above 
+# wtage <- wtage[[1]] #this still has second list component, diagnostic plot
+# wtage <- wtage[[1]]
 
-wageplot <- ggplot(wtage, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (5 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
-
+for(s in names(annage_wtage)){
+  cat("  \n##### ",  s,"  \n")
+  print(wageplot(annage_wtage[[s]][[1]][[1]]))
+  cat("  \n")
+}
 ```
 
 #### Fishery catch at age (annual ages)
-```{r plot-catchagecomp, eval=FALSE}
+```{r plot-catchagecomp}
 
 fish_annage_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullAgeComp.rds")))
 fish_annage_comp <- fish_annage_comp[[1]]
@@ -1076,33 +1076,21 @@ fish_annage_comp <- fish_annage_comp[[1]]
 #add this to om_indices function so that this has years when read in
 fish_annage_comp$time <- fish_annage_comp$time/fstepperyr
 
-Catage <- filter(fish_annage_comp, time %in% c(30:53))
+acompsub <- as.data.frame(fish_annage_comp) %>% filter(time %in% c(30:54)) %>%
+  group_by(species) %>%
+  group_map(~ Natageplot(.x), keep = TRUE)
 
-Catageplot <- ggplot(Catage, aes(x=agecl, y=atoutput)) +
-    geom_point() +
-    theme_tufte() +
-    labs(subtitle = paste(scenario.name,
-                          Catage$species))
-  
-  Catageplot + facet_wrap(~time, ncol=6, scales="free_y")
+for(i in 1:length(acompsub)) {
+  print(acompsub[[i]])
+}
 ```
 
 #### Fishery iterpolated weight at age (annual ages) 
-```{r plot-fishannwtage, eval=FALSE}
+```{r plot-fishannwtage}
 
-wtage <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullWtAtAge.rds")))
-wtage <- wtage[[1]] #this still has second list component, diagnostic plot
-wtage <- wtage[[1]]
+fish_annage_wtage <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullWtAtAge.rds")))
 
-wageplot <- ggplot(wtage, aes(time, atoutput)) +
-  geom_line(aes(colour = factor(agecl))) +
-  theme_tufte() +
-  theme(legend.position = "bottom") +
-  xlab("model timestep (5 per year)") +
-  ylab("average individual weight (g)") +
-  labs(subtitle = paste0(scenario.name, " annual mid year sample"))
-
-wageplot + facet_wrap(c("species"), scales="free_y")
+wageplot(fish_annage_wtage[[1]][[1]])
 
 ```
 
