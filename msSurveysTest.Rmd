@@ -136,11 +136,12 @@ My plotting functions: too specialized to include in the package?
 ```{r plotfuns}
 
 # plot biomass time series facet wrapped by species
-plotB <- function(dat){
+plotB <- function(dat, truedat=NULL){
   
     ggplot() +
     geom_line(data=dat, aes(x=time/stepperyr,y=atoutput, color="Survey Biomass"), 
               alpha = 10/10) +
+    {if(!is.null(truedat)) geom_line(data=truedat, aes(x=time/365,y=atoutput, color="True B"), alpha = 3/10)} + 
     theme_tufte() +
     theme(legend.position = "top") +
     xlab("model year") +
@@ -152,11 +153,12 @@ plotB <- function(dat){
 
 # make a catch series function that can be split by fleet? this doesnt
 # also note different time (days) from model timestep in all other output
-plotC <- function(dat){
+plotC <- function(dat, truedat=NULL){
   
     ggplot() +
     geom_line(data=dat, aes(x=time/365,y=atoutput, color="Catch biomass"), 
               alpha = 10/10) +
+    {if(!is.null(truedat)) geom_line(data=truedat, aes(x=time/365,y=atoutput, color="True Catch"), alpha = 3/10)} + 
     theme_tufte() +
     theme(legend.position = "top") +
     xlab("model year") +
@@ -167,7 +169,7 @@ plotC <- function(dat){
 }
 
 # plot length frequencies by timestep (one species)
-plotlen <- function(dat){
+plotlen <- function(dat, truedat=NULL){
   
     ggplot(dat, aes(upper.bins)) +
     geom_bar(aes(weight = atoutput)) +
@@ -181,7 +183,7 @@ plotlen <- function(dat){
 }
 
 # plot numbers at age by timestep (one species)
-Natageplot <- function(dat){
+Natageplot <- function(dat, truedat=NULL){
   ggplot(dat, aes(x=agecl, y=atoutput)) +
     geom_point() +
     theme_tufte() +
@@ -193,7 +195,7 @@ Natageplot <- function(dat){
 }
 
 # plot weight at age time series facet wrapped by species
-wageplot <- function(dat){
+wageplot <- function(dat, truedat=NULL){
   ggplot(dat, aes(time/stepperyr, atoutput)) +
     geom_line(aes(colour = factor(agecl))) +
     theme_tufte() +
@@ -214,11 +216,17 @@ We are using the full time series for biomass and weight at age, and a subsample
 #### Survey biomass
 ```{r, results="asis"}
 
+# compare with true output (all timesteps)
 for(s in names(survObsBiom)){
   cat("  \n##### ",  s,"  \n")
-  print(plotB(survObsBiom[[s]][[1]]))
+  print(plotB(survObsBiom[[s]][[1]], omlist_ss$truetotbio_ss))
   cat("  \n")
 }
+
+# plots survey only
+# for(s in names(survObsBiom)){
+#   print(plotB(survObsBiom[[s]][[1]]))
+# }
 
 ```
 
@@ -306,7 +314,8 @@ We are using the full time series for total catch and weight at age, and a subsa
 #### Fishery total catch
 ```{r}
 
-plotC(catchbio_ss)
+# compare with true catch, should match
+plotC(catchbio_ss, omlist_ss$truecatchbio_ss)
 
 ```
 
