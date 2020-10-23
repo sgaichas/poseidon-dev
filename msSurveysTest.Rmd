@@ -131,6 +131,34 @@ fish_annage_wtage <- fish_annage_wtage[[1]] #need to change time units?
 
 ```
 
+Crunch a few things to get true age comps
+```{r}
+# age classes
+totNagecl <- omlist_ss$truenums_ss %>%
+  group_by(species, agecl, time) %>%
+  summarize(numAtAge = sum(atoutput))
+
+totN <- totNagecl %>%
+  group_by(species, time) %>%
+  summarize(totN = sum(numAtAge))
+
+trueNagecl <- merge(totNagecl, totN)
+
+# annual ages
+totNage <- omlist_ss$truenumsage_ss %>%
+  group_by(species, agecl, time) %>%
+  summarize(numAtAge = sum(atoutput))
+
+#this should be exactly the same as totN but just making sure...
+totN2 <- totNage %>%
+  group_by(species, time) %>%
+  summarize(totN = sum(numAtAge))
+
+trueNage <- merge(totNage, totN2)
+
+```
+
+
 My plotting functions: too specialized to include in the package?
 
 ```{r plotfuns}
@@ -183,9 +211,10 @@ plotlen <- function(dat, truedat=NULL){
 }
 
 # plot numbers at age by timestep (one species)
-Natageplot <- function(dat, truedat=NULL){
-  ggplot(dat, aes(x=agecl, y=atoutput)) +
-    geom_point() +
+Natageplot <- function(dat, effN=1, truedat=NULL){
+  ggplot() +
+    geom_point(dat, aes(x=agecl, y=atoutput/effN, color="Est Comp")) +
+    {if(!is.null(truedat)) geom_line(data=truedat, aes(x=agecl, y=numAtAge/totN, color="True Comp"), alpha = 3/10)} + 
     theme_tufte() +
     xlab("age/agecl") +
     ylab("number") +
@@ -211,7 +240,7 @@ wageplot <- function(dat, truedat=NULL){
 
 ### Visualize census surveys {.tabset #census}
 
-We are using the full time series for biomass and weight at age, and a subsample of years 30-53 for compositions. 
+We are using the full time series for biomass and weight at age, and a subsample of years 30-53 for compositions. In this test we see the effect of surveying in one season, with migratory species missedor only partially represented in some surveys, and with the overall surveyed biomass being at the lower or higher end of the range depending on the time of year. (Observation error is included in the survey biomass time series.) Samples for length and age assume a total of 100000 fish were randomly sampled for each species in each survey (surveffN defined in the survey config files), so older age classes may not be represented. 
 
 #### Survey biomass
 ```{r, results="asis"}
@@ -309,7 +338,7 @@ for(s in names(annage_wtage)){
 
 ### Visualize perfectly observed fisheries {.tabset}
 
-We are using the full time series for total catch and weight at age, and a subsample of years 30-35 for compositions. Fishery length and age composition is sampled every output timestep. 
+We are using the full time series for total catch and weight at age, and a subsample of years 30-35 for compositions. Fishery length and age composition is sampled every output timestep. Fishery effN for length and age sampling was 1000 fish per time step, so this is reflected in the composition plots.
 
 #### Fishery total catch
 ```{r}
