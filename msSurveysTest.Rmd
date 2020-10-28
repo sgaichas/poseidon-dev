@@ -156,6 +156,29 @@ totN2 <- totNage %>%
 
 trueNage <- merge(totNage, totN2)
 
+# fishery catch at age class
+totCagecl <- omlist_ss$truecatchnum_ss %>%
+  group_by(species, agecl, time) %>%
+  summarize(numAtAge = sum(atoutput))
+
+totCAAcl <- totCagecl %>%
+  group_by(species, time) %>%
+  summarize(totN = sum(numAtAge))
+
+trueCAAcl <- merge(totCagecl, totCAAcl)
+
+# fishery catch at annual age
+totCage <- omlist_ss$truecatchage_ss %>%
+  group_by(species, agecl, time) %>%
+  summarize(numAtAge = sum(atoutput))
+
+totCAA <- totCage %>%
+  group_by(species, time) %>%
+  summarize(totN = sum(numAtAge))
+
+trueCAA <- merge(totCage, totCAA)
+
+
 ```
 
 
@@ -206,21 +229,22 @@ plotlen <- function(dat, truedat=NULL){
     ylab("number") +
     labs(subtitle = paste(scenario.name,
                           dat$species)) +
-    facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+    facet_wrap(~time, ncol=6, scales="free_y")
 
 }
 
 # plot numbers at age by timestep (one species)
 Natageplot <- function(dat, effN=1, truedat=NULL){
   ggplot() +
-    geom_point(dat, aes(x=agecl, y=atoutput/effN, color="Est Comp")) +
-    {if(!is.null(truedat)) geom_line(data=truedat, aes(x=agecl, y=numAtAge/totN, color="True Comp"), alpha = 3/10)} + 
+    geom_point(data=dat, aes(x=agecl, y=atoutput/effN, color="Est Comp")) +
+    {if(!is.null(truedat)) geom_line(data=dat, aes(x=agecl, y=numAtAge/totN, color="True Comp"))} + 
     theme_tufte() +
+    theme(legend.position = "bottom") +    
     xlab("age/agecl") +
     ylab("number") +
     labs(subtitle = paste(scenario.name,
                           dat$species)) + 
-    facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+    facet_wrap(~time, ncol=6, scales="free_y")
 }
 
 # plot weight at age time series facet wrapped by species
@@ -240,7 +264,7 @@ wageplot <- function(dat, truedat=NULL){
 
 ### Visualize census surveys {.tabset #census}
 
-We are using the full time series for biomass and weight at age, and a subsample of years 30-53 for compositions. In this test we see the effect of surveying in one season, with migratory species missedor only partially represented in some surveys, and with the overall surveyed biomass being at the lower or higher end of the range depending on the time of year. (Observation error is included in the survey biomass time series.) Samples for length and age assume a total of 100000 fish were randomly sampled for each species in each survey (surveffN defined in the survey config files), so older age classes may not be represented. 
+We are using the full time series for biomass and weight at age, and a subsample of years 30-53 for compositions. In this test we see the effect of surveying in one season, with migratory species missed or only partially represented in some surveys, and with the overall surveyed biomass being at the lower or higher end of the range depending on the time of year. (Observation error is included in the survey biomass time series.) Samples for length and age assume a total of 100000 fish were randomly sampled for each species in each survey (surveffN defined in the survey config files). 
 
 #### Survey biomass
 ```{r, results="asis"}
@@ -277,14 +301,16 @@ for(s in names(len_comp_data)){
 ```
 
 #### Survey age class composition (Atlantis age class)
-```{r, results="asis"}
+```{r, results="asis", message=FALSE, warning=FALSE}
 
 for(s in names(age_comp_data)){
   cat("  \n##### ",  s,"  \n")
   acompsub <- as.data.frame(age_comp_data[[s]][[1]]) %>% filter(time %in% c(150:270)) %>%
     group_by(species) %>%
-    group_map(~ Natageplot(.x), keep = TRUE)
-  
+    left_join(., trueNagecl) %>%
+    #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+    group_map(~ Natageplot(.x, effN = 100000, truedat = 1), keep = TRUE) # plots merged true age comp
+
   for(i in 1:length(acompsub)) {
     print(acompsub[[i]])
   }
@@ -294,13 +320,15 @@ for(s in names(age_comp_data)){
 ```
 
 #### Survey age composition (annual ages)
-```{r plot-annagecomp, results="asis"}
+```{r plot-annagecomp, results="asis", message=FALSE, warning=FALSE}
 
 for(s in names(annage_comp_data)){
   cat("  \n##### ",  s,"  \n")
   acompsub <- as.data.frame(annage_comp_data[[s]][[1]]) %>% filter(time %in% c(150:270)) %>%
     group_by(species) %>%
-    group_map(~ Natageplot(.x), keep = TRUE)
+    left_join(., trueNage) %>%
+    #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+    group_map(~ Natageplot(.x, effN = 100000, truedat = 1), keep = TRUE) # plots merged true age comp
   
   for(i in 1:length(acompsub)) {
     print(acompsub[[i]])
@@ -338,7 +366,7 @@ for(s in names(annage_wtage)){
 
 ### Visualize perfectly observed fisheries {.tabset}
 
-We are using the full time series for total catch and weight at age, and a subsample of years 30-35 for compositions. Fishery length and age composition is sampled every output timestep. Fishery effN for length and age sampling was 1000 fish per time step, so this is reflected in the composition plots.
+We are using the full time series for total catch and weight at age, and a subsample of years 30-35 for compositions. Fishery length and age composition is sampled every output timestep. Fishery effN for length and age sampling was 1000 fish per year (200 per time step), so this is reflected in the composition plots.
 
 #### Fishery total catch
 ```{r}
@@ -364,11 +392,14 @@ for(i in 1:length(lcompsub)) {
 
 
 #### Fishery catch at age (Atlantis age class)
-```{r}
+```{r, message=FALSE, warning=FALSE}
 
 acompsub <- as.data.frame(fish_age_comp) %>% filter(time %in% c(150:175)) %>%
   group_by(species) %>%
-  group_map(~ Natageplot(.x), keep = TRUE)
+  left_join(., trueCAAcl) %>%
+  #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+  group_map(~ Natageplot(.x, effN = 200, truedat = 1), keep = TRUE) # plots merged true age comp
+
 
 for(i in 1:length(acompsub)) {
   print(acompsub[[i]])
@@ -378,11 +409,13 @@ for(i in 1:length(acompsub)) {
 
 
 #### Fishery catch at age (annual ages)
-```{r}
+```{r, message=FALSE, warning=FALSE}
 
 acompsub <- as.data.frame(fish_annage_comp) %>% filter(time %in% c(150:175)) %>%
   group_by(species) %>%
-  group_map(~ Natageplot(.x), keep = TRUE)
+  left_join(., trueCAA) %>%
+  #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+  group_map(~ Natageplot(.x, effN = 200, truedat = 1), keep = TRUE) # plots merged true age comp
 
 for(i in 1:length(acompsub)) {
   print(acompsub[[i]])
