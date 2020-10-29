@@ -441,3 +441,57 @@ wageplot(fish_annage_wtage[[1]])
 ```
 
 ### {-}
+
+## Specifying a more realistic survey.
+
+### New survey and fishery config files
+
+`mssurvey_spring_01.R` and `mssurvey_fall_01.R` configure the fishery independent surveys. We keep spring and fall survey timing, but now we have efficiency defined for each species and a selectivity function for each species. Our surveys exclude offshore areas. These specifications are invented for demonstration purposes, not intended to realistically mimic a particular survey:
+
+```{r, code = readLines("./config/mssurvey_spring_01.R"), eval=F}
+```
+
+```{r, code = readLines("./config/mssurvey_fall_01.R"), eval=F}
+```
+
+`msfishery_01.R` configures the fishery dependent data:
+
+```{r, code = readLines("./config/msfishery_01.R"), eval=F}
+```
+
+Model boxes show where our survey works now. We are including boxes x...x in these surveys:
+```{r NOBAmap}
+knitr::include_graphics("images/NOBAboxes.png")
+```
+
+The way sampling is set up, effective N for each survey is the number of fish measured for length, age, and average weight at age. We could introduce further realism by using the `sample_ages()` function to take a subsample for age composition and optionally apply an ageing error matrix. This would require changing the `om_comps()` wrapper: see [atlantisom issue](https://github.com/r4atlantis/atlantisom/issues/42).  
+
+### New survey and fishery outputs
+
+```{r full-test, message=FALSE, warning=FALSE, eval=FALSE}
+
+#NOBAom <- om_init(here("config/NOBA2config.R"))
+
+#NOBAom_ms <- om_species(sppsubset$Name, NOBAom)
+
+NOBAom_ms <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+
+# new wrapper for multiple surveys saves survey output separately
+# but returns a list with all surveys, not ideal; make consistent
+
+NOBAom_ms_ind <- om_index(usersurvey = c(here("config/mssurvey_spring_01.R"), 
+                                         here("config/mssurvey_fall_01.R")), 
+                           userfishery = here("config/msfishery_01.R"),
+                           omlist_ss = NOBAom_ms, 
+                           n_reps = 1, 
+                           save = TRUE)
+
+NOBAom_ms_comp <- om_comps(usersurvey = c(here("config/mssurvey_spring_01.R"), 
+                                         here("config/mssurvey_fall_01.R")), 
+                           userfishery = here("config/msfishery_01.R"),
+                           omlist_ss = NOBAom_ms, 
+                           n_reps = 1, 
+                           save = TRUE)
+
+
+```

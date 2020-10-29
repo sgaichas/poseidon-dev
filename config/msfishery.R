@@ -30,7 +30,8 @@ fishtime <- fish_times
 fishboxes <- c(0:(omlist_ss$boxpars$nbox - 1))
 
 # effective sample size needed for sample_fish
-# this effective N is high but not equal to total for numerous groups
+# this effective N is divided by the number of annual timesteps below, so 200 per time
+# use as input to the length samples, ages can be a subset
 fisheffN <- data.frame(species=survspp, effN=rep(1000, length(survspp)))
 
 #this adjusts for subannual fishery output so original effN is for whole year
