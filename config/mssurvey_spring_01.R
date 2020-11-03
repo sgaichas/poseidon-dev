@@ -79,24 +79,48 @@ sigmoid <- function(a,b,x) {
   1 / (1 + exp(-a-b*x))
 }
 
-selgroups <- as.data.frame(pelagics) %>% mutate(survgroup="pelagics") %>% rename(species = pelagics) %>%
-  bind_rows(as.data.frame(demersals) %>% mutate(survgroup="demersals") %>% rename(species = demersals)) %>%
-  bind_rows(as.data.frame(selflats) %>% mutate(survgroup="selflats") %>% rename(species = selflats))
+# selgroups <- as.data.frame(pelagics) %>% mutate(survgroup="pelagics") %>% rename(species = pelagics) %>%
+#   bind_rows(as.data.frame(demersals) %>% mutate(survgroup="demersals") %>% rename(species = demersals)) %>%
+#   bind_rows(as.data.frame(selflats) %>% mutate(survgroup="selflats") %>% rename(species = selflats))
+# 
+# selage <- sp_age %>%
+#   mutate(n_annages = NumCohorts * NumAgeClassSize) %>%
+#   left_join(selgroups, by=c("Name"="species"))
+# 
+# # survey selectivity specification by species group--replace for each group in surselex
+# 
+# selpelagics <- sigmoid(2*n_annages/5,1,seq(-10,10,length.out=n_annages))
+# seldemersals <- sigmoid(n_annages/4,1,seq(-10,10,length.out=n_annages))
+# selselflats <- sigmoid(1,1,seq(-10,10,length.out=n_annages))
 
-selage <- sp_age %>%
-  mutate(n_annages = NumCohorts * NumAgeClassSize) %>%
-  left_join(selgroups, by=c("Name"="species"))
+selnontrawl <- data.frame(species=rep(nontrawl, each=10),
+                          agecl=rep(c(1:10),length(nontrawl)),
+                          selex=rep(1.0,length(nontrawl)*10))
+selpelagics <- data.frame(species=rep(pelagics, each=10),
+                          agecl=rep(c(1:10),length(pelagics)),
+                          selex=sigmoid(5,1,seq(-10,10,length.out=10)))
+seldemersals <- data.frame(species=rep(demersals, each=10),
+                           agecl=rep(c(1:10),length(demersals)),
+                           selex=sigmoid(1,1,seq(-10,10,length.out=10)))
+selselflats <- data.frame(species=rep(selflats, each=10),
+                          agecl=rep(c(1:10),length(selflats)),
+                          selex=sigmoid(1,1,seq(-10,10,length.out=10)))
 
-# survey selectivity specification by species group--replace for each group in surselex
+selexmix <- bind_rows(selnontrawl, selpelagics, seldemersals, selselflats) 
 
-selpelagics <- sigmoid(5,1,seq(-10,10,length.out=n_annages))
-seldemersals <- sigmoid(1,1,seq(-10,10,length.out=n_annages))
-selselflats <- sigmoid(1,1,seq(-10,10,length.out=n_annages))
+selexmix <- selexmix %>%
+  filter(species %in% survspp) %>%
+  rename(selex10 = selex)
 
-#selexmix <- bind_rows(selnontrawl, selpelagics, seldemersals, selselflats)
-
-#survselex <- selexmix %>%
-#  filter(species %in% survspp)
+survselex <- merge(survselex, selexmix, all = TRUE) %>%
+  filter(!is.na(selex)) %>%
+  mutate(selex = case_when(!is.na(selex10) ~ selex10,
+                           is.na(selex10) ~ selex)) %>%
+  select(-selex10)
+  
+# now apply this for agecl selectivity that matches
+# and figure out how to use in wrapper!
+ageclsel <- fullsel[seq(NumAgeClassSize, n_annages, length.out=NumCohorts)]
 
 # effective sample size needed for sample_fish
 # this is the number of *lengths* per species that are measured on a survey

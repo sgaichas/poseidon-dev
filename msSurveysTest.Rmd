@@ -260,6 +260,21 @@ wageplot <- function(dat, truedat=NULL){
     facet_wrap(c("species"), scales="free_y")
 }
   
+# compare N at age and C at age between standard and ANNAGE outputs
+totNageplot <- function(dat, anndat){
+  
+    ggplot() +
+    geom_line(data=dat, aes(x=time/stepperyr,y=totN, color="Tot N cohorts"), 
+              alpha = 5/10) +
+    geom_line(data=anndat, aes(x=time/stepperyr,y=totN, color="Tot N annage"), alpha = 5/10) + 
+    theme_tufte() +
+    theme(legend.position = "top") +
+    xlab("model year") +
+    ylab("N") +
+    labs(colour=scenario.name) +
+    facet_wrap(~species, scales="free") 
+  
+}
 
 ```
 
