@@ -92,25 +92,25 @@ omlist_ss <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
 source(here("config/omdimensions.R"))
 
 # add this paste0(d.name, "/mscensus1") and add option to name save directory in wrappers
-survObsBiom <- read_savedsurvs(d.name, 'survB')
-age_comp_data <- read_savedsurvs(d.name, 'survAge')
-len_comp_data <- read_savedsurvs(d.name, 'survLen')
-wtage <- read_savedsurvs(d.name, 'survWtage')
-annage_comp_data <- read_savedsurvs(d.name, 'survAnnAge')
-annage_wtage <- read_savedsurvs(d.name, 'survAnnWtage')
+survObsBiom <- read_savedsurvs(paste0(d.name, "/mscensus1"), 'survB')
+age_comp_data <- read_savedsurvs(paste0(d.name, "/mscensus1"), 'survAge')
+len_comp_data <- read_savedsurvs(paste0(d.name, "/mscensus1"), 'survLen')
+wtage <- read_savedsurvs(paste0(d.name, "/mscensus1"), 'survWtage')
+annage_comp_data <- read_savedsurvs(paste0(d.name, "/mscensus1"), 'survAnnAge')
+annage_wtage <- read_savedsurvs(paste0(d.name, "/mscensus1"), 'survAnnWtage')
 
 # no function needed for saved fishery output as long as there is only one fishery specification file
 
-catchbio_ss <- readRDS(file.path(d.name, paste0(scenario.name, "fishCatch.rds")))
+catchbio_ss <- readRDS(file.path(paste0(d.name, "/mscensus1"), paste0(scenario.name, "fishCatch.rds")))
 catchbio_ss <- catchbio_ss[[1]] #in same time unit as surveys
 
-fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
+fish_age_comp <- readRDS(file.path(paste0(d.name, "/mscensus1"), paste0(scenario.name, "fishObsAgeComp.rds")))
 fish_age_comp <- fish_age_comp[[1]]
 
 #add this to om_indices function so that this has years when read in
 #fish_age_comp$time <- fish_age_comp$time/fstepperyr
 
-fish_len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsLenComp.rds")))
+fish_len_comp_data <- readRDS(file.path(paste0(d.name, "/mscensus1"), paste0(scenario.name, "fishObsLenComp.rds")))
 
 #len_comp_data <- len_comp_data[[1]]
 fish_len_comp_data <- fish_len_comp_data[[1]]
@@ -118,16 +118,16 @@ fish_len_comp_data <- fish_len_comp_data[[1]]
 #add this to om_indices function so that this has years when read in
 #fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time/fstepperyr))
 
-fishwtage <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsWtAtAge.rds")))
+fishwtage <- readRDS(file.path(paste0(d.name, "/mscensus1"), paste0(scenario.name, "fishObsWtAtAge.rds")))
 fishwtage <- fishwtage[[1]] #need to change time units?
 
-fish_annage_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullAgeComp.rds")))
+fish_annage_comp <- readRDS(file.path(paste0(d.name, "/mscensus1"), paste0(scenario.name, "fishObsFullAgeComp.rds")))
 fish_annage_comp <- fish_annage_comp[[1]]
 
 #add this to om_indices function so that this has years when read in
 #fish_annage_comp$time <- fish_annage_comp$time/fstepperyr
 
-fish_annage_wtage <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullWtAtAge.rds")))
+fish_annage_wtage <- readRDS(file.path(paste0(d.name, "/mscensus1"), paste0(scenario.name, "fishObsFullWtAtAge.rds")))
 fish_annage_wtage <- fish_annage_wtage[[1]] #need to change time units?
 
 ```
@@ -513,92 +513,7 @@ NOBAom_ms_comp <- om_comps(usersurvey = c(here("config/mssurvey_spring_01.R"),
 
 ```
 
-Diagnose failure of om_comps on annage data with new survey config file--selectivity function by 10 agecl instead of annual ages.
+NOTE! Need to have selectivities defined *both* for annual ages and for age classes. Worked in census because flat selectivity was defined for full set of annual ages and it just didn't use past age 10 for age class output. They were all 1 anyway so it didnt matter. The updated survey config file first specifies selectivity by true age and then backs out an approximate equivalent for age classes. We will use true age classes for the real datasets but wanted to check both outputs here. `om_comps()` has now changed to take `survselex.agecl` as input to the age class comps and survselex as input to the full comps. 
 
-```{r}
-
-# source(here("config/mssurvey_spring_01.R"))
-# source(here("config/mssurvey_fall_01.R"))
-# source(here("config/msfishery_01.R"))
-
-usersurvey <- c(here("config/mssurvey_spring_01.R"), 
-                here("config/mssurvey_fall_01.R"))
-
-n_reps <- 1
-
-if(!is.null(omlist_ss$truenumsage_ss)){
-    #numbers based fishery independent survey for age and length comps
-    #allows for mulitple surveys
-    annage_comp_datas <- list()
-
-    for (s in usersurvey)
-    {
-      source(s, local = TRUE)
-
-      # same user specifications as indices
-      survey_annageN <- atlantisom::create_survey(dat = omlist_ss$truenumsage_ss,
-                                                  time = survtime,
-                                                  species = survspp,
-                                                  boxes = survboxes,
-                                                  effic = surveffic,
-                                                  selex = survselex)
-      #Sample fish for age composition
-      # if we want replicates for obs error this sample function will generate them
-      annage_comp_data <- list()
-      for(i in 1:n_reps){
-        annage_comp_data[[i]] <- atlantisom::sample_fish(survey_annageN, surveffN)
-      }
-
-      # save survey annual age comps
-      if(save){
-        saveRDS(annage_comp_data, file.path(d.name, paste0(scenario.name, "_",
-                                                           survey.name, "survObsFullAgeComp.rds")))
-      }
-      annage_comp_datas[[survey.name]] <- annage_comp_data
-    }
-
-}else{annage_comp_datas <- NULL}
-
-#breaking at sample_fish; test:
-
-dat <- survey_annageN
-effN <- surveffN
-
-    #sum over boxes and assume sampling occurs coastwide (the sampled boxes were already subset in create functions)
-    dat2 <- aggregate(dat$atoutput,list(dat$species,dat$agecl,dat$time),sum)
-    names(dat2) <- c("species","agecl","time","numAtAge")
-
-    #TODO: Need error checking--SKG moved nn assignement of effN to inside y loop from outside
-	  dat2$numAtAgeSamp <- NA
-	  for(sp in unique(dat2$species)) {
-	    for(y in unique(dat2$time)) {
-	      nn <- effN[effN$species==sp,"effN"]
-	      ind <- dat2$species == sp & dat2$time == y
-	      totalNums <- sum(dat2[ind,]$numAtAge) #add na.rm to get totalNums for Greenland halibut
-
-	      if(nn > totalNums) {
-	        nn <- totalNums
-	        message("effN is greater than total numbers available, so nEff set equal to ", nn," for species ",sp," and time ",y,"\n")
-	      }
-	      probs <- matrix(dat2[ind,]$numAtAge,nrow=1)
-	      if(nn > 0){
-	        dat2[ind,]$numAtAgeSamp <- rmultinom(1,nn,probs)[,1]
-	      } else { # sample is 0 if probs vector all 0s, no fish that year
-	        dat2[ind,]$numAtAgeSamp <- rep(0, length(probs))
-	        message("total numAtAge ", nn,", assigning 0 sample for species ",sp," and time ",y,"\n")
-	      }
-	    }
-	  }
-
-
-# breaking at Greenland halibut, which has no fish in ages 11-20 in this survey
-	  
-	  survey_annageN %>% filter(species %in% "Green_halibut") %>% group_by(agecl) %>% tally(atoutput)
-	  
-	  # want the function to return 0 for missing ages
-	  # probs statement returns NA for ages 11-20
-	  
-	  
-
-```
+Both `om_index()` and `om_comps()` wrappers now name fishery output based on a `fishery.name` in the fishery config file.
 

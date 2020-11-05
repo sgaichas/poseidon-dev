@@ -67,31 +67,22 @@ surveffic <- efficmix %>%
                          agecl=unlist(sapply(n_annages,seq)),
                          selex=rep(1.0,sum(n_annages)))
 
-#   mixed selectivity (using 10 agecl for all species)--breaks for annual ages! specify for annual
+#   mixed selectivity: specify for annual ages 0-10 to 
 #   then apply that curve to agecl keeping every nth selectivity index n=NumAgeClassSize
 #   ageclsel <- fullsel[seq(NumAgeClassSize, n_annages, length.out=NumCohorts)]
 #     flat=1 for large pelagics, reef dwellers, others not in trawlable habitat
-#     sigmoid 0 to 1 with 0.5 inflection at agecl 3 for pelagics, reaching 1 at agecl 5, flat top
-#     sigmoid 0 to 1 with 0.5 inflection at agecl 5 for most demersals and flatfish, reaching 1 at agecl 7, flat top
-#     dome shaped 0 to 1 at agecl 6&7 for selected demersals, falling off to 0.7 by agecl 10
+#     sigmoid 0 to 1 with 0.5 inflection ~ age 3 for pelagics, reaching 1 at age 5, flat top
+#     sigmoid 0 to 1 with 0.5 inflection ~ age 5 for most demersals and flatfish, reaching 1 at age 7, flat top
+#     dome shaped 0 to 1 at agecl 6&7 for selected demersals, falling off to 0.7 by agecl 10--didn't do
 
 sigmoid <- function(a,b,x) {
   1 / (1 + exp(-a-b*x))
 }
 
-# selgroups <- as.data.frame(pelagics) %>% mutate(survgroup="pelagics") %>% rename(species = pelagics) %>%
-#   bind_rows(as.data.frame(demersals) %>% mutate(survgroup="demersals") %>% rename(species = demersals)) %>%
-#   bind_rows(as.data.frame(selflats) %>% mutate(survgroup="selflats") %>% rename(species = selflats))
+ sp_age <- sp_age %>%
+   mutate(n_annages = NumCohorts * NumAgeClassSize) 
 # 
-# selage <- sp_age %>%
-#   mutate(n_annages = NumCohorts * NumAgeClassSize) %>%
-#   left_join(selgroups, by=c("Name"="species"))
-# 
-# # survey selectivity specification by species group--replace for each group in surselex
-# 
-# selpelagics <- sigmoid(2*n_annages/5,1,seq(-10,10,length.out=n_annages))
-# seldemersals <- sigmoid(n_annages/4,1,seq(-10,10,length.out=n_annages))
-# selselflats <- sigmoid(1,1,seq(-10,10,length.out=n_annages))
+# survey selectivity specification for true ages 1-10 by species group--replace for each group in surselex
 
 selnontrawl <- data.frame(species=rep(nontrawl, each=10),
                           agecl=rep(c(1:10),length(nontrawl)),
@@ -120,7 +111,15 @@ survselex <- merge(survselex, selexmix, all = TRUE) %>%
   
 # now apply this for agecl selectivity that matches
 # and figure out how to use in wrapper!
-ageclsel <- fullsel[seq(NumAgeClassSize, n_annages, length.out=NumCohorts)]
+#ageclsel <- fullsel[seq(NumAgeClassSize, n_annages, length.out=NumCohorts)]
+
+survselex.agecl <- survselex %>% left_join(sp_age, by=c("species"="Name")) %>%
+  group_by(species) %>%
+  filter(agecl %in% seq(unique(NumAgeClassSize), 
+                        unique(n_annages), 
+                        length.out=unique(NumCohorts))) %>%
+  mutate(agecl = agecl/unique(NumAgeClassSize)) %>%
+  select(species, agecl, selex)
 
 # effective sample size needed for sample_fish
 # this is the number of *lengths* per species that are measured on a survey

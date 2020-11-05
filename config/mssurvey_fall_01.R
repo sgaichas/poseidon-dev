@@ -60,23 +60,29 @@ efficmix <- bind_rows(effnontrawl, effpelagics, effdemersals, effselflats)
 surveffic <- efficmix %>%
   filter(species %in% survspp)
 
-# survey selectivity (agecl based, flat)
+# survey selectivity (true age based, flat)
 # for annage output uses names(annages) NOT alphabetical survspp
-# survselex <- data.frame(species=rep(names(annages), n_annages), #  
-#                         agecl=unlist(sapply(n_annages,seq)),
-#                         selex=rep(1.0,sum(n_annages)))
+survselex <- data.frame(species=rep(names(annages), n_annages), #  
+                        agecl=unlist(sapply(n_annages,seq)),
+                        selex=rep(1.0,sum(n_annages)))
 
-#   mixed selectivity (using 10 agecl for all species)
+#   mixed selectivity: specify for annual ages 0-10 to 
+#   then apply that curve to agecl keeping every nth selectivity index n=NumAgeClassSize
+#   ageclsel <- fullsel[seq(NumAgeClassSize, n_annages, length.out=NumCohorts)]
 #     flat=1 for large pelagics, reef dwellers, others not in trawlable habitat
-#     sigmoid 0 to 1 with 0.5 inflection at agecl 3 for pelagics, reaching 1 at agecl 5, flat top
-#     sigmoid 0 to 1 with 0.5 inflection at agecl 5 for most demersals and flatfish, reaching 1 at agecl 7, flat top
-#     dome shaped 0 to 1 at agecl 6&7 for selected demersals, falling off to 0.7 by agecl 10
+#     sigmoid 0 to 1 with 0.5 inflection ~ age 3 for pelagics, reaching 1 at age 5, flat top
+#     sigmoid 0 to 1 with 0.5 inflection ~ age 5 for most demersals and flatfish, reaching 1 at age 7, flat top
+#     dome shaped 0 to 1 at agecl 6&7 for selected demersals, falling off to 0.7 by agecl 10--didn't do
 
 sigmoid <- function(a,b,x) {
   1 / (1 + exp(-a-b*x))
 }
 
-# survey selectivity specification by species group
+sp_age <- sp_age %>%
+  mutate(n_annages = NumCohorts * NumAgeClassSize) 
+# 
+# survey selectivity specification for true ages 1-10 by species group--replace for each group in surselex
+
 selnontrawl <- data.frame(species=rep(nontrawl, each=10),
                           agecl=rep(c(1:10),length(nontrawl)),
                           selex=rep(1.0,length(nontrawl)*10))
@@ -90,10 +96,29 @@ selselflats <- data.frame(species=rep(selflats, each=10),
                           agecl=rep(c(1:10),length(selflats)),
                           selex=sigmoid(1,1,seq(-10,10,length.out=10)))
 
-selexmix <- bind_rows(selnontrawl, selpelagics, seldemersals, selselflats)
+selexmix <- bind_rows(selnontrawl, selpelagics, seldemersals, selselflats) 
 
-survselex <- selexmix %>%
-  filter(species %in% survspp)
+selexmix <- selexmix %>%
+  filter(species %in% survspp) %>%
+  rename(selex10 = selex)
+
+survselex <- merge(survselex, selexmix, all = TRUE) %>%
+  filter(!is.na(selex)) %>%
+  mutate(selex = case_when(!is.na(selex10) ~ selex10,
+                           is.na(selex10) ~ selex)) %>%
+  select(-selex10)
+
+# now apply this for agecl selectivity that matches
+# and figure out how to use in wrapper!
+#ageclsel <- fullsel[seq(NumAgeClassSize, n_annages, length.out=NumCohorts)]
+
+survselex.agecl <- survselex %>% left_join(sp_age, by=c("species"="Name")) %>%
+  group_by(species) %>%
+  filter(agecl %in% seq(unique(NumAgeClassSize), 
+                        unique(n_annages), 
+                        length.out=unique(NumCohorts))) %>%
+  mutate(agecl = agecl/unique(NumAgeClassSize)) %>%
+  select(species, agecl, selex)
 
 # effective sample size needed for sample_fish
 # this is the number of *lengths* per species that are measured on a survey
@@ -109,8 +134,8 @@ surv_cv_0 <- data.frame(species=survspp, cv=rep(0.0,length(survspp)))
 
 #   define bottom trawl survey cv by group
 cv.nt <- 1.0 # for large pelagics, reef dwellers, others not in trawlable habitat
-cv.pl <- 0.5  # for pelagics
-cv.dm <- 0.1  # for demersals
+cv.pl <- 0.4  # for pelagics
+cv.dm <- 0.2  # for demersals
 cv.fl <- 0.2  # for selected flatfish
 
 # specify cv by species groups
@@ -130,3 +155,4 @@ lenage_cv <- 0.1
 
 # max size bin for length estimation, function defaults to 150 cm if not supplied
 maxbin <- 200
+
