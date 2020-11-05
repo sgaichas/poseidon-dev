@@ -485,7 +485,7 @@ The way sampling is set up, effective N for each survey is the number of fish me
 
 ### New survey and fishery outputs
 
-```{r full-test, message=FALSE, warning=FALSE}
+```{r full-test, message=FALSE, warning=FALSE, eval=FALSE}
 
 #NOBAom <- om_init(here("config/NOBA2config.R"))
 
@@ -517,3 +517,229 @@ NOTE! Need to have selectivities defined *both* for annual ages and for age clas
 
 Both `om_index()` and `om_comps()` wrappers now name fishery output based on a `fishery.name` in the fishery config file.
 
+```{r read-newsurvs}
+
+# source(here("config", "NOBA2config.R"))
+# omlist_ss <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+# source(here("config/omdimensions.R"))
+
+# add this paste0(d.name, "/mscensus1") and add option to name save directory in wrappers
+survObsBiom <- read_savedsurvs(d.name, 'survB')
+age_comp_data <- read_savedsurvs(d.name, 'survAge')
+len_comp_data <- read_savedsurvs(d.name, 'survLen')
+wtage <- read_savedsurvs(d.name, 'survWtage')
+annage_comp_data <- read_savedsurvs(d.name, 'survAnnAge')
+annage_wtage <- read_savedsurvs(d.name, 'survAnnWtage')
+
+# no function needed for saved fishery output as long as there is only one fishery specification file
+
+catchbio_ss <- readRDS(file.path(d.name, paste0(scenario.name, "fishCatch.rds")))
+catchbio_ss <- catchbio_ss[[1]] #in same time unit as surveys
+
+fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
+fish_age_comp <- fish_age_comp[[1]]
+
+#add this to om_indices function so that this has years when read in
+#fish_age_comp$time <- fish_age_comp$time/fstepperyr
+
+fish_len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsLenComp.rds")))
+
+#len_comp_data <- len_comp_data[[1]]
+fish_len_comp_data <- fish_len_comp_data[[1]]
+
+#add this to om_indices function so that this has years when read in
+#fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time/fstepperyr))
+
+fishwtage <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsWtAtAge.rds")))
+fishwtage <- fishwtage[[1]] #need to change time units?
+
+fish_annage_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullAgeComp.rds")))
+fish_annage_comp <- fish_annage_comp[[1]]
+
+#add this to om_indices function so that this has years when read in
+#fish_annage_comp$time <- fish_annage_comp$time/fstepperyr
+
+fish_annage_wtage <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsFullWtAtAge.rds")))
+fish_annage_wtage <- fish_annage_wtage[[1]] #need to change time units?
+
+```
+
+### Visualize surveys with different q and selectivity {.tabset #census}
+
+We are using the full time series for biomass and weight at age, and a subsample of years 30-53 for compositions. In this test we see the effect of survey efficiency and selectivity as well as the effect of surveying in one season. (Observation error that differs by species group is included in the survey biomass time series.) Samples for length and age assume a total of 10000 fish were randomly sampled for each species in each survey (surveffN defined in the survey config files). 
+
+#### Survey biomass
+```{r, results="asis"}
+
+# compare with true output (all timesteps)
+for(s in names(survObsBiom)){
+  cat("  \n##### ",  s,"  \n")
+  print(plotB(survObsBiom[[s]][[1]], omlist_ss$truetotbio_ss))
+  cat("  \n")
+}
+
+# plots survey only
+# for(s in names(survObsBiom)){
+#   print(plotB(survObsBiom[[s]][[1]]))
+# }
+
+```
+
+#### Survey length composition
+```{r, results="asis"}
+
+for(s in names(len_comp_data)){
+  cat("  \n##### ",  s,"  \n")
+  lcompsub <- as.data.frame(len_comp_data[[s]][[1]]) %>% filter(time %in% c(150:270)) %>%
+    group_by(species) %>%
+    group_map(~ plotlen(.x), keep = TRUE)
+  
+  for(i in 1:length(lcompsub)) {
+    print(lcompsub[[i]])
+  }
+  cat("  \n")
+}
+
+```
+
+#### Survey age class composition (Atlantis age class)
+```{r, results="asis", message=FALSE, warning=FALSE}
+
+for(s in names(age_comp_data)){
+  cat("  \n##### ",  s,"  \n")
+  acompsub <- as.data.frame(age_comp_data[[s]][[1]]) %>% filter(time %in% c(150:270)) %>%
+    group_by(species) %>%
+    left_join(., trueNagecl) %>%
+    #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+    group_map(~ Natageplot(.x, effN = 100000, truedat = 1), keep = TRUE) # plots merged true age comp
+
+  for(i in 1:length(acompsub)) {
+    print(acompsub[[i]])
+  }
+  cat("  \n")
+}
+
+```
+
+#### Survey age composition (annual ages)
+```{r plot-annagecomp, results="asis", message=FALSE, warning=FALSE}
+
+for(s in names(annage_comp_data)){
+  cat("  \n##### ",  s,"  \n")
+  acompsub <- as.data.frame(annage_comp_data[[s]][[1]]) %>% filter(time %in% c(150:270)) %>%
+    group_by(species) %>%
+    left_join(., trueNage) %>%
+    #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+    group_map(~ Natageplot(.x, effN = 100000, truedat = 1), keep = TRUE) # plots merged true age comp
+  
+  for(i in 1:length(acompsub)) {
+    print(acompsub[[i]])
+  }
+  cat("  \n")
+}
+```
+
+#### Survey weight at age (Atlantis age class)
+```{r, results='asis'}
+
+for(s in names(wtage)){
+  cat("  \n##### ",  s,"  \n")
+  print(wageplot(wtage[[s]][[1]]))
+  cat("  \n")
+}
+
+```
+
+#### Survey iterpolated weight at age (annual ages) 
+```{r plot-annwtage, fig.height=10, results='asis'}
+
+# annage_wtage read in above 
+# annage_wtage <- annage_wtage[[1]] #this still has second list component, diagnostic plot
+# annage_wtage <- annage_wtage[[1]] #still in this old version but just removed from function.
+
+for(s in names(annage_wtage)){
+  cat("  \n##### ",  s,"  \n")
+  print(wageplot(annage_wtage[[s]][[1]][[1]]))
+  cat("  \n")
+}
+```
+
+### {-}
+
+### Visualize fisheries observed with some error {.tabset}
+
+Here we are not sampling all fished areas, and the observation error on the total catch index is higher. We are using the full time series for total catch and weight at age, and a subsample of years 30-35 for compositions. Fishery length and age composition is sampled every output timestep. Fishery effN for length and age sampling was 1000 fish per year (200 per time step), so this is reflected in the composition plots.
+
+#### Fishery total catch
+```{r}
+
+# compare with true catch, should match
+plotC(catchbio_ss, omlist_ss$truecatchbio_ss)
+
+```
+
+
+#### Fishery length composition 
+```{r}
+
+lcompsub <- as.data.frame(fish_len_comp_data) %>% filter(time %in% c(150:175)) %>%
+  group_by(species) %>%
+  group_map(~ plotlen(.x), keep = TRUE)
+
+for(i in 1:length(lcompsub)) {
+  print(lcompsub[[i]])
+}
+
+```
+
+
+#### Fishery catch at age (Atlantis age class)
+```{r, message=FALSE, warning=FALSE}
+
+acompsub <- as.data.frame(fish_age_comp) %>% filter(time %in% c(150:175)) %>%
+  group_by(species) %>%
+  left_join(., trueCAAcl) %>%
+  #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+  group_map(~ Natageplot(.x, effN = 200, truedat = 1), keep = TRUE) # plots merged true age comp
+
+
+for(i in 1:length(acompsub)) {
+  print(acompsub[[i]])
+}
+
+```
+
+
+#### Fishery catch at age (annual ages)
+```{r, message=FALSE, warning=FALSE}
+
+acompsub <- as.data.frame(fish_annage_comp) %>% filter(time %in% c(150:175)) %>%
+  group_by(species) %>%
+  left_join(., trueCAA) %>%
+  #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+  group_map(~ Natageplot(.x, effN = 200, truedat = 1), keep = TRUE) # plots merged true age comp
+
+for(i in 1:length(acompsub)) {
+  print(acompsub[[i]])
+}
+
+```
+
+
+#### Fishery weight at age (Atlantis age class)
+```{r}
+
+wageplot(fishwtage)
+
+```
+
+
+#### Fishery interpolated weight at age (annual ages)
+```{r, fig.height=10}
+
+#diagnostic plot component still in this old version but just removed from function.
+wageplot(fish_annage_wtage[[1]])
+
+```
+
+### {-}
