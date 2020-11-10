@@ -1,0 +1,69 @@
+---
+title: "Multispecies survey for diet comp"
+author: "Sarah Gaichas"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_fold: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(here)
+library(tidyverse)  
+library(atlantisom)
+library(ggthemes)
+
+```
+
+## Species surveyed
+
+Diet composition sampling will need to include more than the species in the set of 11... for now lets get the diet comp for just those species. In the next step we will figure out how to deal with biomass pool groups in surveys and for diets.
+
+We will want a new `atlantisom` wrapper function to deal with diets separately. The current `om_comps()` already takes a long time to run generating length compositions and adding the huge diet file here will be really cumbersome for users only looking for ages and lengths.
+
+The `om_diet()` function will either call `load_detailed_diet_comp()` on a pre-processed zipped `DetailedDietCheck.txt.gz` file as explained [here](https://sgaichas.github.io/poseidon-dev/NOBAmsdiets.html) or will read in an .rds file saved from its output.
+
+It will then apply `create_survey()` with the diet file as dat and the survey specifications from the config file: 
+
+```{r}
+
+om_diet<- function(config = configfile,
+                   dietfile = file_diet,
+                   usersurvey = usersurvey_file,
+                   userfishery = NULL,
+                   omlist_ss,
+                   n_reps = n_reps,
+                   save = TRUE){
+  
+  if(!file.exists(file.path(d.name,
+                            paste0(scenario.name, "ms_detaileddiet.rds")))){
+    ms_detaileddiet <- load_detailed_diet_comp(dir = d.name, 
+                                               file_diet, 
+                                               fgs = om_list_ss$fgs)
+    
+    # passing fgs for the subset so shouldn't need this filter
+    # ms_detaileddiet <- detdiet %>%
+    #   filter(species %in% sppsubset$Name)
+    
+    if(save){
+      saveRDS(ms_detaileddiet, file.path(d.name, paste0(scenario.name, "ms_detaileddiet.rds")))
+    }
+    
+  } else {
+    ms_detaileddiet <- get(load(file.path(d.name,
+                                paste0(scenario.name, "ms_detaileddiet.rds"))))
+  }
+  
+  survey_diet = create_survey(dat = ms_detaileddiet,
+                              time = survtime,
+                              species = survspp,
+                              boxes = survboxes,
+                              effic = surveffic,
+                              selex = survselex)
+  
+  
+  
+}
+```
+
