@@ -704,7 +704,131 @@ for(s in names(annage_wtage)){
 
 ### Visualize fisheries observed with some error {.tabset}
 
-Here we are not sampling all fished areas, and the observation error on the total catch index is higher. We are using the full time series for total catch and weight at age, and a subsample of years 30-35 for compositions. Fishery length and age composition is sampled every output timestep. Fishery effN for length and age sampling was 1000 fish per year (200 per time step), so this is reflected in the composition plots.
+Here we are not sampling all fished areas, and the observation error on the total catch index is higher. We are using the full time series for total catch and weight at age, and a subsample of years 30-35 for compositions. Fishery length and age composition is sampled every output timestep. Fishery effN for length and age sampling was 500 fish per year (100 per time step), so this is reflected in the composition plots.
+
+```{r rerun-fishery-comps-only, eval=FALSE}
+
+# I changed the effN based on NE sampling and didn't want to run the full om_comps again because surveys aren't changing
+# these are the fishery comps snippets only
+
+source(here("config", "NOBA2config.R"))
+omlist_ss <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+source(here("config/omdimensions.R"))
+
+#The last timestep to sample
+total_sample <- noutsteps-1 #495
+n_reps <- 1
+save = TRUE
+lenage_cv <- 0.1
+maxbin <- 200
+
+userfishery <- here("config/msfishery_01.R")
+
+# snippet of om_comps
+  #now do fishery comps
+  # user options for fishery--default is a census with mid-year sample
+  # only one fishery, but multiple fleets possible within it
+  source(userfishery, local = TRUE)
+
+  #fishery catch at age each observed timestep summed over observed polygons
+  # catch at age by area and timestep
+  catch_numbers <-  atlantisom::create_fishery_subset(dat = omlist_ss$truecatchnum_ss,
+                                                      time = fishtime,
+                                                      species = survspp,
+                                                      boxes = fishboxes)
+
+  # if we want replicates for obs error this sample function will generate them
+  catch_age_comp <- list()
+  for(i in 1:n_reps){
+    catch_age_comp[[i]] <- atlantisom::sample_fish(catch_numbers, fisheffN)
+  }
+
+  # save fishery age comps
+  if(save){
+    saveRDS(catch_age_comp, file.path(d.name, paste0(scenario.name, "_",
+                                                     fishery.name, "fishObsAgeComp.rds")))
+  }
+
+  #Get catch weights for length comp calc
+  # aggregate true resn per fishery subset design
+  catch_aggresnss <- atlantisom::aggregateDensityData(dat = omlist_ss$trueresn_ss,
+                                                      time = fishtime,
+                                                      species = survspp,
+                                                      boxes = fishboxes)
+
+  # aggregate true structn fishery subsetdesign
+  catch_aggstructnss <- atlantisom::aggregateDensityData(dat = omlist_ss$truestructn_ss,
+                                                         time = fishtime,
+                                                         species = survspp,
+                                                         boxes = fishboxes)
+
+  #dont sample these, just aggregate them using median
+  catch_structnss <- atlantisom::sample_fish(catch_aggstructnss, fisheffN, sample = FALSE)
+
+  catch_resnss <- atlantisom::sample_fish(catch_aggresnss, fisheffN, sample = FALSE)
+
+  # these fishery lengths and weight at age are each output timestep
+  #same structure as above for surveys, replicates follow age comp reps
+  #  separating the length comps from the weight at age here
+  fishery_lenwt <- list()
+  fishObsLenComp <- list()
+  fishObsWtAtAge <- list()
+
+  for(i in 1:n_reps){
+    fishery_lenwt[[i]] <- atlantisom::calc_age2length(structn = catch_structnss,
+                                                      resn = catch_resnss,
+                                                      nums = catch_age_comp[[i]],
+                                                      biolprm = omlist_ss$biol,
+                                                      fgs = omlist_ss$funct.group_ss,
+                                                      maxbin = maxbin,
+                                                      CVlenage = lenage_cv,
+                                                      remove.zeroes=TRUE)
+
+    fishObsLenComp[[i]] <- fishery_lenwt[[i]]$natlength
+    fishObsWtAtAge[[i]] <- fishery_lenwt[[i]]$muweight
+  }
+
+  if(save){
+    saveRDS(fishObsLenComp, file.path(d.name, paste0(scenario.name, "_",
+                                                     fishery.name, "fishObsLenComp.rds")))
+    saveRDS(fishObsWtAtAge, file.path(d.name, paste0(scenario.name, "_",
+                                                     fishery.name, "fishObsWtAtAge.rds")))
+  }
+
+    #fishery catch at age each observed timestep summed over observed polygons
+    # catch at age by area and timestep
+    catch_annagenumbers <-  atlantisom::create_fishery_subset(dat = omlist_ss$truecatchage_ss,
+                                                        time = fishtime,
+                                                        species = survspp,
+                                                        boxes = fishboxes)
+
+    # if we want replicates for obs error this sample function will generate them
+    # WARNING THIS AGGREGATES ACROSS FLEETS
+    # TODO: need to change sample_fish to fix
+    catch_annage_comp <- list()
+    for(i in 1:n_reps){
+      catch_annage_comp[[i]] <- atlantisom::sample_fish(catch_annagenumbers, fisheffN)
+    }
+
+    # save fishery annual age comps
+    if(save){
+    saveRDS(catch_annage_comp, file.path(d.name, paste0(scenario.name,"_",
+                                                        fishery.name, "fishObsFullAgeComp.rds")))
+    }
+
+    interp_fishWtAtAge <- list()
+    for(i in 1:n_reps){
+      interp_fishWtAtAge[[i]] <- calc_avgwtstage2age(wtagecl = fishObsWtAtAge[[i]],
+                                                     annages = omlist_ss$truecatchage_ss,
+                                                     fgs = omlist_ss$funct.group_ss)
+    }
+    if(save){
+      saveRDS(interp_fishWtAtAge, file.path(d.name, paste0(scenario.name,"_",
+                                                           fishery.name, "fishObsFullWtAtAge.rds")))
+    }
+
+```
+
 
 #### Fishery total catch
 ```{r}
@@ -736,7 +860,7 @@ acompsub <- as.data.frame(fish_age_comp) %>% filter(time %in% c(150:175)) %>%
   group_by(species) %>%
   left_join(., trueCAAcl) %>%
   #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
-  group_map(~ Natageplot(.x, effN = 200, truedat = 1), keep = TRUE) # plots merged true age comp
+  group_map(~ Natageplot(.x, effN = 100, truedat = 1), keep = TRUE) # plots merged true age comp
 
 
 for(i in 1:length(acompsub)) {
@@ -753,7 +877,7 @@ acompsub <- as.data.frame(fish_annage_comp) %>% filter(time %in% c(150:175)) %>%
   group_by(species) %>%
   left_join(., trueCAA) %>%
   #group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
-  group_map(~ Natageplot(.x, effN = 200, truedat = 1), keep = TRUE) # plots merged true age comp
+  group_map(~ Natageplot(.x, effN = 100, truedat = 1), keep = TRUE) # plots merged true age comp
 
 for(i in 1:length(acompsub)) {
   print(acompsub[[i]])
