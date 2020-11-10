@@ -16,7 +16,7 @@ library(ggthemes)
 
 ```
 
-## Species surveyed
+## Apply survey design to diet outputs
 
 Diet composition sampling will need to include more than the species in the set of 11... for now lets get the diet comp for just those species. In the next step we will figure out how to deal with biomass pool groups in surveys and for diets.
 
@@ -26,44 +26,196 @@ The `om_diet()` function will either call `load_detailed_diet_comp()` on a pre-p
 
 It will then apply `create_survey()` with the diet file as dat and the survey specifications from the config file: 
 
-```{r}
+```{r omdiet-test, eval=FALSE}
 
 om_diet<- function(config = configfile,
                    dietfile = file_diet,
+                   fgs = fgs,
                    usersurvey = usersurvey_file,
                    userfishery = NULL,
                    omlist_ss,
                    n_reps = n_reps,
                    save = TRUE){
   
+  # load or read in saved detailed diet
   if(!file.exists(file.path(d.name,
-                            paste0(scenario.name, "ms_detaileddiet.rds")))){
-    ms_detaileddiet <- load_detailed_diet_comp(dir = d.name, 
+                            paste0(scenario.name, "detaileddiet.rds")))){
+    detaileddiet <- load_detailed_diet_comp(dir = d.name, 
                                                file_diet, 
-                                               fgs = om_list_ss$fgs)
-    
-    # passing fgs for the subset so shouldn't need this filter
-    # ms_detaileddiet <- detdiet %>%
-    #   filter(species %in% sppsubset$Name)
+                                               fgs = fgs)
     
     if(save){
-      saveRDS(ms_detaileddiet, file.path(d.name, paste0(scenario.name, "ms_detaileddiet.rds")))
+      saveRDS(detaileddiet, file.path(d.name, paste0(scenario.name, "detaileddiet.rds")))
     }
     
   } else {
-    ms_detaileddiet <- get(load(file.path(d.name,
-                                paste0(scenario.name, "ms_detaileddiet.rds"))))
+    detaileddiet <- readRDS(file.path(d.name,
+                                paste0(scenario.name, "detaileddiet.rds")))
   }
   
-  survey_diet = create_survey(dat = ms_detaileddiet,
-                              time = survtime,
-                              species = survspp,
-                              boxes = survboxes,
-                              effic = surveffic,
-                              selex = survselex)
+  #one script for dimension parameters to be used in multiple functions
+  source("config/omdimensions.R", local = TRUE)
   
+  survObsDiets <- list()
   
+  for (s in usersurvey)
+  {
+    source(s, local = TRUE)
+    
+    # survtime doesn't match units of time.days in detaileddiet
+    survtime <- survey_sample_full*omlist_ss$runpar$outputstep
+
+    # apply survey design to detailed diet
+    survey_cons <- create_survey_diet(dat = detaileddiet,
+                                      time = survtime,
+                                      species = survspp,
+                                      boxes = survboxes,
+                                      effic = surveffic,
+                                      selex = survselex)
+    
+    # add observation error to survey diet
+    survObsDiet <- list()
+    for(i in 1:n_reps){
+      survObsDiet[[i]] <- atlantisom::sample_diet(survey_diet, surv_cv)
+    }
+
+    #save survey diets, takes a long time to generate with lots of reps/species
+    if(save){
+      saveRDS(survObsDiet, file.path(d.name, paste0(scenario.name, "_",
+                                                     survey.name, "surveydiet.rds")))
+    }
+
+    survObsDiets[[survey.name]] <- survObsDiet
+    
+  }
   
 }
+```
+
+Reading in the full diet file works. Saved as `[...]detaileddiet.rds`, a huge file.
+
+```{r, readdiet-test}
+
+fgs <- load_fgs(here("atlantisoutput", "NOBA_March_2020"), "nordic_groups_v04.csv")
+
+source(here("config", "NOBA2config.R"))
+
+file_diet <- "NOBADetDiet.gz"
+save = TRUE
+
+  if(!file.exists(file.path(d.name,
+                            paste0(scenario.name, "detaileddiet.rds")))){
+    detaileddiet <- load_detailed_diet_comp(dir = d.name, 
+                                               file_diet, 
+                                               fgs = fgs)
+    
+    if(save){
+      saveRDS(detaileddiet, file.path(d.name, paste0(scenario.name, "detaileddiet.rds")))
+    }
+    
+  } else {
+    detaileddiet <- readRDS(file.path(d.name,
+                                paste0(scenario.name, "detaileddiet.rds")))
+  }
+
+
+```
+
+Fixing mismatches between diet data objects and survey function inputs: align time units and column name, add prey column to aggregateData function call. It was hard-coded without the prey column in `create_survey()` and also didn't output prey so a new function, `create_survey_diet()` fixes this.
+
+If we modify the existing `create_survey()`, the total consumption in tons aggregated over layers (output of aggregateData) will be multiplied by our survey efficiency (q) and selectivity at agecl. Is this appropriate? 
+
+In a global diet composition, applying selectivity may make sense because it excludes or downweights consumption by less selected age classes. However, if we are looking at agecl specific diet, the composition is the same, just scaled down. Similar thoughts for survey q, all it does is scale the total consumption in tons across all ages so the comp is the same but tonnage smaller. Would this be double counting the effects of q if put back into a model and scaled up somehow? Need to see how consumption in tons is used in our models. For now `create_survey_diet()` applies q and selectivity exactly like `create_survey()`.
+
+```{r, surveydiet-test, eval=FALSE}
+
+omlist_ss <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+source(here("config/omdimensions.R"))
+
+# first a census in spring
+source(here("config/mssurvey_spring.R"))
+
+# survtime doesn't match units of time.days in detaileddiet, add to om_diet
+survtime <- survey_sample_full*omlist_ss$runpar$outputstep
+
+# aggregateData called by create_survey expects a column "time", add to function
+#  if("time.days" %in% names(dat) & !("time" %in% names(dat))) {
+#    names(dat)[names(dat) == 'time.days'] <- 'time'
+#  }
+
+# aggregateData doesn't keep the prey column
+# create survey also won't output prey column and hardcodes keep columns for aggegateData
+# use functions separately
+
+# aggregate over layer, adding prey column (names resulting column "numAtAge", should generalize)
+	aggDat <- aggregateData(dat = detaileddiet, 
+	                        time = survtime, 
+	                        species = survspp, 
+	                        boxes = survboxes, 
+	                        keepColumns=c("species","agecl","polygon","time", "prey"))
+
+	
+# should we be multiplying true consumption by q and selectivity? create_survey does
+# selectivity misses consumption from younger age classes
+
+	effic <- surveffic
+	selex <- survselex # should be survselex.agecl but identical in census survey config
+	
+	surv <- aggDat   #this can be removed and uncomment density stuff above. Make sure to think how this plays into sampling
+	#merge in efficiency
+	surv <- merge(surv,effic,by="species",all.x=T)
+	#merge in selex
+	surv <- merge(surv,selex,by=c("species","agecl"),all.x=T)
+	#should I change any missing selex to zero???
+	#should I scale or check selex maximum at 1?
+
+	#surv$numAtAgeSurv <- surv$density * surv$survArea * surv$efficiency * surv$selex
+	surv$numAtAgeSurv <- surv$numAtAge * surv$efficiency * surv$selex
+
+	#Should I be checking for NA's along the way to identify problems?
+
+
+	#Create final dataframe in same format as input
+	#put time (mean) and layers (NA) back in the dataframe for completeness
+	out <- data.frame(species = surv$species,
+		              agecl = surv$agecl,
+		              polygon = surv$polygon,
+		              layer = NA,
+		              time = surv$time,
+		              prey = surv$prey,
+		              atoutput = surv$numAtAgeSurv)
+
+	survey_cons_test <- out[order(out$species,out$time,out$polygon,out$agecl),]
+
+
+# survey_diet <- create_survey(dat = detaileddiet,
+#                              time = survtime,
+#                              species = survspp,
+#                              boxes = survboxes,
+#                              effic = surveffic,
+#                              selex = survselex)
+	
+```
+
+```{r, test-createsurveydiet}
+
+omlist_ss <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+source(here("config/omdimensions.R"))
+
+# first a census in spring
+source(here("config/mssurvey_spring.R"))
+
+# survtime doesn't match units of time.days in detaileddiet, add to om_diet
+survtime <- survey_sample_full*omlist_ss$runpar$outputstep
+
+	
+survey_cons <- create_survey_diet(dat = detaileddiet,
+                                  time = survtime,
+                                  species = survspp,
+                                  boxes = survboxes,
+                                  effic = surveffic,
+                                  selex = survselex)
+
+
 ```
 
