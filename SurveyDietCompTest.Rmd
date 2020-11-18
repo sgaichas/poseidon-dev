@@ -225,20 +225,26 @@ The current partial `sample_diet()` function needs to change because it expects 
 
 It would be nice if `sample_diet()` could take either the output of `load_diet_comp()` (global proportions not surveyed, long format) or `create_survey_diet()`.
 
-The current function removes predators not expected on a fish trawl survey, removes prey types that are normally not counted, then adds uniform error to half the remaining diet proportions, removes a random subet of prey accounting for <0.25 diet proportion, then renormalizes. I would rather have a function that could be used on any "survey" so have already removed hardcoded predator selection. I think also the distributional assumptions need revision; a Dirichlet seems most appropriate to simulate continuous proportions. 
+The current function removes predators not expected on a fish trawl survey, removes prey types that are normally not counted, then adds uniform error to half the remaining diet proportions, removes a random subet of prey accounting for <0.25 diet proportion, then renormalizes. I would rather have a function that could be used on any "survey" so have already removed hardcoded predator selection. I think also the distributional assumptions need revision; a Dirichlet is most appropriate to simulate continuous proportions. 
 
 
 ```{r, scratch-samplediet, eval=FALSE}
 
 sample_diet <- function(dat, fgs) {
 
-  # read in dat, long format output of load_diet_comp, or create_survey_diet, both have layers aggregated
+  # dat can be long format output of load_diet_comp, or create_survey_diet, both have layers aggregated
+  # load_diet_comp output has no polygon column and atoutput is proportion, 
+  # create_survey_diet output has polygon column and atoutput is consumption in tons
+  # first aggregate to get global diet comp in proportion, if not already in that form
   
-  # load_diet_comp has no polygon information and is proportion, create_survey_diet has polygons and is consumption in tons
+  if("polygon" %in% names(dat)){
+    #sum over boxes and assume sampling occurs coastwide (the sampled boxes were already subset in create functions)
+    dat2 <- aggregate(dat$atoutput,list(dat$species,dat$agecl,dat$time, dat$prey),sum)
+    names(dat2) <- c("species","agecl","time","prey", "sumcons")
+
+  }
   
-  # first aggregate to global diet comp in proportion
-  
-  # then apply aggregation bias
+  # then apply id/aggregation bias--this adds prey categories that don't exist??
   
   # then apply Dirichlet obs error; Dirichlet equivalent of rmultinom(1, effN, trueagecomp)?   
   # see e.g., https://rdrr.io/cran/DirichletReg/man/Dirichlet.html
@@ -318,6 +324,11 @@ sample_diet <- function(dat, fgs) {
 ```
 
 ```{r, test-samplediet}
+
+# global proportion diet comp for comparison with survey_cons
+diettest <- load_diet_comp(here("atlantisoutput", "NOBA_march_2020"), 
+                           "nordic_runresults_01DietCheck.txt", fgs = fgs) %>%
+  filter(atoutput>0)
 
 
 ```
