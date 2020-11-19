@@ -241,10 +241,19 @@ sample_diet <- function(dat, fgs) {
     #sum over boxes and assume sampling occurs coastwide (the sampled boxes were already subset in create functions)
     dat2 <- aggregate(dat$atoutput,list(dat$species,dat$agecl,dat$time, dat$prey),sum)
     names(dat2) <- c("species","agecl","time","prey", "sumcons")
+    
+    dat2 <- dat2 %>%
+      group_by(species, agecl, time) %>%
+      mutate(totcons = sum(sumcons)) %>%
+      mutate(dietprop = sumcons/totcons) %>%
+      arrange(species, agecl, time)
 
   }
   
   # then apply id/aggregation bias--this adds prey categories that don't exist??
+  # user specified max proportion to reallocate
+  # apply taxonomically, allocating fish prey to fish unid, invert prey to invert unid, then some portion unid
+  # phytoplankton and zooplankton prey direct to unid?
   
   # then apply Dirichlet obs error; Dirichlet equivalent of rmultinom(1, effN, trueagecomp)?   
   # see e.g., https://rdrr.io/cran/DirichletReg/man/Dirichlet.html
