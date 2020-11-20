@@ -221,14 +221,31 @@ survey_cons <- create_survey_diet(dat = detaileddiet,
 
 We want `sample_diet()` to give us something like we would get out of the survey sampling process. The diet sampling function could return diet proportions by predator, including unknown/family level id, with observation error. This would then be input into the models. True diets will be the actual consumption in tons output from `load_detailed_diet_comp()`. 
 
-The current partial `sample_diet()` function needs to change because it expects a wide format file of diet proportions, rather than a long-format file of consumption in tons which is the output of `create_survey_diet()`. 
+The intial partial `sample_diet()` function in `atlantisom` needs to change because it expects a wide format file of diet proportions, rather than a long-format file of consumption in tons which is the output of `create_survey_diet()`. 
 
 It would be nice if `sample_diet()` could take either the output of `load_diet_comp()` (global proportions not surveyed, long format) or `create_survey_diet()`.
 
-The current function removes predators not expected on a fish trawl survey, removes prey types that are normally not counted, then adds uniform error to half the remaining diet proportions, removes a random subet of prey accounting for <0.25 diet proportion, then renormalizes. I would rather have a function that could be used on any "survey" so have already removed hardcoded predator selection. I think also the distributional assumptions need revision; a Dirichlet is most appropriate to simulate continuous proportions. 
+The initial function removed predators not expected on a fish trawl survey, removed prey types that are normally not counted, then adds uniform error to half the remaining diet proportions, removes a random subet of prey accounting for <0.25 diet proportion, then renormalizes. I would rather have a function that could be used on any "survey" so have already removed hardcoded predator selection. 
 
+I think also the distributional assumptions need revision; a Dirichlet is most appropriate to simulate continuous proportions. See [Douma and Weedon 2019](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13234) for an excellent overview, as well as [a description of the Dirichlet alpha parameter](https://stats.stackexchange.com/questions/244917/what-exactly-is-the-alpha-in-the-dirichlet-distribution) and [Lin 2016](https://mast.queensu.ca/~communications/Papers/msc-jiayu-lin.pdf). 
+
+Here I'll use the random number generation function `rdirichlet()` in the package `DirichletReg`but others may work too.
+
+```{r, test-samplediet}
+
+# global proportion diet comp for comparison with survey_cons
+diettest <- load_diet_comp(here("atlantisoutput", "NOBA_march_2020"), 
+                           "nordic_runresults_01DietCheck.txt", fgs = fgs) %>%
+  filter(atoutput>0) %>%
+  filter(species %in% survspp) 
+
+
+```
 
 ```{r, scratch-samplediet, eval=FALSE}
+
+dat <- survey_cons
+#dat <- diettest
 
 sample_diet <- function(dat, fgs, alphamult = 10000000) {
 
@@ -247,8 +264,12 @@ sample_diet <- function(dat, fgs, alphamult = 10000000) {
       mutate(totcons = sum(sumcons)) %>%
       mutate(dietprop = sumcons/totcons) %>%
       arrange(species, agecl, time)
+    
+    # rename to match output of load_diet_comp
+    names(dat2)[names(dat2) == 'dietprop'] <- 'atoutput'
+    names(dat2)[names(dat2) == 'time'] <- 'time.days'
 
-  }
+  } else dat2 <- dat
   
   # aggregate over age? which ones? leave as age class specific?
   
@@ -347,13 +368,4 @@ sample_diet <- function(dat, fgs, alphamult = 10000000) {
 
 ```
 
-```{r, test-samplediet}
-
-# global proportion diet comp for comparison with survey_cons
-diettest <- load_diet_comp(here("atlantisoutput", "NOBA_march_2020"), 
-                           "nordic_runresults_01DietCheck.txt", fgs = fgs) %>%
-  filter(atoutput>0)
-
-
-```
 
