@@ -230,12 +230,12 @@ The current function removes predators not expected on a fish trawl survey, remo
 
 ```{r, scratch-samplediet, eval=FALSE}
 
-sample_diet <- function(dat, fgs) {
+sample_diet <- function(dat, fgs, alphamult = 10000000) {
 
   # dat can be long format output of load_diet_comp, or create_survey_diet, both have layers aggregated
   # load_diet_comp output has no polygon column and atoutput is proportion, 
   # create_survey_diet output has polygon column and atoutput is consumption in tons
-  # first aggregate to get global diet comp in proportion, if not already in that form
+  # first aggregate to get global diet comp by species, agecl, time in proportion, if not already in that form
   
   if("polygon" %in% names(dat)){
     #sum over boxes and assume sampling occurs coastwide (the sampled boxes were already subset in create functions)
@@ -250,13 +250,28 @@ sample_diet <- function(dat, fgs) {
 
   }
   
+  # aggregate over age? which ones? leave as age class specific?
+  
   # then apply id/aggregation bias--this adds prey categories that don't exist??
   # user specified max proportion to reallocate
   # apply taxonomically, allocating fish prey to fish unid, invert prey to invert unid, then some portion unid
   # phytoplankton and zooplankton prey direct to unid?
   
+  
   # then apply Dirichlet obs error; Dirichlet equivalent of rmultinom(1, effN, trueagecomp)?   
   # see e.g., https://rdrr.io/cran/DirichletReg/man/Dirichlet.html
+  # alpha vector is the diet comp scaled by a user-supplied multiplier
+  # default to a very high multiplier for close-to-true diet comp
+  # lower multipliers stray further from true diet comp
+  
+  # testdiet <- c(.1, .32, .06, .02, .49, .01)
+  # library(DirichletReg)
+  # rdirichlet(10, 10000000*testdiet)
+  # rdirichlet(10, 100*testdiet)
+  
+  alphavec <- alphamult * 
+  
+  sampdiet <- DirichletReg::rdirichlet(1, alphavec)
   
   # returns diet proportions with observation error: Dirichlet, and bias from unknown id and/or family level aggregation
   
