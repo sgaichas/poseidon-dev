@@ -278,6 +278,20 @@ sample_diet <- function(dat, fgs, alphamult = 10000000) {
   # apply taxonomically, allocating fish prey to fish unid, invert prey to invert unid, then some portion unid
   # phytoplankton and zooplankton prey direct to unid?
   
+  # use grouptype column to allocate
+  colnames(fgs) <- tolower(colnames(fgs))
+
+  # check for GroupType or InvertType
+  if (!("grouptype" | "inverttype") %in% colnames(fgs)) {
+    stop(paste("The columns GroupType or InvertType ars not in your functional\n",
+      "groups file."))
+  }
+
+  # change inverttype to grouptype, contents should be the same
+  if("inverttype" %in% names(fgs)) names(fgs)[names(fgs) == 'inverttype'] <- 'grouptype'
+
+  fgs$grouptype <- tolower(fgs$grouptype)
+
   
   # then apply Dirichlet obs error; Dirichlet equivalent of rmultinom(1, effN, trueagecomp)?   
   # see e.g., https://rdrr.io/cran/DirichletReg/man/Dirichlet.html
@@ -290,10 +304,11 @@ sample_diet <- function(dat, fgs, alphamult = 10000000) {
   # rdirichlet(10, 10000000*testdiet)
   # rdirichlet(10, 100*testdiet)
   
-  alphavec <- alphamult * 
-  
-  sampdiet <- DirichletReg::rdirichlet(1, alphavec)
-  
+	#tidy
+	dietprop <- dat2 %>%
+	  group_by(species, time.days, agecl) %>%
+	  do(mutate(., dietSamp = DirichletReg::rdirichlet(1, alphamult * atoutput)))
+	  
   # returns diet proportions with observation error: Dirichlet, and bias from unknown id and/or family level aggregation
   
   return(dietprop)
