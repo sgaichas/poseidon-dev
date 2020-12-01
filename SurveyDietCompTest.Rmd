@@ -247,7 +247,7 @@ diettest <- load_diet_comp(here("atlantisoutput", "NOBA_march_2020"),
 dat <- survey_cons
 #dat <- diettest
 
-sample_diet <- function(dat, fgs, alphamult = 10000000) {
+sample_diet <- function(dat, fgs, unidprey = 0, alphamult = 10000000) {
 
   # dat can be long format output of load_diet_comp, or create_survey_diet, both have layers aggregated
   # load_diet_comp output has no polygon column and atoutput is proportion, 
@@ -291,6 +291,21 @@ sample_diet <- function(dat, fgs, alphamult = 10000000) {
   if("inverttype" %in% names(fgs)) names(fgs)[names(fgs) == 'inverttype'] <- 'grouptype'
 
   fgs$grouptype <- tolower(fgs$grouptype)
+  
+  # associate prey categories with unid categories
+  fgs<- fgs%>% 
+       mutate(unidtype = case_when((grouptype %in% c("mammal", "bird")) ~ "Unid_Vert",
+                                   (grouptype %in% "fish") ~ "Unid_Fish",
+                                   (grouptype %in% c("mammal")) ~ "Unid_Invert",
+                                   (grouptype %in% c("lg_zoo", "med_zoo")) ~ "Unid_Plankton",
+                                          TRUE ~ 0)) 
+  
+  # associate prey with prey category
+  
+  # add rows with unid categories
+  
+  # randomly assign up to unidprey % of prey in each prey category to associated unid category
+  
 
   
   # then apply Dirichlet obs error; Dirichlet equivalent of rmultinom(1, effN, trueagecomp)?   
