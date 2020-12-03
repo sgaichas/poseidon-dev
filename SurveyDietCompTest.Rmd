@@ -282,7 +282,7 @@ sample_diet <- function(dat, fgs, unidprey = 0, alphamult = 10000000) {
   colnames(fgs) <- tolower(colnames(fgs))
 
   # check for GroupType or InvertType
-  if (!("grouptype" | "inverttype") %in% colnames(fgs)) {
+  if (!("grouptype" %in% colnames(fgs) | "inverttype"%in% colnames(fgs))) {
     stop(paste("The columns GroupType or InvertType ars not in your functional\n",
       "groups file."))
   }
@@ -292,21 +292,44 @@ sample_diet <- function(dat, fgs, unidprey = 0, alphamult = 10000000) {
 
   fgs$grouptype <- tolower(fgs$grouptype)
   
-  # associate prey categories with unid categories
+  # associate prey categories (atlantis user guide I Table 8) with unid categories
   fgs<- fgs%>% 
-       mutate(unidtype = case_when((grouptype %in% c("mammal", "bird")) ~ "Unid_Vert",
-                                   (grouptype %in% "fish") ~ "Unid_Fish",
-                                   (grouptype %in% c("mammal")) ~ "Unid_Invert",
-                                   (grouptype %in% c("lg_zoo", "med_zoo")) ~ "Unid_Plankton",
-                                          TRUE ~ 0)) 
+       mutate(unidtype = case_when((grouptype %in% c("mammal", 
+                                                     "bird", 
+                                                     "reptile")) ~ "Unid_Vert",
+                                   (grouptype %in% c("fish", 
+                                                     "shark")) ~ "Unid_Fish",
+                                   (grouptype %in% c("fish_invert", 
+                                                     "cep", 
+                                                     "pwn", 
+                                                     "lg_inf",
+                                                     "sm_inf",
+                                                     "sed_ep_ff",
+                                                     "sed_ep_other",
+                                                     "mobile_ep_other",
+                                                     "coral",
+                                                     "sponge")) ~ "Unid_Invert",
+                                   (grouptype %in% c("lg_zoo", 
+                                                     "med_zoo", 
+                                                     "sm_zoo",
+                                                     "dinoflag",
+                                                     "lg_phy",
+                                                     "sm_phy")) ~ "Unid_Plankton",
+                                   TRUE ~ "Unid")) 
   
   # associate prey with prey category
-  
-  # add rows with unid categories
-  
   # randomly assign up to unidprey % of prey in each prey category to associated unid category
-  
 
+  fgsprey <- fgs[,c("name", "unidtype")]
+  names(fgsprey)[names(fgsprey) == 'name'] <- 'prey'
+    
+  dat2 <- left_join(dat2, fgsprey) %>%
+    group_by(species, time.days, agecl, prey) %>%
+    mutate(unidprop = runif(1, 0, unidprey*atoutput))
+  
+  # add rows with unid categories and sum prop assigned to the category
+  
+  
   
   # then apply Dirichlet obs error; Dirichlet equivalent of rmultinom(1, effN, trueagecomp)?   
   # see e.g., https://rdrr.io/cran/DirichletReg/man/Dirichlet.html
