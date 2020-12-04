@@ -246,6 +246,8 @@ diettest <- load_diet_comp(here("atlantisoutput", "NOBA_march_2020"),
 
 dat <- survey_cons
 #dat <- diettest
+unidprey <- 0.5 #0 makes none unid, 1 could be all, reflects max proportion to unid
+alphamult <- 10000000 #default is almost identical to true, smaller more variable
 
 sample_diet <- function(dat, fgs, unidprey = 0, alphamult = 10000000) {
 
@@ -324,21 +326,23 @@ sample_diet <- function(dat, fgs, unidprey = 0, alphamult = 10000000) {
   fgsprey <- fgs[,c("name", "unidtype")]
   names(fgsprey)[names(fgsprey) == 'name'] <- 'prey'
     
-  dat3 <- left_join(dat2, fgsprey) %>%
+  dat2 <- left_join(dat2, fgsprey) %>%
     rowwise() %>%
     mutate(unidprop = runif(1, 0, unidprey*atoutput),
            sampprop = atoutput - unidprop)
   
   # add rows with unid categories and sum prop assigned to the category
   
-  unidrows <- dat3 %>%
+  unidrows <- dat2 %>%
     #select(-atoutput, -prey, -sampprop) %>%
     group_by(species, time.days, agecl, unidtype) %>%
     summarise(unidtot = sum(unidprop)) %>%
     ungroup() %>%
     rename(prey = unidtype, sampprop = unidtot)
   
-
+  dat2 <- dat2 %>%
+    select(species, time.days, agecl, prey, sampprop) %>%
+    full_join(unidrows)
   
   # then apply Dirichlet obs error; Dirichlet equivalent of rmultinom(1, effN, trueagecomp)?   
   # see e.g., https://rdrr.io/cran/DirichletReg/man/Dirichlet.html
@@ -352,13 +356,16 @@ sample_diet <- function(dat, fgs, unidprey = 0, alphamult = 10000000) {
   # rdirichlet(10, 100*testdiet)
   
 	#tidy
-	dietprop <- dat2 %>%
+	dat2 <- dat2 %>%
+	  filter(sampprop>0) %>%
 	  group_by(species, time.days, agecl) %>%
-	  do(mutate(., dietSamp = DirichletReg::rdirichlet(1, alphamult * atoutput)))
+	  do(mutate(., dietSamp = DirichletReg::rdirichlet(1, alphamult * sampprop))) %>%
+    ungroup() %>%
+    select(-sampprop)
 	  
-  # returns diet proportions with observation error: Dirichlet, and bias from unknown id and/or family level aggregation
+  # returns diet proportions with observation error: Dirichlet, and bias from unknown id 
   
-  return(dietprop)
+  return(dat2)
 }
 
   # old function below
