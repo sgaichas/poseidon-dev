@@ -437,4 +437,10 @@ sample_diet <- function(dat, fgs, unidprey = 0, alphamult = 10000000) {
 
 ```
 
+```{r test-sample-diet}
+
+samp1 <- sample_diet(survey_cons, fgs, unidprey = 0, alphamult = 10000000)
+
+samp2 <- sample_diet(diettest, fgs, unidprey = 0.5, alphamult = 10000000)
+```
 
