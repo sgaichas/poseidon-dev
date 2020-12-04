@@ -319,17 +319,26 @@ sample_diet <- function(dat, fgs, unidprey = 0, alphamult = 10000000) {
   
   # associate prey with prey category
   # randomly assign up to unidprey % of prey in each prey category to associated unid category
+  # take remainder for identified prey
 
   fgsprey <- fgs[,c("name", "unidtype")]
   names(fgsprey)[names(fgsprey) == 'name'] <- 'prey'
     
-  dat2 <- left_join(dat2, fgsprey) %>%
-    group_by(species, time.days, agecl, prey) %>%
-    mutate(unidprop = runif(1, 0, unidprey*atoutput))
+  dat3 <- left_join(dat2, fgsprey) %>%
+    rowwise() %>%
+    mutate(unidprop = runif(1, 0, unidprey*atoutput),
+           sampprop = atoutput - unidprop)
   
   # add rows with unid categories and sum prop assigned to the category
   
+  unidrows <- dat3 %>%
+    #select(-atoutput, -prey, -sampprop) %>%
+    group_by(species, time.days, agecl, unidtype) %>%
+    summarise(unidtot = sum(unidprop)) %>%
+    ungroup() %>%
+    rename(prey = unidtype, sampprop = unidtot)
   
+
   
   # then apply Dirichlet obs error; Dirichlet equivalent of rmultinom(1, effN, trueagecomp)?   
   # see e.g., https://rdrr.io/cran/DirichletReg/man/Dirichlet.html
