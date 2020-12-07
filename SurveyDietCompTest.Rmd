@@ -16,7 +16,7 @@ library(ggthemes)
 
 ```
 
-## Apply survey design to diet outputs
+## Apply survey design to diet outputs--develop functions and wrapper
 
 Diet composition sampling will need to include more than the species in the set of 11... for now lets get the diet comp for just those species. In the next step we will figure out how to deal with biomass pool groups in surveys and for diets.
 
@@ -197,6 +197,8 @@ survtime <- survey_sample_full*omlist_ss$runpar$outputstep
 	
 ```
 
+## Test `create_survey_diet()` 
+
 ```{r, test-createsurveydiet}
 
 omlist_ss <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
@@ -218,6 +220,8 @@ survey_cons <- create_survey_diet(dat = detaileddiet,
 
 
 ```
+
+## Create `sample_diet()`
 
 We want `sample_diet()` to give us something like we would get out of the survey sampling process. The diet sampling function could return diet proportions by predator, including unknown/family level id, with observation error. This would then be input into the models. True diets will be the actual consumption in tons output from `load_detailed_diet_comp()`. 
 
@@ -437,10 +441,168 @@ sample_diet <- function(dat, fgs, unidprey = 0, alphamult = 10000000) {
 
 ```
 
+## Test `sample_diet()`
+
+Testing the new `sample_diet()` function with both surveyed diet (survey_cons, output of create_survey_diet) and global diet (diettest, output of load_diet_comp), with both unidentified prey bias and Dirichlet observation error.
+
 ```{r test-sample-diet}
 
 samp1 <- sample_diet(survey_cons, fgs, unidprey = 0, alphamult = 10000000)
 
 samp2 <- sample_diet(diettest, fgs, unidprey = 0.5, alphamult = 10000000)
+
+samp3 <- sample_diet(survey_cons, fgs, unidprey = 0.3, alphamult = 10000000)
+
+samp4 <- sample_diet(survey_cons, fgs, unidprey = 0.3, alphamult = 10000)
+
+samp5 <- sample_diet(diettest, fgs, unidprey = 0, alphamult = 10000000)
+
+
 ```
 
+Plotting functions and colors for everyone
+
+```{r color-plotfun}
+
+# length(unique(samp2$prey)) #39 prey categories max 
+# 35 categories in samp5 without unid length(unique) #http://medialab.github.io/iwanthue/
+preycol <- c("#7b7927",
+             "#746dd8",
+             "#a6bc3a",
+             "#4f3587",
+             "#86af42",
+             "#c666c7",
+             "#42c87f",
+             "#cb417f",
+             "#6fb95c",
+             "#882e7b",
+             "#67b271",
+             "#c83c63",
+             "#43c8ac",
+             "#da4953",
+             "#3ba7e5",
+             "#caa432",
+             "#5081db",
+             "#c8802f",
+             "#6c79c2",
+             "#c7b961",
+             "#bb86d6",
+             "#3b7125",
+             "#d672b9",
+             "#b57e43",
+             "#872957",
+             "#dd6741",
+             "#db75a2",
+             "#9e3d14",
+             "#db6f81",
+             "#7b3015",
+             "#e08262",
+             "#8d2a41",
+             "#d56467",
+             "#8c242e",
+             "#a73830")
+names(preycol) <- as.factor(sort(unique(samp5$prey)))
+
+# going for more greyscale for unident categories, same website
+unidcol <- c("#b8b8b2",
+             "#302a1d",
+             "#6b7069",
+             "#1e3430")
+names(unidcol) <- as.factor(c("Unid", "Unid_Fish",  "Unid_Invert", "Unid_Plankton"))
+
+col <- c(preycol, unidcol)
+
+# plot diet comp over time at age by species
+plotdiet <- function(dat, compdat=NULL, namedat, namecomp=NULL){
+  
+  dat <- dat %>% add_column(run = namedat)
+  if(!is.null(compdat)) compdat <- compdat %>% add_column(run = namecomp)
+  
+    ggplot() +
+    geom_bar(data=dat, aes(time.days/365, dietSamp, fill=prey), stat = "identity") +
+    {if(!is.null(compdat)) geom_bar(data=compdat, aes(time.days/365, dietSamp, fill=prey), stat = "identity")} + 
+    theme_tufte() +
+    theme(legend.position = "bottom") +
+    xlab("year") +
+    ylab("diet proportion") +
+    facet_grid(agecl~run) + 
+    scale_fill_manual(values=col) + 
+    ggtitle(dat$species)
+  
+}
+
+# method for a single species diet, no comparisons
+# plist = lapply(split(ms_diet, ms_diet$species), function(d) {
+#   ggplot(d, aes(time.days/365, atoutput, fill=prey)) + 
+#     geom_bar(stat = "identity") +
+#     facet_wrap(species~agecl) +
+#     xlab("year") +
+#     ylab("diet proportion") +
+#     theme_tufte() +
+#     theme(legend.position="bottom")
+# })
+
+```
+
+## Visualize diet comparisons 
+
+### Surveyed and Global diet {.tabset}
+
+Here we compare the surveyed diet comp with the global diet comp, both with no prey bias (unidprey = 0) and extremely low Diriclet observation error (alphamult = 10000000):
+
+```{r, fig.width=9, fig.height=12, results='asis'}
+
+preds <- unique(samp1$species)
+
+for(i in 1:length(preds)) {
+  cat("  \n####",  as.character(preds[i]),"  \n")
+  print(plotdiet(dat = filter(samp1, species %in% preds[i]), namedat = "Survey diet", compdat = filter(samp5, species %in% preds[i]), namecomp = "Global diet")) 
+  cat("  \n")
+}
+
+```
+
+### {-}
+
+### Unbiased and biased global diet {.tabset}
+
+Here we compare the global diet comp without and with unidentified prey bias (unidprey = 0 and unidprey = 0.5, or up to 50% of each prey proportion could be set to unidentified) using extremely low Diriclet observation error (alphamult = 10000000):
+
+```{r, fig.width=9, fig.height=12, results='asis'}
+
+for(i in 1:length(preds)) {
+  cat("  \n####",  as.character(preds[i]),"  \n")
+  print(plotdiet(dat = filter(samp5, species %in% preds[i]), namedat = "Global diet", compdat = filter(samp2, species %in% preds[i]), namecomp = "Biased global diet")) 
+  cat("  \n")
+}
+```
+
+### {-}
+
+### Unbiased and biased survey diet {.tabset}
+
+Here we compare survey diet comp with no bias and variance, with some bias (unidprey = 0.3 or up to 30% of each prey proportion could be set to unidentified) and extremely low to moderate Dirichlet observation error (alphamult = 10000000 and alphamult = 10000):
+
+```{r, fig.width=9, fig.height=12, results='asis'}
+
+for(i in 1:length(preds)) {
+  cat("  \n####",  as.character(preds[i]),"  \n")
+  print(plotdiet(dat = filter(samp1, species %in% preds[i]), namedat = "Survey diet", compdat = filter(samp3, species %in% preds[i]), namecomp = "Biased survey diet")) 
+  cat("  \n")
+}
+```
+
+### {-}
+
+### Biased survey diet, low and high observation error {.tabset}
+
+```{r, fig.width=9, fig.height=12, results='asis'}
+
+for(i in 1:length(preds)) {
+  cat("  \n####",  as.character(preds[i]),"  \n")
+  print(plotdiet(dat = filter(samp3, species %in% preds[i]), namedat = "Biased survey diet", compdat = filter(samp4, species %in% preds[i]), namecomp = "Bias and variance survey diet")) 
+  cat("  \n")
+}
+```
+
+### {-}
