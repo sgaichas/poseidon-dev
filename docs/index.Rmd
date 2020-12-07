@@ -9,9 +9,9 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/atlantisom_landingpage.html" target="_blank">Draft atlantisom landing page for review, June 9, 2020</a>
 
-### Full age structured data for multispecies modeling, June-November 2020
+### Full age structured data for multispecies modeling, June-December 2020
 
-<a href="https://sgaichas.github.io/poseidon-dev/SurveyDietCompTest.html" target="_blank">Apply survey specifications to diet outputs, November 10, 2020</a>
+<a href="https://sgaichas.github.io/poseidon-dev/SurveyDietCompTest.html" target="_blank">Apply survey specifications to diet outputs, December 7, 2020</a>
 
 <a href="https://sgaichas.github.io/poseidon-dev/msSurveysTest.html" target="_blank">Compare multispecies survey specifications, November 9, 2020</a>
 
