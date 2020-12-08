@@ -453,9 +453,11 @@ samp2 <- sample_diet(diettest, fgs, unidprey = 0.5, alphamult = 10000000)
 
 samp3 <- sample_diet(survey_cons, fgs, unidprey = 0.3, alphamult = 10000000)
 
-samp4 <- sample_diet(survey_cons, fgs, unidprey = 0.3, alphamult = 10000)
+samp4 <- sample_diet(survey_cons, fgs, unidprey = 0.3, alphamult = 10)
 
 samp5 <- sample_diet(diettest, fgs, unidprey = 0, alphamult = 10000000)
+
+samp6 <- sample_diet(survey_cons, fgs, unidprey = 0, alphamult = 10)
 
 
 ```
@@ -581,7 +583,7 @@ for(i in 1:length(preds)) {
 
 ### Unbiased and biased survey diet {.tabset}
 
-Here we compare survey diet comp with no bias and variance, with some bias (unidprey = 0.3 or up to 30% of each prey proportion could be set to unidentified) and extremely low to moderate Dirichlet observation error (alphamult = 10000000 and alphamult = 10000):
+Here we compare survey diet comp with no bias and variance (unidprey = 0 and alphamult = 10000000) to survey diet with some bias (unidprey = 0.3 or up to 30% of each prey proportion could be set to unidentified, and alphamult = 10000000):
 
 ```{r, fig.width=9, fig.height=12, results='asis'}
 
@@ -594,13 +596,29 @@ for(i in 1:length(preds)) {
 
 ### {-}
 
-### Biased survey diet, low and high observation error {.tabset}
+### Unbiased survey diet, low and high observation error {.tabset}
+Here we compare survey diet comp with no bias or variance (unidprey = 0 and alphamult = 10000000), with no bias and high Dirichlet observation error (unidprey = 0 and alphamult = 10):
 
 ```{r, fig.width=9, fig.height=12, results='asis'}
 
 for(i in 1:length(preds)) {
   cat("  \n####",  as.character(preds[i]),"  \n")
-  print(plotdiet(dat = filter(samp3, species %in% preds[i]), namedat = "Biased survey diet", compdat = filter(samp4, species %in% preds[i]), namecomp = "Bias and variance survey diet")) 
+  print(plotdiet(dat = filter(samp1, species %in% preds[i]), namedat = "No variance survey diet", compdat = filter(samp6, species %in% preds[i]), namecomp = "High variance survey diet")) 
+  cat("  \n")
+}
+
+```
+
+### {-}
+
+### Biased survey diet, low and high observation error {.tabset}
+Last we compare survey diet comp with some bias (unidprey = 0.3 or up to 30% of each prey proportion could be set to unidentified) and low observation error (alphamult = 1000000) to the same bias and high Dirichlet observation error (alphamult = 10):
+
+```{r, fig.width=9, fig.height=12, results='asis'}
+
+for(i in 1:length(preds)) {
+  cat("  \n####",  as.character(preds[i]),"  \n")
+  print(plotdiet(dat = filter(samp3, species %in% preds[i]), namedat = "Biased survey diet", compdat = filter(samp4, species %in% preds[i]), namecomp = "Bias and high variance survey diet")) 
   cat("  \n")
 }
 ```
