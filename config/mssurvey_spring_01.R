@@ -157,3 +157,7 @@ lenage_cv <- 0.1
 # max size bin for length estimation, function defaults to 150 cm if not supplied
 maxbin <- 200
 
+# diet sampling parameters
+alphamult <- 10
+unidprey <- 0.3
+

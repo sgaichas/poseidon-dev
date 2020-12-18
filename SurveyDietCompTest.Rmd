@@ -30,14 +30,17 @@ It will then apply `create_survey()` with the diet file as dat and the survey sp
 
 om_diet<- function(config = configfile,
                    dietfile = file_diet,
-                   fgs = fgs,
                    usersurvey = usersurvey_file,
-                   userfishery = NULL,
                    omlist_ss,
                    n_reps = n_reps,
-                   unidprey = 0,
-                   alphamult = 10000000,
                    save = TRUE){
+
+  source(config)
+
+  #Load functional groups
+  fgs <- atlantisom::load_fgs(dir=d.name,
+                                       file_fgs = functional.groups.file)
+
   
   # load or read in saved detailed diet
   if(!file.exists(file.path(d.name,
@@ -90,6 +93,8 @@ om_diet<- function(config = configfile,
     survObsDiets[[survey.name]] <- survObsDiet
     
   }
+  
+  return(survObsDiets)
   
 }
 ```
@@ -623,6 +628,47 @@ for(i in 1:length(preds)) {
   print(plotdiet(dat = filter(samp3, species %in% preds[i]), namedat = "Biased survey diet", compdat = filter(samp4, species %in% preds[i]), namecomp = "Bias and high variance survey diet")) 
   cat("  \n")
 }
+```
+
+### {-}
+
+## Test wrapper
+
+The new `om_diet` function should load the detailed diet file, run the survey, then sample the diets and save outputs for each survey. This takes 3 minutes to run with two surveys and 10 species. 
+
+```{r testwrapper, eval=FALSE}
+
+NOBAom_ms <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+
+NOBAom_ms_diet <- om_diet(config = here("config", "NOBA2config.R"),
+                          dietfile = "NOBADetDiet.gz",
+                          usersurvey = c(here("config/mssurvey_spring_01.R"), 
+                                         here("config/mssurvey_fall_01.R")), 
+                          omlist_ss = NOBAom_ms, 
+                          n_reps = 1, 
+                          save = TRUE)
+
+```
+
+### Compare spring and fall surveys {.tabset}
+
+The diet was sampled with alphamult = 10 and unidprey = 0.3 using the survey configuration files. 
+
+```{r, fig.width=9, fig.height=12, results='asis'}
+
+NOBAom_ms_diet <- read_savedsurvs(d.name, 'survDiet')
+
+preds <- unique(unique(NOBAom_ms_diet[[2]][[1]]$species))
+
+fall <- as.data.frame(NOBAom_ms_diet$BTS_fall_nearbox_qmix_selmix[[1]])
+spring <- as.data.frame(NOBAom_ms_diet$BTS_spring_nearbox_qmix_selmix[[1]])
+
+for(i in 1:length(preds)) {
+  cat("  \n####",  as.character(preds[i]),"  \n")
+  print(plotdiet(dat = filter(spring, species %in% preds[i]), namedat = "Spring survey diet", compdat = filter(fall, species %in% preds[i]), namecomp = "Fall survey diet")) 
+  cat("  \n")
+}
+
 ```
 
 ### {-}
