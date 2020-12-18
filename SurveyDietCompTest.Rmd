@@ -35,6 +35,8 @@ om_diet<- function(config = configfile,
                    userfishery = NULL,
                    omlist_ss,
                    n_reps = n_reps,
+                   unidprey = 0,
+                   alphamult = 10000000,
                    save = TRUE){
   
   # load or read in saved detailed diet
@@ -76,7 +78,7 @@ om_diet<- function(config = configfile,
     # add observation error to survey diet
     survObsDiet <- list()
     for(i in 1:n_reps){
-      survObsDiet[[i]] <- atlantisom::sample_diet(survey_diet, surv_cv)
+      survObsDiet[[i]] <- atlantisom::sample_diet(survey_cons, fgs, unidprey = unidprey, alphamult = alphamult)
     }
 
     #save survey diets, takes a long time to generate with lots of reps/species
