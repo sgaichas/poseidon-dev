@@ -237,7 +237,7 @@ plotsurv <- ggplot() +
                      guide = guide_legend(override.aes = list(
                          linetype = c("blank", "solid"),
                          shape = c(16, NA)))) + 
-  xlim(0,80) +
+  xlim(20,80) +
   theme_tufte() +
   theme(legend.position = "right") +
   labs(colour="Atlantis-sardine")
@@ -259,7 +259,7 @@ plotSSfit <- ggplot() +
                      guide = guide_legend(override.aes = list(
                          linetype = c("solid", "blank"),
                          shape = c(NA, 16)))) + 
-  xlim(0,80) +
+  xlim(20,80) +
   theme_tufte() +
   theme(legend.position = "right") +
   labs(colour="SS3-survey fit")
@@ -275,7 +275,7 @@ plotSSskill <- ggplot() +
                      guide = guide_legend(override.aes = list(
                          linetype = c("blank", "solid"),
                          shape = c(16, NA)))) + 
-  xlim(0,80) +
+  xlim(20,80) +
   theme_tufte() +
   theme(legend.position = "right") +
   labs(colour="SS3-biomass skill")
