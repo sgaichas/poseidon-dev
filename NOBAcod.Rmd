@@ -1130,24 +1130,41 @@ We will need to alter this for SAM, SS3, etc. Right now just makes SS3.
 ```{r writedat, eval=FALSE}
 
 require(r4ss)
-omlist_ss<-CC3om_sardine
-source(here("/config/CC3Config_sardLWcorr.R"))
-source(here("/config/omdimensions.R"))
-source(here("/config/sardinesurvey.R"))
-source(here("/config/sardinefishery.R")) 
+#omlist_ss<- ?
+source(here("config/omdimensions.R"))
+source(here("/config/codsurvey.R"))
+source(here("/config/codfishery.R")) 
 
 #Directory with SS files
-model_dir <- "Sardine_SS_files/"
+model_dir <- "NOBA_cod_files/"
 
 #Name of SS data file
-datfile_name <- "sardEM_3_3.dat"
+datfile_name <- "ss3.dat"
 
 #CVs for length at age, catch, and survey
 CVs <- list("lenage"=0.1, "fishery"=0.01, "survey"=0.1)
 
+#Load in model object from SAM
+noba_cod_out <- system.file("inst","extdata","NOBA_cod_files","NEAcod-2020","run","model.RData",
+                            package = "atlantisom") 
+#This is the SAM object
+noba_fit <- noba_cod_out$fit
+
+properties <- c("minAge","maxAge", "maxAgePlusGroup")
+
+age_info <- lapply(properties, get, noba_fit$conf)
+names(age_info) <- properties
+
+#install SAM
+remotes::install_github("fishfollower/SAM/stockassessment")
+require(stockassessment)
+
+
+
+
 #Month of survey/fishing
-survey_month <- 7
-fishing_month <- 1
+#survey_month <- 7
+#fishing_month <- 1
 
 #Years to survey, assuming survey is once per year
 #survey_years <- survey_sample_full[(burnin+1):(burnin+nyears)] # my original
