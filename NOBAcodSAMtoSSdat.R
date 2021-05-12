@@ -1,3 +1,4 @@
+require(dplyr)
 #Directory with SS files
 model_dir <- "./NOBA_cod_files"
 #Name of SS data file
@@ -22,10 +23,24 @@ properties <- c("minAge","maxAge", "maxAgePlusGroup")
 age_info <- lapply(properties, get, noba_cod_out$conf)
 names(age_info) <- properties
 
+#Add nages to datfile
 dat_in$Nages <- length(age_info$minAge:age_info$maxAge)
 
 
 plot(exp(noba_fit$sdrep$value[idx]))
+
+##########################################################
+remotes::install_github("kellijohnson-NOAA/saconvert")
+require(saconvert)
+sacon_path <- "C:\\Users\\chris\\Documents\\GitHub\\saconvert"
+devtools::load_all(sacon_path)
+ices_file_path <- file.path(model_dir,"NEAcod-2020","data")
+
+example_dir <- file.path(sacon_path,"inst","extdata")
+ICES2SS(user.wd=example_dir, user.od = model_dir)
+ICES2SS(user.wd=ices_file_path, user.od = model_dir)
+
+catch_nums <- read.ices(file.path(getwd(), "NOBA_cod_files","NEAcod-2020","data","cn.dat"))
 
 #install SAM
 remotes::install_github("fishfollower/SAM/stockassessment")
