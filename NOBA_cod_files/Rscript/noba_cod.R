@@ -1,6 +1,17 @@
 # devtools::load_all("C:/Users/bai.li/Documents/saconvert")
 remotes::install_github("Bai-Li-NOAA/saconvert")
 
+
+if(here()){
+  args <- c("--no-multiarch")
+} else{
+  args <- c("")
+}
+
+remotes::install_github("r4ss/r4ss", branch ="development")
+devtools::install_github("fishfollower/SAM/stockassessment", args)
+
+
 library(here)
 library(stockassessment) # For using SAM
 library(r4ss) # For using SS
@@ -8,25 +19,23 @@ library(saconvert)
 
 # Read SAM input data (NAE cod) ---------------------------------------------------------------
 
-# devtools::install_github("fishfollower/SAM/stockassessment")
+
 sam_input_path <- here::here("NOBA_cod_files", "NEAcod-2020", "data")
 
 # Read in data files
-cn <- read.ices(file.path(sam_input_path, "cn.dat"))
-cw <- read.ices(file.path(sam_input_path, "cw.dat"))
-dw <- read.ices(file.path(sam_input_path, "dw.dat"))
-lf <- read.ices(file.path(sam_input_path, "lf.dat"))
-lw <- read.ices(file.path(sam_input_path, "lw.dat"))
-mo <- read.ices(file.path(sam_input_path, "mo.dat"))
-nm <- read.ices(file.path(sam_input_path, "nm.dat"))
-pf <- read.ices(file.path(sam_input_path, "pf.dat"))
-pm <- read.ices(file.path(sam_input_path, "pm.dat"))
-sw <- read.ices(file.path(sam_input_path, "sw.dat"))
-surveys <- read.ices(file.path(sam_input_path, "survey.dat"))
+regdat <- grep(".dat",list.files(sam_input_path))
+filenames_ICES <- list.files(sam_input_path)[regdat]
+
+#All objects are now on input_file_list
+input_file_list <- lapply(file.path(sam_input_path,filenames_ICES), read.ices)
+names(input_file_list) <- gsub(".dat","",filenames_ICES)
+
+#Load into function environment as objects
+list2env(input_file_list, environment())
 
 # Create a collected data object
 sam_dat <- setup.sam.data(
-  surveys = surveys,
+  surveys = survey,
   residual.fleet = cn,
   prop.mature = mo,
   stock.mean.weight = sw,
