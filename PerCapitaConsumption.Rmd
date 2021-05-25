@@ -1,0 +1,181 @@
+---
+title: "Per captia consumption"
+author: "Sarah Gaichas"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_fold: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(here)
+library(tidyverse)  
+library(atlantisom)
+library(ggthemes)
+library(FSA)
+
+```
+
+## Diet info for multispecies modeling
+
+Multispecies models rely on either estimated or input parameters governing predator consumption rates to estimate predation mortality on consumed species.
+
+Stomach weights are needed as input to the length-based multispecies model hydra. At present each species has a stomach weight for each size bin that is repeated for each year. We have total consumed weight for each predator age class at each timestep in the detailed diet atlantis output, so would need to map age classes to length bins, sum consumed weight by length bin and divide by total numbers in that length bin to get stomach weight.
+
+What we have saved so far is a diet comp in proportion that has had bias and observation error added to proportions. However, we need the stomach weight portion of the equation, which has the survey timing/area/efficiency/selectivity applied to true consumed weight. The hydra input is mean daily stomach weight in grams. From the Atlantis manual, "DetailedDietCheck.txt returns the total consumed biomass since the last output given for each cell (box and layer) of each age group of each functional group." So daily per capita consumed biomass is this output, summed over prey for total consumption, divided by the numbers from the same survey design, divided by the output step `omlist_ss$runpar$outputstep`. 
+
+The function below should return per-capita consumption by age class. This can then be converted to lengthbin as necessary.
+
+```{r stomwt, eval=FALSE}
+
+om_cons<- function(config = configfile,
+                   dietfile = file_diet,
+                   usersurvey = usersurvey_file,
+                   omlist_ss,
+                   n_reps = n_reps,
+                   save = TRUE){
+  
+  source(config)
+  
+  #Load functional groups
+  fgs <- atlantisom::load_fgs(dir=d.name,
+                              file_fgs = functional.groups.file)
+  
+  
+  # load or read in saved detailed diet
+  if(!file.exists(file.path(d.name,
+                            paste0(scenario.name, "detaileddiet.rds")))){
+    detaileddiet <- load_detailed_diet_comp(dir = d.name, 
+                                            file_diet, 
+                                            fgs = fgs)
+    
+    if(save){
+      saveRDS(detaileddiet, file.path(d.name, paste0(scenario.name, "detaileddiet.rds")))
+    }
+    
+  } else {
+    detaileddiet <- readRDS(file.path(d.name,
+                                      paste0(scenario.name, "detaileddiet.rds")))
+  }
+  
+  #one script for dimension parameters to be used in multiple functions
+  source("config/omdimensions.R", local = TRUE)
+  
+  survObsStomWt <- list()
+  
+  for (s in usersurvey)
+  {
+    source(s, local = TRUE)
+    
+    # survtime doesn't match units of time.days in detaileddiet
+    survtime <- survey_sample_full*omlist_ss$runpar$outputstep
+    
+    # apply survey design to detailed diet
+    survey_cons <- create_survey_diet(dat = detaileddiet,
+                                      time = survtime,
+                                      species = survspp,
+                                      boxes = survboxes,
+                                      effic = surveffic,
+                                      selex = survselex)
+    
+    # get numbers at ageclass for same survey design
+    # note different time units!
+    survey_N <- atlantisom::create_survey(dat = omlist_ss$truenums_ss,
+                                          time = survey_sample_full,
+                                          species = survspp,
+                                          boxes = survboxes,
+                                          effic = surveffic,
+                                          selex = survselex.agecl)
+    
+    # convert survey N times to cons times in days
+    survey_N$time <- survey_N$time*omlist_ss$runpar$outputstep
+    
+    # get rid of polygon
+    survey_totN <- survey_N %>%
+      group_by(species, agecl, time) %>%
+      summarise(totN = sum(atoutput)) %>%
+      ungroup()
+    
+    # sum over prey to get total consumption in t, divide by N and timestep, convert to g
+    survey_totcons <- survey_cons %>%
+      group_by(species, agecl, time) %>%
+      summarise(totcons = sum(atoutput)) %>%
+      ungroup() %>%
+      left_join(survey_totN) %>%
+      mutate(percap_cons = totcons/totN) %>%
+      #mutate(daily_percap_g = percap_cons/omlist_ss$runpar$outputstep*1000000)
+      mutate(daily_percap_g = percap_cons*1000000) #try assuming cons is snapshot not cumulative since last timestep
+    
+    #save survey consumption, takes a long time to generate with lots of reps/species
+    #if(save){
+    saveRDS(survey_cons, file.path(d.name, paste0(scenario.name, "_",
+                                                  survey.name, "surveycons.rds")))
+    #}
+    
+    survObsStomWt[[survey.name]] <- survey_cons
+    
+  }
+  
+}
+
+```
+
+
+## NOBA
+
+The configuration files for NOBA are in posiedon-dev/config and see also ms-keyrun project repo [illustrating full simulated multispecies modeling data](https://noaa-edab.github.io/ms-keyrun/SimData.html). The NOBA model output was producing fairly low per capita consumption using the code above, so we will compare that with what we get from the CC model to see if we have an output file problem across models or if this is a characteristic of the NOBA model. 
+
+```{r, eval=FALSE}
+
+source(here("config/NOBA2Config.R"))
+
+# apply surveys to true total consumption (snipped from atlantosom om_diet.R and om_comps.R)
+detaileddiet <- readRDS(file.path(d.name, paste0(scenario.name, "detaileddiet.rds")))
+
+usersurvey <- c(here("config/mssurvey_spring.R"),
+                here("config/mssurvey_fall.R"),
+                here("config/mssurvey_spring_01.R"),
+                here("config/mssurvey_fall_01.R"))
+
+omlist_ss <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+
+source(here("config/omdimensions.R"))
+
+```
+
+
+## CCA
+
+This is a short run of the CCA model implemented in the latest codebase, so it can produce full age structured output. First we need to process the detailed diet file, and also get the output of `run_truth` for numbers.
+
+```{r, eval=FALSE}
+
+source(here("config/CCConfig_constest.R"))
+
+file_diet <- paste0(scenario.name,"DetailedDietCheck.txt")
+
+#Load functional groups
+  fgs <- atlantisom::load_fgs(dir=d.name,
+                              file_fgs = functional.groups.file)
+  
+  
+  # load or read in saved detailed diet
+  if(!file.exists(file.path(d.name,
+                            paste0(scenario.name, "detaileddiet.rds")))){
+    detaileddiet <- load_detailed_diet_comp(dir = d.name, 
+                                            file_diet, 
+                                            fgs = fgs)
+    
+    if(save){
+      saveRDS(detaileddiet, file.path(d.name, paste0(scenario.name, "detaileddiet.rds")))
+    }
+    
+  } else {
+    detaileddiet <- readRDS(file.path(d.name,
+                                      paste0(scenario.name, "detaileddiet.rds")))
+  }
+
+
+```
+
