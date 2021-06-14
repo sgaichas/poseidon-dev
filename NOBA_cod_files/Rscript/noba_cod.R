@@ -96,13 +96,18 @@ for (i in 1:length(surveys)) {
 # SAM2SS --------------------------------------------------------------------------------------
 
 #### Recruitment age is 0 and bias adjustment in recruitment = TRUE
-output_path <- here::here("NOBA_cod_files", "output", "age0")
+i <- 1
+path_final <- c("age0","age0_slx20", "age1")
+output_path <- here::here("NOBA_cod_files", "output", path_final[i])
+slx_pattern <- c(12,20,12)
+start_age <- c(0,0,1)
+bias_adj <- c(TRUE, TRUE, FALSE)
 
 saconvert::ICES2SS(
   user.wd = sam_input_path,
   user.od = output_path,
   ices.id = "",
-  slx = 12,
+  slx = slx_pattern[i],
   tvslx = FALSE,
   ages = NULL,
   nsexes = 1, # 1: one sex; 2: two sex; -1: one sex and multiply the spawning biomass by the fraction female in the control file
@@ -111,55 +116,9 @@ saconvert::ICES2SS(
   q.float = FALSE,
   sigma.init = 0.5,
   steep.init = 1,
-  start.age = 0,
-  bias.adj = TRUE
+  start.age = start_age[i],
+  bias.adj = bias_adj[i]
 ) # steep.init: http://sedarweb.org/docs/wpapers/SEDAR19_DW_06_SteepnessInference.pdf
-
-ss_ouput <- SS_output(dir = output_path, verbose = TRUE, printstats = TRUE)
-SS_plots(ss_ouput)
-
-#### Recruitment age is 0, bias adjustment in recruitment = TRUE, selectivity pattern = 20
-output_path <- here::here("NOBA_cod_files", "output", "age0_slx20")
-
-saconvert::ICES2SS(
-  user.wd = sam_input_path,
-  user.od = output_path,
-  ices.id = "",
-  slx = 20,
-  tvslx = FALSE,
-  ages = NULL,
-  nsexes = 1, # 1: one sex; 2: two sex; -1: one sex and multiply the spawning biomass by the fraction female in the control file
-  forN = 2,
-  q.extra.se = FALSE,
-  q.float = FALSE,
-  sigma.init = 0.5,
-  steep.init = 1,
-  start.age = 0,
-  bias.adj = TRUE
-) # steep.init: http://sedarweb.org/docs/wpapers/SEDAR19_DW_06_SteepnessInference.pdf
-
-ss_ouput <- SS_output(dir = output_path, verbose = TRUE, printstats = TRUE)
-SS_plots(ss_ouput)
-
-#### Recruitment age is 1 and bias adjustment in recruitment = FALSE
-output_path <- here::here("NOBA_cod_files", "output", "age1")
-
-saconvert::ICES2SS(
-  user.wd = sam_input_path,
-  user.od = output_path,
-  ices.id = "",
-  slx = 12,
-  tvslx = FALSE,
-  ages = NULL,
-  nsexes = 1, # 1: one sex; 2: two sex; -1: one sex and multiply the spawning biomass by the fraction female in the control file
-  forN = 2,
-  q.extra.se = FALSE,
-  q.float = FALSE,
-  sigma.init = 0.5,
-  steep.init = 1,
-  start.age = 1,
-  bias.adj = FALSE
-) # Source of steep.init: http://sedarweb.org/docs/wpapers/SEDAR19_DW_06_SteepnessInference.pdf
 
 ss_ouput <- SS_output(dir = output_path, verbose = TRUE, printstats = TRUE)
 SS_plots(ss_ouput)
