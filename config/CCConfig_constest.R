@@ -8,5 +8,5 @@ run.prm.file <- "CalCurrentV3_run.xml"
 scenario.name <- "outputCCV3"
 bioind.file <- "outputCCV3BiomIndx.txt"
 catch.file <- "outputCCV3Catch.txt"
-annage <- TRUE
+annage <- FALSE
 fisheries.file <- "CalCurrentV3Fisheries.csv"
