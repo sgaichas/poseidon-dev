@@ -170,11 +170,11 @@ catchplot(sam_fit)
 
 ``` r
 # Set up two scenarios
-# Scenario A: use selectivity pattern 12 and F method 3 in SS
-# Scenario B: use selectivity pattern 12 and F method 2 in SS
+# Scenario A: use selectivity pattern 20 and F method 3 in SS
+# Scenario B: use selectivity pattern 20 and F method 2 in SS
 
 scenario_path <- c("A", "B")
-slx_pattern <- c(12, 12)
+slx_pattern <- c(20, 20)
 f_method <- c(3, 2)
 
 
@@ -217,7 +217,7 @@ for (scenario_id in seq_along(scenario_path)){
   ss_output[[scenario_id]] <- data.frame(
     "Year" = sam_output$Year,
     "SSB" = ss_output_data$timeseries$SpawnBio[ss_output_data$timeseries$Yr %in% sam_output$Year],
-    "Recruits" = ss_output_data$timeseries$Recruit_0[ss_output_data$timeseries$Yr %in% sam_output$Year],
+    "Recruits" = ss_output_data$timeseries$Recruit_0[ss_output_data$timeseries$Yr %in% (sam_output$Year-1)],
     "F" = ss_output_data$timeseries$`F:_1`[ss_output_data$timeseries$Yr %in% sam_output$Year],
     "Catch" = ss_output_data$timeseries$`sel(B):_1`[ss_output_data$timeseries$Yr %in% sam_output$Year]
   )

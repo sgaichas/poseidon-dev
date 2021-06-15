@@ -101,11 +101,11 @@
 #_Errtype:  -1=normal; 0=lognormal; >0=T
 #_SD_Report: 0=no sdreport; 1=enable sdreport
 #_Fleet	Units	Errtype	SD_Report
-1	1	0	0	#_fleet1                   
-2	1	0	0	#_FLT15:NorBarTrSur        
-3	1	0	0	#_FLT16:NorBarLofAcSur     
-4	1	0	0	#_FLT18:RusSweptArea       
-5	1	0	0	#_FLT007:Ecosystem_2018corr
+1	0	0	0	#_fleet1                   
+2	0	0	0	#_FLT15:NorBarTrSur        
+3	0	0	0	#_FLT16:NorBarLofAcSur     
+4	0	0	0	#_FLT18:RusSweptArea       
+5	0	0	0	#_FLT007:Ecosystem_2018corr
 #
 #_CPUE_data
 #_year	seas	index	obs	se_log
