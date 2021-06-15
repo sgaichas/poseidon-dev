@@ -126,7 +126,7 @@ om_cons<- function(config = configfile,
 
 The configuration files for NOBA are in posiedon-dev/config and see also ms-keyrun project repo [illustrating full simulated multispecies modeling data](https://noaa-edab.github.io/ms-keyrun/SimData.html). The NOBA model output was producing fairly low per capita consumption using the code above, so we will compare that with what we get from the CC model to see if we have an output file problem across models or if this is a characteristic of the NOBA model. 
 
-```{r, eval=FALSE}
+```{r}
 
 source(here("config/NOBA2Config.R"))
 
@@ -139,7 +139,58 @@ usersurvey <- c(here("config/mssurvey_spring.R"),
 omlist_ss <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
 
 source(here("config/omdimensions.R"))
+source(usersurvey[2])
 
+    # survtime doesn't match units of time.days in detaileddiet
+    survtime <- survey_sample_full*omlist_ss$runpar$outputstep
+    
+    # apply survey design to detailed diet
+    survey_cons <- create_survey_diet(dat = detaileddiet,
+                                      time = survtime,
+                                      species = survspp,
+                                      boxes = survboxes,
+                                      effic = surveffic,
+                                      selex = survselex)
+    
+    # get numbers at ageclass for same survey design
+    # note different time units!
+    survey_N <- atlantisom::create_survey(dat = omlist_ss$truenums_ss,
+                                          time = survey_sample_full,
+                                          species = survspp,
+                                          boxes = survboxes,
+                                          effic = surveffic,
+                                          selex = survselex.agecl)
+    
+    # convert survey N times to cons times in days
+    survey_N$time <- survey_N$time*omlist_ss$runpar$outputstep
+    
+    # get rid of polygon
+    survey_totN <- survey_N %>%
+      group_by(species, agecl, time) %>%
+      summarise(totN = sum(atoutput)) %>%
+      ungroup()
+    
+    # sum over prey to get total consumption in t, divide by N and timestep, convert to g
+    survey_totcons <- survey_cons %>%
+      group_by(species, agecl, time) %>%
+      summarise(totcons = sum(atoutput)) %>%
+      ungroup() %>%
+      left_join(survey_totN) %>%
+      mutate(percap_cons = totcons/totN) %>%
+      #mutate(daily_percap_g = percap_cons/omlist_ss$runpar$outputstep*1000000)
+      mutate(daily_percap_g = percap_cons*1000000) #try assuming cons is snapshot not cumulative since last timestep
+
+
+```
+
+For example, NOBA cod daily per capita intake is tens of grams for older age classes, but is 3-4x lower than expected:
+
+```{r}
+DT::datatable(as.data.frame(survey_totcons%>%filter(species=="North_atl_cod")),
+              rownames = FALSE,
+              options = list(pageLength = 25, 
+                         order = list(list(0, 'asc')))
+)
 ```
 
 
@@ -147,7 +198,7 @@ source(here("config/omdimensions.R"))
 
 This is a short run of the CCA model implemented in the latest codebase, so it can produce full age structured output. First we need to process the detailed diet file, and also get the output of `run_truth` for numbers. At present it seems the CC model is also producing very low per capita consumpton. This suggests that interpretation of the DetailedDietCheck.txt output is incorrect? It doesn't seem like it is tons consumed at by the population of predators at agecl. 
 
-```{r, eval=FALSE}
+```{r}
 
 source(here("config/CCConfig_constest.R"))
 
@@ -198,11 +249,13 @@ CCAtestom <- om_init(here("config/CCConfig_constest.R"))
 
 CCAtestom_ms <- om_species(sppsubset$Name, CCAtestom)
 
+omlist_ss <- CCAtestom_ms 
+
 # fall census survey
 source(here("config/omdimensions.R"))
 source(here("config/mssurvey_CCtest.R"))
        
-omlist_ss <- CCAtestom_ms       
+      
        
     # survtime doesn't match units of time.days in detaileddiet
     survtime <- survey_sample_full*omlist_ss$runpar$outputstep
@@ -243,5 +296,11 @@ omlist_ss <- CCAtestom_ms
       #mutate(daily_percap_g = percap_cons/omlist_ss$runpar$outputstep*1000000)
       mutate(daily_percap_g = percap_cons*1000000) #try assuming cons is snapshot not cumulative since last timestep
        
+```
+
+For example, CCA arrowtooth flounder should have a daily per capita intake in at least tens of grams for older age classes:
+
+```{r}
+knitr::kable(as.data.frame(survey_totcons%>%filter(species=="Arrowtooth_flounder")))
 ```
 
