@@ -78,7 +78,7 @@ sam_fit <- sam.fit(sam_dat, sam_conf, sam_par, silent=TRUE)
 
 
 ### Plot SAM fits
-```{r, fig.height = 2, sam_fit}
+```{r, fig.height = 6, sam_fit}
 par(mfrow = c(1, 1))
 ssbplot(sam_fit)
 fbarplot(sam_fit)
@@ -119,7 +119,7 @@ for (scenario_id in seq_along(scenario_path)){
 ```
 
 ### Compare SAM outputs and SS outputs
-```{r, warning = FALSE, message = FALSE, fig.height = 2, sam_ss_comparison}
+```{r, warning = FALSE, message = FALSE, fig.height = 6, sam_ss_comparison}
 sam_output <- data.frame(
   "Year" = c(sam_dat$years),
   "SSB" = exp(sam_fit$sdrep$value[names(sam_fit$sdrep$value) %in% "logssb"]),
@@ -175,7 +175,7 @@ legend("top",
 ```
 
 
-### Userful resources
+### Resources
   - [SAM GitHub repository](https://github.com/fishfollower/SAM)
 	- Aldrin et al., 2020: [The specification of the data model part in the SAM model matters](https://www.sciencedirect.com/science/article/pii/S0165783620301028#bib0020)
 	- Nielsen and Berg, 2014: [Estimation of time-varying selectivity in stock assessments using state-space models](https://www.sciencedirect.com/science/article/abs/pii/S0165783614000228?via%3Dihub)

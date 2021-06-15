@@ -258,7 +258,7 @@ legend("top",
 
 ![](README_files/figure-gfm/sam_ss_comparison-1.png)<!-- -->
 
-### Userful resources
+### Resources
 
 -   [SAM GitHub repository](https://github.com/fishfollower/SAM)
     -   Aldrin et al., 2020: [The specification of the data model part
