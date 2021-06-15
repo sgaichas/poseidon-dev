@@ -102,11 +102,11 @@
 3 #_recdev_early_phase
 6 #_forecast_recruitment phase (incl. late recr) (0 value resets to maxphase+1)
 1 #_lambda for Fcast_recr_like occurring before endyr+1
--999 #_last_yr_nobias_adj_in_MPD; begin of ramp
-1933 #_first_yr_fullbias_adj_in_MPD; begin of plateau
+1945 #_last_yr_nobias_adj_in_MPD; begin of ramp
+1946 #_first_yr_fullbias_adj_in_MPD; begin of plateau
 2019 #_last_yr_fullbias_adj_in_MPD
 2020 #_end_yr_for_ramp_in_MPD (can be in forecast to shape ramp, but SS sets bias_adj to 0.0 for fcast yrs)
-0 #_max_bias_adj_in_MPD (-1 to override ramp and set biasadj=1.0 for all estimated recdevs)
+1 #_max_bias_adj_in_MPD (-1 to override ramp and set biasadj=1.0 for all estimated recdevs)
 0 #_period of cycles in recruitment (N parms read below)
 -5 #min rec_dev
 5 #max rec_dev
@@ -135,10 +135,10 @@
 -9999	0	0	0	0	0	#_terminator
 #_Q_parms(if_any);Qunits_are_ln(q)
 #_LO	HI	INIT	PRIOR	PR_SD	PR_type	PHASE	env-var	use_dev	dev_mnyr	dev_mxyr	dev_PH	Block	Blk_Fxn  #  parm_name
--10	10	-2.81991	0	0	0	1	0	0	0	0	0	0	0	#_1
--10	10	-3.36200	0	0	0	1	0	0	0	0	0	0	0	#_2
--10	10	-3.11577	0	0	0	1	0	0	0	0	0	0	0	#_3
--10	10	-2.65287	0	0	0	1	0	0	0	0	0	0	0	#_4
+-10	10	-2.84438	0	0	0	1	0	0	0	0	0	0	0	#_1
+-10	10	-2.63590	0	0	0	1	0	0	0	0	0	0	0	#_2
+-10	10	-2.82468	0	0	0	1	0	0	0	0	0	0	0	#_3
+-10	10	-2.79611	0	0	0	1	0	0	0	0	0	0	0	#_4
 #_no timevary Q parameters
 #
 #_size_selex_patterns
@@ -151,25 +151,45 @@
 #
 #_age_selex_patterns
 #_V1	V2	V3	V4
-12	0	0	0	#_1 1
-12	0	0	0	#_2 2
-12	0	0	0	#_3 3
-12	0	0	0	#_4 4
-12	0	0	0	#_5 5
+20	0	0	0	#_1 1
+20	0	0	0	#_2 2
+20	0	0	0	#_3 3
+20	0	0	0	#_4 4
+20	0	0	0	#_5 5
 #
 #_SizeSelex
 #_No size_selex_parm
 #_AgeSelex
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_1 
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_2 
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_3 
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_4 
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_5 
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_6 
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_7 
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_8 
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_9 
-0	13	6.5	0	0	0	2	0	0	0	0	0	0	0	#_10
+  0	13	   6.5	0	0	0	 2	0	0	0	0	0	0	0	#_1 
+-15	15	   3.0	0	0	0	-1	0	0	0	0	0	0	0	#_2 
+-15	15	   5.0	0	0	0	 2	0	0	0	0	0	0	0	#_3 
+-15	15	   5.0	0	0	0	-1	0	0	0	0	0	0	0	#_4 
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_5 
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_6 
+  0	13	   6.5	0	0	0	 2	0	0	0	0	0	0	0	#_7 
+-15	15	   3.0	0	0	0	-1	0	0	0	0	0	0	0	#_8 
+-15	15	   5.0	0	0	0	 2	0	0	0	0	0	0	0	#_9 
+-15	15	   5.0	0	0	0	-1	0	0	0	0	0	0	0	#_10
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_11
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_12
+  0	13	   6.5	0	0	0	 2	0	0	0	0	0	0	0	#_13
+-15	15	   3.0	0	0	0	-1	0	0	0	0	0	0	0	#_14
+-15	15	   5.0	0	0	0	 2	0	0	0	0	0	0	0	#_15
+-15	15	   5.0	0	0	0	-1	0	0	0	0	0	0	0	#_16
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_17
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_18
+  0	13	   6.5	0	0	0	 2	0	0	0	0	0	0	0	#_19
+-15	15	   3.0	0	0	0	-1	0	0	0	0	0	0	0	#_20
+-15	15	   5.0	0	0	0	 2	0	0	0	0	0	0	0	#_21
+-15	15	   5.0	0	0	0	-1	0	0	0	0	0	0	0	#_22
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_23
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_24
+  0	13	   6.5	0	0	0	 2	0	0	0	0	0	0	0	#_25
+-15	15	   3.0	0	0	0	-1	0	0	0	0	0	0	0	#_26
+-15	15	   5.0	0	0	0	 2	0	0	0	0	0	0	0	#_27
+-15	15	   5.0	0	0	0	-1	0	0	0	0	0	0	0	#_28
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_29
+-15	15	-999.0	0	0	0	-1	0	0	0	0	0	0	0	#_30
 #_no timevary selex parameters
 #
 0 #  use 2D_AR1 selectivity(0/1):  experimental feature
