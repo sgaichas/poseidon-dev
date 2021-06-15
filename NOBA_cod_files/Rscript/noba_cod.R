@@ -1,21 +1,21 @@
 # Install and library packages --------------------------------------------------------
 
 # install.packages("here")
-#
+# 
 # install_64bit <- TRUE
-#
+# 
 # if(install_64bit){
 #   args <- c("--no-multiarch")
 # } else{
 #   args <- c("")
 # }
-#
+# 
 # devtools::install_github("fishfollower/SAM/stockassessment", INSTALL_opts=args)
-#
+# 
 # remotes::install_github("r4ss/r4ss", branch ="development")
-#
+# 
 # remotes::install_github("Bai-Li-NOAA/saconvert")
-#
+# 
 # remotes::install_github("nmfs-general-modeling-tools/nmfspalette")
 
 library(here)
@@ -72,7 +72,7 @@ catchplot(sam_fit)
 
 # SAM2SS --------------------------------------------------------------------------------------
 scenario_path <- c("A", "B")
-slx_pattern <- c(12, 12)
+slx_pattern <- c(20, 20)
 f_method <- c(3, 2)
 
 
@@ -112,7 +112,7 @@ for (scenario_id in seq_along(scenario_path)){
   ss_output[[scenario_id]] <- data.frame(
     "Year" = sam_output$Year,
     "SSB" = ss_output_data$timeseries$SpawnBio[ss_output_data$timeseries$Yr %in% sam_output$Year],
-    "Recruits" = ss_output_data$timeseries$Recruit_0[ss_output_data$timeseries$Yr %in% sam_output$Year],
+    "Recruits" = ss_output_data$timeseries$Recruit_0[ss_output_data$timeseries$Yr %in% (sam_output$Year-1)],
     "F" = ss_output_data$timeseries$`F:_1`[ss_output_data$timeseries$Yr %in% sam_output$Year],
     "Catch" = ss_output_data$timeseries$`sel(B):_1`[ss_output_data$timeseries$Yr %in% sam_output$Year]
   )
