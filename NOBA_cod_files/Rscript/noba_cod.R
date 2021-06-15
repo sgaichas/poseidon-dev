@@ -1,23 +1,30 @@
+# Install and library packages --------------------------------------------------------
+
+# install.packages("here")
+#
+# install_64bit <- TRUE
+#
+# if(install_64bit){
+#   args <- c("--no-multiarch")
+# } else{
+#   args <- c("")
+# }
+#
+# devtools::install_github("fishfollower/SAM/stockassessment", INSTALL_opts=args)
+#
+# remotes::install_github("r4ss/r4ss", branch ="development")
+#
 # remotes::install_github("Bai-Li-NOAA/saconvert")
-
-
-if(here()){
-  args <- c("--no-multiarch")
-} else{
-  args <- c("")
-}
-
-remotes::install_github("r4ss/r4ss", branch ="development")
-devtools::install_github("fishfollower/SAM/stockassessment", args)
-
+#
+# remotes::install_github("nmfs-general-modeling-tools/nmfspalette")
 
 library(here)
 library(stockassessment) # For using SAM
 library(r4ss) # For using SS
 library(saconvert)
+library(nmfspalette)
 
 # Read SAM input data (NAE cod) ---------------------------------------------------------------
-
 
 sam_input_path <- here::here("NOBA_cod_files", "NEAcod-2020", "data")
 
@@ -63,103 +70,91 @@ fbarplot(sam_fit)
 recplot(sam_fit)
 catchplot(sam_fit)
 
-# Plot SAM selectivity
-par(mfrow = c(1,1))
-slex_age <- sam_conf$minAge:sam_conf$maxAge
-plot(slex_age, apply(cn, 2, mean, na.rm = TRUE), 
-     type="o", 
-     xlab="Age",
-     ylab="Number of fish")
-legend("topleft", "Catch",
-       bty="n")
+# SAM2SS --------------------------------------------------------------------------------------
+scenario_path <- c("A", "B")
+slx_pattern <- c(12, 12)
+f_method <- c(3, 2)
 
-par(mfrow = c(2, 2))
-slex_age <- sam_conf$minAge:sam_conf$maxAge
-survey_slex <- matrix(NA, ncol=length(surveys), nrow=length(slex_age))
-row.names(survey_slex) <- slex_age
 
-for (i in 1:length(surveys)) {
+for (scenario_id in seq_along(scenario_path)){
+  output_path <- here::here("NOBA_cod_files", "output", scenario_path[scenario_id])
+  if(!dir.exists(output_path)) dir.create(output_path)
   
-  survey_slex[colnames(surveys[[i]]),i] <- matrix(apply(surveys[[i]], 2, mean, na.rm = TRUE))
-  
-  plot(slex_age, survey_slex[,i], 
-       col = i,
-       type="o", 
-       lty = i,
-       xlab="Age",
-       ylab="Number of fish")
-  legend("topleft", names(surveys)[i],
-         bty="n")
+  saconvert::ICES2SS(
+    user.wd = sam_input_path,
+    user.od = output_path,
+    ices.id = "",
+    tvslx = FALSE,
+    ages = NULL,
+    nsexes = 1, # 1: one sex; 2: two sex; -1: one sex and multiply the spawning biomass by the fraction female in the control file
+    forN = 2,
+    q.extra.se = FALSE,
+    q.float = FALSE,
+    slx = slx_pattern[scenario_id],
+    f.method = f_method[scenario_id]
+  ) # steep.init: http://sedarweb.org/docs/wpapers/SEDAR19_DW_06_SteepnessInference.pdf
   
 }
 
-# SAM2SS --------------------------------------------------------------------------------------
-
-#### Recruitment age is 0 and bias adjustment in recruitment = TRUE
-i <- 1
-path_final <- c("age0","age0_slx20", "age1")
-output_path <- here::here("NOBA_cod_files", "output", path_final[i])
-slx_pattern <- c(12,20,12)
-start_age <- c(0,0,1)
-bias_adj <- c(TRUE, TRUE, FALSE)
-
-saconvert::ICES2SS(
-  user.wd = sam_input_path,
-  user.od = output_path,
-  ices.id = "",
-  slx = slx_pattern[i],
-  tvslx = FALSE,
-  ages = NULL,
-  nsexes = 1, # 1: one sex; 2: two sex; -1: one sex and multiply the spawning biomass by the fraction female in the control file
-  forN = 2,
-  q.extra.se = FALSE,
-  q.float = FALSE,
-  sigma.init = 0.5,
-  steep.init = 1,
-  start.age = start_age[i],
-  bias.adj = bias_adj[i]
-) # steep.init: http://sedarweb.org/docs/wpapers/SEDAR19_DW_06_SteepnessInference.pdf
-
-ss_ouput <- SS_output(dir = output_path, verbose = TRUE, printstats = TRUE)
-SS_plots(ss_ouput)
-
 # Compare SAM and SS estimates ----------------------------------------------------------------
-ss_path <- here::here("NOBA_cod_files", "output", "age0_slx20")
-# ss_path <- here::here("NOBA_cod_files", "output", "age0")
-ss_fit <- SS_output(dir = ss_path, verbose = TRUE, printstats = TRUE)
-par(mfrow = c(4, 2), mar = c(1, 4, 1, 0))
-ssbplot(sam_fit)
-plot(sam_dat$years,
-  ss_fit$timeseries$SpawnBio[ss_fit$timeseries$Yr %in% sam_dat$years],
-  ylim = range(0, 3000000),
-  type = "o", lty = 1,
-  xlab = "Year",
-  ylab = "SSB"
+sam_output <- data.frame(
+  "Year" = c(sam_dat$years),
+  "SSB" = exp(sam_fit$sdrep$value[names(sam_fit$sdrep$value) %in% "logssb"]),
+  "Recruits" = exp(sam_fit$sdrep$value[names(sam_fit$sdrep$value) %in% "logR"]),
+  "F" = exp(sam_fit$sdrep$value[names(sam_fit$sdrep$value) %in% "logfbar"]),
+  "Catch" = c(exp(sam_fit$sdrep$value[names(sam_fit$sdrep$value) %in% "logCatch"]), NA)
 )
 
-recplot(sam_fit)
-plot(sam_dat$years,
-  ss_fit$timeseries$Recruit_0[ss_fit$timeseries$Yr %in% sam_dat$years],
-  ylim = range(0, 2500000),
-  type = "o", lty = 1,
-  xlab = "Year",
-  ylab = "R (age 0)"
-)
+ss_output <- list()
+for (scenario_id in seq_along(scenario_path)){
+  ss_output_path <- here::here("NOBA_cod_files", "output", scenario_path[scenario_id])
+  ss_output_data <- SS_output(dir = ss_output_path, verbose = T, printstats = T)
+  ss_output[[scenario_id]] <- data.frame(
+    "Year" = sam_output$Year,
+    "SSB" = ss_output_data$timeseries$SpawnBio[ss_output_data$timeseries$Yr %in% sam_output$Year],
+    "Recruits" = ss_output_data$timeseries$Recruit_0[ss_output_data$timeseries$Yr %in% sam_output$Year],
+    "F" = ss_output_data$timeseries$`F:_1`[ss_output_data$timeseries$Yr %in% sam_output$Year],
+    "Catch" = ss_output_data$timeseries$`sel(B):_1`[ss_output_data$timeseries$Yr %in% sam_output$Year]
+  )
+}
 
-fbarplot(sam_fit)
-plot(sam_dat$years,
-  ss_fit$timeseries$`F:_1`[ss_fit$timeseries$Yr %in% sam_dat$years],
-  ylim = range(0, 2),
-  type = "o", lty = 1,
-  xlab = "Year",
-  ylab = "F"
-)
+var <- c("SSB", "Recruits", "F", "Catch")
+var_label <- c("SSB", "Recruits (Age 3)", expression(F[9-13]), "Catch (in weight)")
+colors <- nmfspalette::nmfs_palette("regional web")(length(scenario_path)+1)
 
-catchplot(sam_fit)
-plot(sam_dat$years,
-  ss_fit$timeseries$`sel(N):_1`[ss_fit$timeseries$Yr %in% sam_dat$years],
-  ylim = range(0, 1500000),
-  type = "o", lty = 1,
-  xlab = "Year",
-  ylab = "Catch"
-)
+par(mfrow = c(2, 2), mar = c(4, 4, 1, 1))
+
+for (i in seq_along(var)){
+  plot(NA,
+       type="n",
+       xlim = range(sam_output$Year),
+       ylim = range(sam_output[, var[i]], na.rm = T),
+       xlab = "Year",
+       ylab = var_label[i]
+  )
+  lines(sam_output$Year,
+        sam_output[, var[i]],
+        # type="o", 
+        # pch=1, 
+        # cex=0.6, 
+        lty=1,
+        col=colors[1])
+  for (j in seq_along(scenario_path)){
+    lines(ss_output[[j]]$Year,
+          ss_output[[j]][, var[i]],
+          # type="o", 
+          # pch=j+1, 
+          # cex=0.6, 
+          lty=j+1,
+          col=colors[j+1])
+  }
+}
+
+legend("top", 
+       c("SAM", paste("SS_", scenario_path)),
+       # pch = seq_along(colors),
+       lty = seq_along(colors),
+       col = colors,
+       bty="n")
+
+
