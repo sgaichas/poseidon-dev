@@ -1,6 +1,9 @@
 # Default survey configuration here is a census
 # Need to define survey season, area, efficiency, selectivity
 
+# Survey name
+survey.name="cod_midyear_allbox_effic1"
+
 #Atlantis model timestep corresponding to the true output--now from census_spec.R
 timestep <- stepperyr #5
 
@@ -11,7 +14,7 @@ timestep <- stepperyr #5
 survey_sample_time <- midptyr #2; defined in omdimensions.R
 
 #The last timestep to sample
-total_sample <- noutsteps-1 #495
+total_sample <- noutsteps-1 
 
 #Vector of indices of survey times to pull
 survey_sample_full <- seq(survey_sample_time,
@@ -35,9 +38,12 @@ surveffic <- data.frame(species=survspp,
 #                     selex=rep(1.0,length(survspp)*n_age_classes))
 
 # for annage output
-survselex <- data.frame(species=rep(survspp, n_annages), #  
+survselex <- data.frame(species=rep(names(annages), n_annages), #  
                         agecl=unlist(sapply(n_annages,seq)),
                         selex=rep(1.0,sum(n_annages)))
+
+survselex.agecl <- survselex 
+
 
 # effective sample size needed for sample_fish
 # this effective N is high but not equal to total for numerous groups
