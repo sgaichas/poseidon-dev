@@ -13,6 +13,8 @@ These pages document initial testing of the atlantisom package in development at
 
 Need to diagnose the annage outputs; they look strange
 
+<a href="https://sgaichas.github.io/poseidon-dev/CheckFisheryAnnageComp.html" target="_blank"> Starting cod catch at annual age diagnosis, Sept 30, 2021</a>
+
 <a href="https://sgaichas.github.io/poseidon-dev/NOBAcod2.html" target="_blank"> Multispecies dataset from NOBA sacc_30 with climate and fishery selectivity, Sept 29, 2021</a>
 
 ### Diagnosing diet and consumption outputs, May 2021

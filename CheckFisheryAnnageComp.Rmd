@@ -1,0 +1,784 @@
+---
+title: "Investigate fishery annual age comp issues"
+author: "Sarah Gaichas"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_fold: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+library(here)
+library(atlantisom)
+library(tidyverse)
+library(ggthemes)
+
+```
+
+There appears to be a problem with the fishery annual age output, especially for NOBA cod which has multiple fleets fishing it. Fishery annual age comps generated for "North_atl_cod" in Sept 2021 from NOBA sacc_38 and sacc_30 (without and with climate signal, but otherwise the same run) have the highest numbers for the oldest ages, which matches neither the aggregated fishery agecl age output nor the length comps generated from atlantisom. We'll try to figure out the problem and a fix here.
+
+## New NOBA run with updated selectivity
+
+For this work we want a NOBA run with the climate signal, the planned fishery forcing, and more realistic fishery selectivities for key species (fisheries that don't catch the smallest age classes).
+
+This dataset will come from NOBA sacc_30, with original biology, planned F + changes in selectivity for multiple groups, forced recruitment for groups	SCR+SSH+NCO, and climate change from	1981-2068+loop 2067.
+
+### What is in the ANNAGECATCH.nc file?
+
+Source the config file to get the right directories
+```{r}
+source(here("config/NOBAsacc30Config.R"))
+```
+
+Load the `ANNAGECATCH.nc` file only for cod.
+```{r}
+
+fgs <- atlantisom::load_fgs(d.name, functional.groups.file)
+
+bps <- atlantisom::load_bps(d.name, functional.groups.file, biomass.pools.file)
+
+biol <- atlantisom::load_biolprm(d.name, biol.prm.file)
+
+allboxes <- atlantisom::load_box(d.name, box.file)
+boxes <- atlantisom::get_boundary(allboxes)
+
+annagecatchnc <- atlantisom::load_nc_annage(dir = d.name, 
+                                            file_nc = paste0(scenario.name, "ANNAGECATCH.nc"),
+                                            file_fish = fisheries.file, 
+                                            bps = bps,
+                                            fgs = fgs,
+                                            biolprm = biol,
+                                            select_groups = "North_atl_cod",
+                                            select_variable = "Catch",
+                                            bboxes = boxes)
+
+```
+
+Visualize catch at age by fleet from full "true" output
+```{r}
+
+plotCAA <- function(dat){
+  ggplot(dat, aes(x=agecl, y=atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  facet_wrap(~fleet) +
+  labs(subtitle = dat$species)
+}
+
+```
+
+At time = 1
+```{r}
+plotCAA(annagecatchnc %>%
+          filter(time==1) %>%
+          group_by(species, agecl, fleet, time) %>%
+          summarise(atoutput = sum(atoutput)))
+```
+
+At time = 200
+```{r}
+plotCAA(annagecatchnc %>%
+          filter(time==200) %>%
+          group_by(species, agecl, fleet, time) %>%
+          summarise(atoutput = sum(atoutput)))
+```
+
+At time = 320
+```{r}
+plotCAA(annagecatchnc %>%
+          filter(time==320) %>%
+          group_by(species, agecl, fleet, time) %>%
+          summarise(atoutput = sum(atoutput)))
+```
+
+At time = 490
+```{r}
+plotCAA(annagecatchnc %>%
+          filter(time==490) %>%
+          group_by(species, agecl, fleet, time) %>%
+          summarise(atoutput = sum(atoutput)))
+```
+Patterns here look identical over time, with a huge amount of catch of 17-20 year olds in the dtrawlNCO fishery.
+
+Is this the same as what we would see in the omlist_ss output?
+
+Read in the om_list file, here called NOBAom_ms
+```{r}
+NOBAom_ms <- readRDS(file.path(d.name, paste0(scenario.name, "omlist_ss.rds")))
+```
+
+The true catch at annual age in this list is `NOBAom_ms$truecatchage_ss`, lets plot it
+At time = 1
+```{r}
+plotCAA(NOBAom_ms$truecatchage_ss %>%
+          filter(time==1,
+                 species=="North_atl_cod") %>%
+          group_by(species, agecl, fleet, time) %>%
+          summarise(atoutput = sum(atoutput)))
+```
+At time = 200
+```{r}
+plotCAA(NOBAom_ms$truecatchage_ss %>%
+          filter(time==200,
+                 species=="North_atl_cod") %>%
+          group_by(species, agecl, fleet, time) %>%
+          summarise(atoutput = sum(atoutput)))
+```
+
+At time = 320
+```{r}
+plotCAA(NOBAom_ms$truecatchage_ss %>%
+          filter(time==320,
+                 species=="North_atl_cod") %>%
+          group_by(species, agecl, fleet, time) %>%
+          summarise(atoutput = sum(atoutput)))
+```
+
+At time = 490
+```{r}
+plotCAA(NOBAom_ms$truecatchage_ss %>%
+          filter(time==490,
+                 species=="North_atl_cod") %>%
+          group_by(species, agecl, fleet, time) %>%
+          summarise(atoutput = sum(atoutput)))
+```
+Yes, these are identical.
+
+
+Look at the file after create_fishery_subset
+
+
+Look at the file after sample_fish
+
+
+Compare with atlantisom output below
+
+### Config files
+
+`NOBAsacc30config.R` looks like this (this is the config file used to produce the outputs posted to google drive, but note that it has a different directory structure than used here):
+
+```{r, code = readLines("https://raw.githubusercontent.com/ices-eg/wg_WGSAM/master/SkillAssessment/config/NOBAsacc30Config.R"), eval=F}
+```
+
+`omdimensions.R` standardizes timesteps, etc.:
+
+```{r, code = readLines("https://raw.githubusercontent.com/ices-eg/wg_WGSAM/master/SkillAssessment/config/omdimensions.R"), eval=F}
+```
+
+`mssurvey_fall.R` and `mssurvey_spring.R`configure the fishery independent surveys and look like this:
+
+```{r, code = readLines("https://raw.githubusercontent.com/ices-eg/wg_WGSAM/master/SkillAssessment/config/mssurvey_fall.R"), eval=F}
+```
+
+```{r, code = readLines("https://raw.githubusercontent.com/ices-eg/wg_WGSAM/master/SkillAssessment/config/mssurvey_spring.R"), eval=F}
+```
+
+`msfishery.R` configures the fishery dependent data and looks like this:
+
+```{r, code = readLines("https://raw.githubusercontent.com/ices-eg/wg_WGSAM/master/SkillAssessment/config/msfishery.R"), eval=F}
+```
+
+### Running atlantisom and location of output files
+
+I ran this for the full 11 species system on wg-WGSAM Skill Assessment using code [here](https://ices-eg.github.io/wg_WGSAM/SkillAssessProject.html), in the section **Run atlantisom and save outputs** and uploaded the outputs to google drive in the [WGSAM skill assessment folder](https://drive.google.com/drive/folders/1Pv4dSdMKSHUUSUY2bhPOE3Sm1Xe6m4zD).
+
+NOBA atlantisom outputs for run sacc_30 with climate are [here](https://drive.google.com/drive/folders/1PBpgS36YYeQNwyOBzo9HZlzMDIW8DLqI).
+
+NOBA Atlantis model outputs and input/parameter files for run sacc_30 with climate are [here](https://drive.google.com/drive/folders/1zyGSBIZze3-5ejXNdqrpa9YxQbqcOK2G).
+
+For the scripts below to work, ensure that the atlantisom and Atlantis files are available locally in the folder designated `d.name` in the `NOBAsacc30Config.R` script. Mine were produced in a `SkillAssessment` directory with subdirectories `atlantisoutput/NOBA_sacc_30` . The `config` folder was also in the `SkillAssessment` directory. On this repository, there is no interim `SkillAssessment` folder, just the `atlantisoutput` and `config` directories on the same level. 
+
+Future work: integrate with the [`atlantisdrive` package](https://noaa-edab.github.io/atlantisdrive/index.html) Andy Beet has developed to upload and download specific Atlantis files. For now just use `googledrive` functions.
+
+```{r, eval=FALSE}
+
+# from https://community.rstudio.com/t/how-to-download-a-google-drives-contents-based-on-drive-id-or-url/16896/12
+
+library(googledrive)
+library(purrr)
+
+## store the URL you have (example, the one with atlantisom output above)
+folder_url <- "https://drive.google.com/drive/folders/1PBpgS36YYeQNwyOBzo9HZlzMDIW8DLqI"
+
+## identify this folder on Drive
+## let googledrive know this is a file ID or URL, as opposed to file name
+folder <- drive_get(as_id(folder_url))
+
+## identify the csv files in that folder
+all_files <- drive_ls(folder)
+
+setwd(here("atlantisoutput/NOBA_sacc_30")) #a hack to get them to download to a folder
+
+## download them
+walk(all_files$id, ~ drive_download(as_id(.x))
+
+#working directory should reset when chunk exits
+```
+
+
+### Trim to smaller time series
+
+Here I'm just suggesting how to cut the dataset down to the right time period to miss squirrely stuff on either end of the Atlantis run. The "data" has been pulled using the full Atlantis run so in the future we can make this part of the survey and fishery design, but for now I wanted the flexibility to use different parts of the full time series.
+
+
+Adjust this script as need be for start and end times. Years 40 to 110 capture the climate trend and leave out the strangest fishery anomalies from spinup. This still starts with a period of 0 fishing. 
+
+
+```{r modtime}
+
+fitstartyr <- 40
+fitendyr <- 110  #used 120 for sacc38
+
+#Number of years of data to pull
+nyears <- NOBAom_ms$runpar$nyears
+total_sample <- NOBAom_ms$runpar$tstop/NOBAom_ms$runpar$outputstep
+stepperyr <- if(NOBAom_ms$runpar$outputstepunit=="days") 365/NOBAom_ms$runpar$toutinc
+
+atlantis_full <- c(0:total_sample)  
+mod_burnin <- fitstartyr*stepperyr+1
+fit_nyears <- fitendyr-fitstartyr
+fit_ntimes <- fit_nyears*stepperyr
+fittimes <- atlantis_full[mod_burnin:(mod_burnin+fit_ntimes-1)]
+#fit_timesteps <- seq(fittimes[stepperyr], max(fittimes), by=stepperyr) #last timestep
+fit_years <- unique(floor(fittimes/stepperyr)) #from Christine's new sardine_config.R
+fittimes.days <- fittimes*73
+
+  
+```
+
+### Plotting functions
+
+A collection of functions used previosuly that may be harvested and modified for diagnostics or visualizations in the ms-keyrun and ICES WGSAM skill assessment projects.
+
+These functions assume you are using `atlantisom` output datasets but they could be generalized. 
+
+```{r plotfuns}
+
+# plot biomass time series facet wrapped by species
+plotB <- function(dat, truedat=NULL){
+  
+    ggplot() +
+    geom_line(data=dat, aes(x=time/stepperyr,y=atoutput, color="Survey Biomass"), 
+              alpha = 10/10) +
+    {if(!is.null(truedat)) geom_line(data=truedat, aes(x=time/365,y=atoutput, color="True B"), alpha = 3/10)} + 
+    theme_tufte() +
+    theme(legend.position = "top") +
+    xlab("model year") +
+    ylab("tons") +
+    labs(colour=scenario.name) +
+    facet_wrap(~species, scales="free") 
+  
+}
+
+# make a catch series function that can be split by fleet? this doesnt
+# also note different time (days) from model timestep in all other output
+plotC <- function(dat, truedat=NULL){
+  
+    ggplot() +
+    geom_line(data=dat, aes(x=time/365,y=atoutput, color="Catch biomass"), 
+              alpha = 10/10) +
+    {if(!is.null(truedat)) geom_line(data=truedat, aes(x=time/365,y=atoutput, color="True Catch"), alpha = 3/10)} + 
+    theme_tufte() +
+    theme(legend.position = "top") +
+    xlab("model year") +
+    ylab("tons") +
+    labs(colour=scenario.name) +
+    facet_wrap(~species, scales="free") 
+  
+}
+
+# note on ggplot default colors, can get the first and second using this
+# library(scales)
+# show_col(hue_pal()(2))
+
+# plot length frequencies by timestep (one species)
+plotlen <- function(dat, effN=1, truedat=NULL){
+  
+  cols <- c("Census Lcomp"="#00BFC4","Sample Lcomp"="#F8766D")  
+  ggplot(mapping=aes(x=upper.bins)) +
+    {if(is.null(truedat)) geom_bar(data=dat, aes(weight = atoutput/effN))} +
+    {if(!is.null(truedat)) geom_bar(data=dat, aes(weight = censuslen/totlen, fill="Census Lcomp"), alpha = 5/10)} +
+    {if(!is.null(truedat)) geom_bar(data=dat, aes(weight = atoutput/effN, fill="Sample Lcomp"), alpha = 5/10)} +
+    theme_tufte() +
+    theme(legend.position = "bottom") +
+    xlab("length (cm)") +
+    {if(is.null(truedat)) ylab("number")} +
+    {if(!is.null(truedat)) ylab("proportion")} +
+    scale_colour_manual(name="", values=cols) +
+    labs(subtitle = paste(scenario.name,
+                          dat$species)) +
+    facet_wrap(~time, ncol=6, scales="free_y")
+
+}
+
+# plot numbers at age by timestep (one species)
+Natageplot <- function(dat, effN=1, truedat=NULL){
+  ggplot() +
+    geom_point(data=dat, aes(x=agecl, y=atoutput/effN, color="Est Comp")) +
+    {if(!is.null(truedat)) geom_line(data=dat, aes(x=agecl, y=numAtAge/totN, color="True Comp"))} + 
+    theme_tufte() +
+    theme(legend.position = "bottom") +    
+    xlab("age/agecl") +
+    {if(is.null(truedat)) ylab("number")} +
+    {if(!is.null(truedat)) ylab("proportion")} +
+    labs(subtitle = paste(scenario.name,
+                          dat$species)) + 
+    facet_wrap(~time, ncol=6, scales="free_y")
+}
+
+# plot weight at age time series facet wrapped by species
+wageplot <- function(dat, truedat=NULL){
+  ggplot(dat, aes(time/stepperyr, atoutput)) +
+    geom_line(aes(colour = factor(agecl))) +
+    theme_tufte() +
+    theme(legend.position = "bottom") +
+    xlab("model year") +
+    ylab("average individual weight (g)") +
+    labs(subtitle = paste0(scenario.name)) +
+    facet_wrap(c("species"), scales="free_y")
+}
+  
+# compare N at age and C at age between standard and ANNAGE outputs
+totNageplot <- function(dat, anndat){
+  
+    ggplot() +
+    geom_line(data=dat, aes(x=time/stepperyr,y=totN, color="Tot N cohorts"), 
+              alpha = 5/10) +
+    geom_line(data=anndat, aes(x=time/stepperyr,y=totN, color="Tot N annage"), alpha = 5/10) + 
+    theme_tufte() +
+    theme(legend.position = "top") +
+    xlab("model year") +
+    ylab("N") +
+    labs(colour=scenario.name) +
+    facet_wrap(~species, scales="free") 
+  
+}
+
+```
+
+### Read in the "data" to check with plots
+
+Note that these are multispecies survey and fishery datasets. 
+
+They can be filtered for species=="North_atl_cod".
+
+Each object is a list of lists with the survey or fishery names being the first list element and the data being the first element (a dataframe) under the name (this is because we can generate multiple replicates but we only have one saved here).
+
+```{r}
+
+survObsBiom <- atlantisom::read_savedsurvs(d.name, 'survB')
+age_comp_data <- atlantisom::read_savedsurvs(d.name, 'survAge') #not using in assessment
+len_comp_data <- atlantisom::read_savedsurvs(d.name, 'survLen')
+#wtage <- atlantisom::read_savedsurvs(d.name, 'survWtage')  #not using in assessment
+annage_comp_data <- atlantisom::read_savedsurvs(d.name, 'survAnnAge')
+annage_wtage <- atlantisom::read_savedsurvs(d.name, 'survAnnWtage')
+
+#all_diets <- atlantisom::read_savedsurvs(d.name, 'survDiet') #not using in assessment
+
+catchbio_ss <- atlantisom::read_savedfisheries(d.name, 'Catch')
+catchlen_ss <- atlantisom::read_savedfisheries(d.name, "catchLen")
+fish_age_comp <- atlantisom::read_savedfisheries(d.name, "catchAge")
+fish_annage_comp <- atlantisom::read_savedfisheries(d.name, 'catchAnnAge')
+fish_annage_wtage <- atlantisom::read_savedfisheries(d.name, 'catchAnnWtage')
+
+```
+
+
+### Visualize survey outputs {.tabset}
+
+We filter the full datasets using the times defined above. These plots represent the selected time series for the survey biomass index and weight at age, and a subset for length and age composition.
+
+#### Survey biomass index
+```{r, results="asis"}
+
+# compare with true output (all timesteps)
+# for(s in names(survObsBiom)){
+#   cat("  \n##### ",  s,"  \n")
+#   print(plotB(survObsBiom[[s]][[1]], omlist_ss$truetotbio_ss))
+#   cat("  \n")
+# }
+
+# plots survey only
+ for(s in names(survObsBiom)){
+   cat("  \n##### ",  s,"  \n")
+   print(plotB(survObsBiom[[s]][[1]] %>%
+                 filter((time %in% fittimes))))
+   cat("  \n")
+ }
+
+```
+
+#### Survey length composition
+```{r lencomp-1, results="asis", message=FALSE, warning=FALSE}
+
+# not the full time series, just first 24 yrs
+for(s in names(len_comp_data)){
+  cat("  \n##### ",  s,"  \n")
+  lcompsub <- as.data.frame(len_comp_data[[s]][[1]]) %>% filter(time %in% c(200:320)) %>%
+    group_by(species) %>%
+    group_map(~ plotlen(.x), keep = TRUE)
+  
+  for(i in 1:length(lcompsub)) {
+    print(lcompsub[[i]])
+  }
+  cat("  \n")
+}
+
+```
+
+#### Survey age composition (annual ages)
+```{r plot-annagecomp, results="asis", message=FALSE, warning=FALSE}
+
+for(s in names(annage_comp_data)){
+  cat("  \n##### ",  s,"  \n")
+  acompsub <- as.data.frame(annage_comp_data[[s]][[1]]) %>% filter(time %in% c(200:320)) %>%
+    group_by(species) %>%
+    #left_join(., trueNage) %>%
+    group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+    #group_map(~ Natageplot(.x, effN = 100000, truedat = 1), keep = TRUE) # plots merged true age comp
+  
+  for(i in 1:length(acompsub)) {
+    print(acompsub[[i]])
+  }
+  cat("  \n")
+}
+```
+
+#### Survey iterpolated weight at age (annual ages) 
+```{r plot-annwtage, fig.height=10, results='asis'}
+
+for(s in names(annage_wtage)){
+  cat("  \n##### ",  s,"  \n")
+  print(wageplot(annage_wtage[[s]][[1]] %>%
+                 filter((time %in% fittimes))))
+  cat("  \n")
+}
+```
+
+#### Survey age class (Atlantis agecl--check against full survey age comp)
+```{r, results="asis", message=FALSE, warning=FALSE}
+
+for(s in names(age_comp_data)){
+  cat("  \n##### ",  s,"  \n")
+  acompsub <- as.data.frame(age_comp_data[[s]][[1]]) %>% filter(time %in% c(200:320)) %>%
+    group_by(species) %>%
+    #left_join(., trueNagecl) %>%
+    group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+    #group_map(~ Natageplot(.x, effN = 100000, truedat = 1), keep = TRUE) # plots merged true age comp
+
+  for(i in 1:length(acompsub)) {
+    print(acompsub[[i]])
+  }
+  cat("  \n")
+}
+
+```
+
+### {-}
+
+### Visualize fishery data {.tabset}
+
+These plots represent the selected time series for fishery catch and weight at age, and a subset for length and age composition. Fishery lengths and ages are sampled 5x per year from this model, while the surveys above sample 1x per year. 
+
+#### Fishery catch time series
+```{r catchind-1, results="asis", message=FALSE, warning=FALSE}
+# observed catch only
+plotC(catchbio_ss$census[[1]] %>%
+        filter(time %in% fittimes.days))
+```
+
+#### Fishery length composition
+```{r, results="asis", message=FALSE, warning=FALSE}
+
+lcompsub <- as.data.frame(catchlen_ss$census[[1]]) %>% filter(time %in% c(291:320)) %>%
+  group_by(species) %>%
+  group_map(~ plotlen(.x), keep = TRUE)
+
+for(i in 1:length(lcompsub)) {
+  print(lcompsub[[i]])
+}
+
+```
+
+#### Fishery catch at age (annual ages)
+```{r plot-catchagecomp, results='asis'}
+
+acompsub <- as.data.frame(fish_annage_comp$census[[1]]) %>% filter(time %in% c(291:320)) %>%
+  group_by(species) %>%
+  #left_join(., trueCAA) %>%
+  group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+  #group_map(~ Natageplot(.x, effN = 200, truedat = 1), keep = TRUE) # plots merged true age comp
+
+for(i in 1:length(acompsub)) {
+  print(acompsub[[i]])
+}
+
+```
+
+#### Fishery interpolated weight at age (annual ages)
+```{r, fig.height=10}
+
+wageplot(fish_annage_wtage$census[[1]] %>%
+                 filter((time %in% fittimes)))
+
+```
+
+#### Fishery catch at age class (Atlantis agecl--check against full age comp)
+```{r, message=FALSE, warning=FALSE}
+
+acompsub <- as.data.frame(fish_age_comp$census[[1]]) %>% filter(time %in% c(291:320)) %>%
+  group_by(species) %>%
+  #left_join(., trueCAAcl) %>%
+  group_map(~ Natageplot(.x), keep = TRUE) # plots only sampled age comp
+  #group_map(~ Natageplot(.x, effN = 200, truedat = 1), keep = TRUE) # plots merged true age comp
+
+
+for(i in 1:length(acompsub)) {
+  print(acompsub[[i]])
+}
+
+```
+
+### {-}
+
+We previously noted that NOBA didn't have a selective fishery for cod; there were lots of age 1 in the catch! With this run, we see some effects of selective fisheries, and 4 different fleets targeting cod.
+
+
+## Write input data for specific assessment models
+
+We will need to alter this for SAM, SS3, etc. Right now just makes SS3.
+
+**I HAVE NOT TOUCHED ANYTHING BELOW**
+
+```{r writedat, eval=FALSE}
+
+require(r4ss)
+#omlist_ss<-CC3om_sardine
+source(here("config/omdimensions.R"))
+source(here("/config/codsurvey.R"))
+source(here("/config/codfishery.R")) 
+
+#Directory with SS files
+model_dir <- "NOBA_cod_files/"
+
+#Name of SS data file
+datfile_name <- "ss3.dat"
+
+#CVs for length at age, catch, and survey
+CVs <- list("lenage"=0.1, "fishery"=0.01, "survey"=0.1)
+
+#Month of survey/fishing
+survey_month <- 7
+fishing_month <- 1
+
+#Years to survey, assuming survey is once per year
+#survey_years <- survey_sample_full[(burnin+1):(burnin+nyears)] # my original
+survey_years <- survey_sample_full[burnin:(burnin+nyears-1)] #from Christine's new sardine_config.R
+
+
+#read time series data
+survObsBiom <- readRDS(file.path(d.name, paste0(scenario.name, "surveyB.rds")))
+truecatchbio_ss <- readRDS(file.path(d.name, paste0(scenario.name, "fishCatch.rds")))
+
+survObsBiom <- survObsBiom[[1]]
+truecatchbio_ss <- truecatchbio_ss[[1]]
+
+#add this to om_indices function so that this has years when read in
+truecatchbio_ss$time <- as.integer(truecatchbio_ss$time/365)
+
+
+#load dummy dat file
+stocksynthesis.data <- r4ss::SS_readdat_3.30(paste0("./inst/extdata/",
+model_dir,
+datfile_name))
+
+#Test writing CPUE in biomass
+  stocksynthesis.data <- atlantisom::SS_write_ts(ss_data_list = stocksynthesis.data,
+                ts_data = list(survObsBiom$atoutput[fish_years],
+                  truecatchbio_ss$atoutput[truecatchbio_ss$time %in% fish_years]),
+                CVs = c(CVs$survey,
+                        CVs$fishery),
+                data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             fish_years),
+            sampling_month = list(rep(survey_month,nyears),
+                                rep(fishing_month,nyears)),
+                units = c("biomass","biomass"),
+                data_type=c("CPUE","catch"),
+                fleets = c(2,1))
+
+#test  
+stocksynthesis.data$CPUE
+
+stocksynthesis.data$catch
+
+#read in comp data
+age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsAgeComp.rds")))
+age_comp_data <- age_comp_data[[1]]
+
+fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsAgeComp.rds")))
+fish_age_comp <- fish_age_comp[[1]]
+
+
+#Get the age bins
+age_bin_names <- names(stocksynthesis.data$agecomp)[10:length(names(stocksynthesis.data$agecomp))]
+age_bins <- sub("a","",age_bin_names)
+
+require(maditr)
+# add dependency on maditr::dcast to atlantisom
+age_comp_flat <- atlantisom::reformat_compositions(age_comp_data,
+                     round.places = 4,
+                     comp_type = "agecomp")
+
+## Write age composition data for survey
+stocksynthesis.data <- atlantisom::SS_write_comps(ss_data_list = stocksynthesis.data,
+               comp_matrix = list(age_comp_flat[burnin:(burnin+nyears-1),]),
+               data_rows = list(stocksynthesis.data$styr:(stocksynthesis.data$styr+nyears-1)),
+               sampling_month = list(rep(survey_month,nyears)),
+               data_type = c("agecomp"),
+               fleet_number = c(1),
+               bins = list(age_bins),
+               caal_bool = c(FALSE))
+stocksynthesis.data$agecomp
+
+#length comps
+len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "survObsLenComp.rds")))
+fish_len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name, "fishObsLenComp.rds")))
+
+len_comp_data <- len_comp_data[[1]]
+fish_len_comp_data <- fish_len_comp_data[[1]]
+
+#add this to om_indices function so that this has years when read in
+fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time/fstepperyr))
+fish_age_comp$time <- as.integer(floor(fish_age_comp$time/fstepperyr))
+
+
+if(fstepperyr>1){
+  fish_len_comp_anndata <- fish_len_comp_data %>%
+    #mutate(yr = floor(time/fstepperyr)) %>%
+    #group_by(species, agecl, lower.bins, upper.bins, time=as.integer(yr)) %>%
+    group_by(species, agecl, lower.bins, upper.bins, time) %>% 
+    summarise(annnatlength=sum(atoutput)) %>%
+    rename(atoutput = annnatlength)
+} else {
+  fish_len_comp_anndata <- fish_len_comp_data
+}
+
+caal_comp_flat <- atlantisom::reformat_compositions(len_comp_data,                                round.places=4,
+                comp_type="caalcomp")
+
+
+#remove burnin
+caal_comp_final <- filter(caal_comp_flat,
+                         time %in% survey_years)
+
+
+#Add over age classes to get sample size
+len_comp_flat <- atlantisom::reformat_compositions(len_comp_data,
+                                  round.places = 0,
+                           comp_type="lencomp")
+#remove burnin
+len_comp_final <- filter(len_comp_flat,
+                         time %in% survey_years)
+
+length_bins <- as.integer(names(len_comp_final))
+length_bins <- length_bins[!is.na(length_bins)]
+
+# fishery length comps are still 5 timesteps per year
+# need to aggregate to annual (done above)
+# also,  make effN annual goal/fstepsperyr (done above)
+fish_len_comp_flat <- atlantisom::reformat_compositions(fish_len_comp_anndata,
+                                  round.places = 0,
+                           comp_type="lencomp")
+
+#remove burnin works after adjustment above
+fish_len_comp_final <- filter(fish_len_comp_flat,
+                         time %in% fish_years)
+
+notbins <- c("time", "nsamp")
+
+# fish_length_bins <- as.integer(names(fish_len_comp_final))
+# fish_length_bins <- fish_length_bins[!is.na(fish_length_bins)]
+
+# need to fill empty length bins with 0s to have same bins as survey for SS_write_comps
+missing.lengths <- setdiff(length_bins, names(fish_len_comp_final)[!names(fish_len_comp_final) %in% notbins])
+fish_len_comp_final[as.character(missing.lengths)] <- 0                    # Add them, filled with '0's
+fish_len_comp_final <- fish_len_comp_final[c("time", length_bins, "nsamp")] #
+
+
+# fishery age comps also 5 timesteps per year
+if(fstepperyr>1){
+  fish_age_comp_anndata <- fish_age_comp %>%
+    #mutate(yr = floor(time/fstepperyr)) %>%
+    #group_by(species, agecl, time=as.integer(yr)) %>%
+    group_by(species, agecl, time) %>%
+    summarise(annnatage=sum(atoutput)) %>%
+    rename(atoutput = annnatage)
+} else {
+  fish_age_comp_anndata <- fish_age_comp
+}
+
+fish_age_comp_flat <- atlantisom::reformat_compositions(fish_age_comp_anndata,
+                           comp_type="agecomp")
+
+#remove burnin (not necessary?fish comps made with fish_years only) 
+fish_age_comp_final <- filter(fish_age_comp_flat,
+                         time %in% fish_years)
+
+# #SS_write_comps breaking because fishery age bins start with 2 not 1; extracting bins from fish file may help?
+# fish_age_bins <- names(fish_age_comp_flat)[!names(fish_age_comp_flat) %in% notbins]
+
+# that leaves an empty column in data file, so instead fill with 0s
+missing.ages <- setdiff(age_bins, names(fish_age_comp_final)[!names(fish_age_comp_final) %in% notbins])
+fish_age_comp_final[missing.ages] <- 0                    # Add them, filled with '0's
+fish_age_comp_final <- fish_age_comp_final[c("time", age_bins, "nsamp")]
+
+comp_list <- list(caal_comp_final,len_comp_final, fish_age_comp_final, fish_len_comp_final)
+
+apply_month <- list(rep(survey_month, nrow(comp_list[[1]])), 
+                    rep(survey_month, nrow(comp_list[[2]])),
+                    rep(fishing_month,nrow(comp_list[[3]])),
+                    rep(fishing_month,nrow(comp_list[[4]])))
+
+
+# This now runs by ensuring that survey and fishery compositions have the same bins 
+# (filled with 0s for missing bins in fishery relative to survey)
+
+# Write CAAL and length composition data
+stocksynthesis.data <- atlantisom::SS_write_comps(ss_data_list = stocksynthesis.data, 
+                                      comp_matrix = comp_list, 
+                                      data_rows = list((comp_list[[1]]$time-survey_sample_time)/timestep + 1 , (survey_years-survey_sample_time)/timestep + 1,fish_years,fish_years),
+                                      sampling_month = apply_month, 
+                                      data_type = rep(c("agecomp", "lencomp"),2), 
+                                      fleet_number = c(2,2,1,1),  
+                                      bins = list(age_bins, 
+                                                  length_bins, 
+                                                  age_bins, 
+                                                  length_bins), 
+                                      caal_bool = c(TRUE, rep(FALSE,3)))
+
+head(stocksynthesis.data$lencomp)
+head(stocksynthesis.data$agecomp)
+
+#Change length bin structure to match atlantis data
+stocksynthesis.data$lbin_vector <- length_bins
+
+#Get correct number of length bins
+stocksynthesis.data$N_lbins <- length(length_bins)
+
+#Set lbin_method to 1 - this makes the population length bins match the data bins 
+#When lbin_method==1, we just comment out the binwidth, minimum, and maximum size arguments since they aren't used
+stocksynthesis.data$lbin_method <- 1
+stocksynthesis.data$binwidth <- "#"
+stocksynthesis.data$minimum_size <- "#"
+stocksynthesis.data$maximum_size <- "#"
+
+#Change minimum sample size to 0.001 for CAAL data (SS won't let it go lower than this)
+stocksynthesis.data$age_info$minsamplesize <- rep(0.001,2)
+
+SS_writedat_3.30(stocksynthesis.data, outfile = paste0("./inst/extdata/",model_dir,
+datfile_name),
+                 overwrite=TRUE)
+
+```
