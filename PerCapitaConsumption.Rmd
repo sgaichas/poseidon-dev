@@ -1,5 +1,5 @@
 ---
-title: "Per captia consumption"
+title: "Per capita consumption"
 author: "Sarah Gaichas"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
@@ -17,15 +17,17 @@ library(FSA)
 
 ```
 
-## Diet info for multispecies modeling
+# Consumption info for multispecies modeling
 
 Multispecies models rely on either estimated or input parameters governing predator consumption rates to estimate predation mortality on consumed species.
 
 Stomach weights are needed as input to the length-based multispecies model hydra. At present each species has a stomach weight for each size bin that is repeated for each year. We have total consumed weight for each predator age class at each timestep in the detailed diet atlantis output, so would need to map age classes to length bins, sum consumed weight by length bin and divide by total numbers in that length bin to get stomach weight.
 
+## Approach 1 based on detailedDietCheck.txt
+
 What we have saved so far is a diet comp in proportion that has had bias and observation error added to proportions. However, we need the stomach weight portion of the equation, which has the survey timing/area/efficiency/selectivity applied to true consumed weight. The hydra input is mean daily stomach weight in grams. From the Atlantis manual, "DetailedDietCheck.txt returns the total consumed biomass since the last output given for each cell (box and layer) of each age group of each functional group." So daily per capita consumed biomass is this output, summed over prey for total consumption, divided by the numbers from the same survey design, divided by the output step `omlist_ss$runpar$outputstep`. 
 
-The function below should return per-capita consumption by age class. This can then be converted to lengthbin as necessary.
+The function below should return per-capita consumption by age class using the `detailedDietCheck.txt` output. This can then be converted to lengthbin as necessary.
 
 ```{r stomwt, eval=FALSE}
 
@@ -122,7 +124,7 @@ om_cons<- function(config = configfile,
 ```
 
 
-## NOBA
+### NOBA
 
 The configuration files for NOBA are in posiedon-dev/config and see also ms-keyrun project repo [illustrating full simulated multispecies modeling data](https://noaa-edab.github.io/ms-keyrun/SimData.html). The NOBA model output was producing fairly low per capita consumption using the code above, so we will compare that with what we get from the CC model to see if we have an output file problem across models or if this is a characteristic of the NOBA model. 
 
@@ -194,7 +196,7 @@ DT::datatable(as.data.frame(survey_totcons%>%filter(species=="North_atl_cod")),
 ```
 
 
-## CCA
+### CCA
 
 This is a short run of the CCA model implemented in the latest codebase, so it can produce full age structured output. First we need to process the detailed diet file, and also get the output of `run_truth` for numbers. At present it seems the CC model is also producing very low per capita consumpton. This suggests that interpretation of the DetailedDietCheck.txt output is incorrect? It doesn't seem like it is tons consumed at by the population of predators at agecl. 
 
@@ -302,5 +304,115 @@ For example, CCA arrowtooth flounder should have a daily per capita intake in at
 
 ```{r}
 knitr::kable(as.data.frame(survey_totcons%>%filter(species=="Arrowtooth_flounder")))
+```
+
+## Approach 2 based on PROD.nc
+
+An existing `atlantisom` function `calc_pred_diet()` was [tested and found to produce consumption estimates orders of magnitude higher](https://sgaichas.github.io/poseidon-dev/NOBAmsdiets.html) than those derived from `detailedDietCheck.txt`. 
+
+Here we develop new functions that don't apply global diet composition to consumption but rather just get total consumption from PROD.nc. The challenge is figuring out what the units are of "Eat" and "Grazing" and how to appropriately expand them to the population level (water volume or numbers in a polygon).
+
+First we need to get "Eat" and "Grazing" from PROD.nc and "Vol" from the .nc file. Here is our model setup from the config file.  Lets look at NOBA_sacc_38, which is being used for mskeyrun simulated dataset generation. **THIS OUTPUT IS NOT COMPARABLE TO NOBA_March_2020 above**.
+
+```{r}
+
+# WARNING!
+# hardcoding because making copies of this in each repo is too cumbersome
+# this currently lives in mskeyrun to make the simulated datasets with no climate
+# change as appropriate!
+
+dir <- "/Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38"
+
+file_fgs <- "nordic_groups_v04.csv"
+file_biolprm <- "nordic_biol_incl_harv_v_011_1skg.prm"
+file_bgm <- "Nordic02.bgm"
+file_init <- "nordic_biol_v23.nc"
+file_runprm <- "nordic_run_v01.xml"
+scenario <- "nordic_runresults_01"
+
+select_groups <- mskeyrun::simFocalSpecies$Name # 11 mskeyrun fish species
+
+verbose <- FALSE
+
+```
+
+This code is part of `atlantisom::run_truth()`. With our selected species from `mskeyrun`, only `eat` will be created. `grazing` applies to non-age structured groups. 
+
+**If this works for fish, test for inverts too**
+
+```{r}
+
+  # Read in the functional groups csv since that is used by many functions
+  fgs <- load_fgs(dir = dir, file_fgs = file_fgs)
+  # Read in the biomass pools
+  bps <- load_bps(dir = dir, fgs = file_fgs, file_init = file_init)
+  # Read in the biological parameters
+  biol <- load_biolprm(dir = dir, file_biolprm = file_biolprm)
+  # Read in the run parameters
+  runprm <- load_runprm(dir = dir, file_runprm = file_runprm)
+
+  nc_out <- paste0(scenario, ".nc")
+  nc_prod <- paste0(scenario, "PROD.nc")
+  
+  # Get the boundary boxes
+  allboxes <- load_box(dir = dir, file_bgm = file_bgm)
+  boxes <- get_boundary(allboxes)
+
+
+
+  eat <- load_nc(dir = dir,
+                     file_nc = nc_prod,
+                     bps = bps,
+                     fgs = fgs,
+                     select_groups = select_groups,
+                     select_variable = "Eat",
+                     check_acronyms = TRUE,
+                     bboxes = boxes)
+  if(verbose) message("Eaten read in.")
+
+  grazing <- load_nc(dir = dir,
+                 file_nc = nc_prod,
+                 bps = bps,
+                 fgs = fgs,
+                 select_groups = select_groups,
+                 select_variable = "Grazing",
+                 check_acronyms = TRUE,
+                 bboxes = boxes)
+  if(verbose) message("Grazing read in.")
+
+  vol <- load_nc_physics(dir = dir,
+                         file_nc = nc_out,
+                         physic_variables = "volume",
+                         aggregate_layers = FALSE,
+                         bboxes = boxes)
+  if(verbose) message("Volume read in.")
+
+```
+
+Now try the new function `atlantisom::calc_pred_cons()` which uses the volume of all water column layers to expand the atoutput (assumed to be mg N per cubic m at that timestep) to bio_eaten in tons.
+
+This is the function code
+
+```{r, code = readLines("https://github.com/r4atlantis/atlantisom/raw/master/R/calc_pred_cons.R"), eval=F}
+```
+
+This is the current result
+
+```{r}
+
+biomass_eaten <- calc_pred_cons(eat = eat, grazing = grazing, vol = vol, biolprm = biol, runprm = runprm)
+
+codtotcons <- biomass_eaten %>% 
+  dplyr::filter(species=="North_atl_cod") %>%
+  dplyr::group_by(time, agecl) %>% 
+  dplyr::summarise(totcons = sum(bio_eaten))  
+
+```
+
+Plotting a cod example total consumption by age class
+
+```{r}
+ggplot2::ggplot(codtotcons, aes(x=time, y=totcons)) + geom_line() + facet_wrap(~agecl, scales="free")
+
 ```
 
