@@ -132,6 +132,12 @@ The configuration files for NOBA are in posiedon-dev/config and see also ms-keyr
 
 source(here("config/NOBA2Config.R"))
 
+# this hardcodes a d.name in a different folder because I don't want multiple copies
+
+if(!dir.exists(d.name)){
+  d.name <- "/Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_march_2020"
+}
+
 # apply surveys to true total consumption (snipped from atlantosom om_diet.R and om_comps.R)
 detaileddiet <- readRDS(file.path(d.name, paste0(scenario.name, "detaileddiet.rds")))
 
