@@ -1,0 +1,12 @@
+d.name <- here("atlantisoutput","AtlantisCalCurrV4_044")
+functional.groups.file <- "CalCurrentV4Groups_noFisheries.csv"
+biomass.pools.file <- "CalCurrentV4_Biol3Feb2022.nc"
+biol.prm.file <- "CalCurrentV4_Biol3Feb2022.prm"
+box.file <- "CalCurrentV3_utm.bgm"
+initial.conditions.file <- "CalCurrentV4_Biol3Feb2022.nc"
+run.prm.file <- "outputFolder/CalCurrentV4_run_test_withFisheries.xml"
+scenario.name <- "outputFolder/outputCCV4_test"
+bioind.file <- "outputFolder/outputCCV4_testBiomIndx.txt"
+catch.file <- "outputFolder/outputCCV4_testCatch.txt"
+annage <- FALSE
+fisheries.file <- "CalCurrentV4Fisheries.csv"

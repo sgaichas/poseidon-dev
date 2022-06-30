@@ -1,6 +1,9 @@
 # Default survey configuration here is a census
 # Need to define survey season, area, efficiency, selectivity
 
+# Survey name
+survey.name="sardine_midyear_allbox_effic.5"
+
 #Atlantis model timestep corresponding to the true output--now from census_spec.R
 timestep <- stepperyr #5
 
@@ -28,11 +31,12 @@ survboxes <- allboxes
 surveffic <- data.frame(species=survspp,
                      efficiency=rep(0.5,length(survspp)))
 
-# survey selectivity (agecl based)
-# this is by age class, need to change to use with ANNAGEBIO output
-survselex <- data.frame(species=rep(survspp, each=n_age_classes),
-                     agecl=rep(c(1:n_age_classes),length(survspp)),
-                     selex=rep(1.0,length(survspp)*n_age_classes))
+# for annage output
+survselex <- data.frame(species=rep(names(annages), n_annages), #  
+                        agecl=unlist(sapply(n_annages,seq)),
+                        selex=rep(1.0,sum(n_annages)))
+
+survselex.agecl <- survselex 
 
 # effective sample size needed for sample_fish
 # this effective N is high but not equal to total for numerous groups

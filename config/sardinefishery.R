@@ -1,4 +1,6 @@
 # Default fishery configuration here is a census
+fishery.name="sardine_census"
+
 # Inherits species from input omlist_ss
 fishspp <- omlist_ss$species_ss 
 
@@ -6,7 +8,7 @@ fishspp <- omlist_ss$species_ss
 nyears <- 50
 
 #Atlantis initialization period in years
-burnin <- 30
+burnin <- 0
 
 
 # same time dimensioning parameters as in surveycensus.R
