@@ -8,7 +8,7 @@ fishspp <- omlist_ss$species_ss
 nyears <- 50
 
 #Atlantis initialization period in years
-burnin <- 0
+burnin <- 30
 
 
 # same time dimensioning parameters as in surveycensus.R

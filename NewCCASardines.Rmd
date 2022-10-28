@@ -10,396 +10,466 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 library(here)
-library(tidyverse)  
+library(tidyverse)
 library(atlantisom)
 library(ggthemes)
 library(FSA)
-
 ```
 
 A test run for sardines with the updated California Current model, September 2022:
 
 ```{r full-test, message=FALSE, warning=FALSE, eval=FALSE}
-
 CCom <- atlantisom::om_init(here("config/CCConfigSep22.R"))
 
 CCom_sard <- atlantisom::om_species(c("Pacific_sardine"), CCom)
 
-CCom_sard_ind <- atlantisom::om_index(usersurvey = here("config/sardinesurvey.R"), 
-                           userfishery = here("config/sardinefishery.R"),
-                           omlist_ss = CCom_sard, 
-                           n_reps = 1, 
-                           save = TRUE)
+CCom_sard_ind <- atlantisom::om_index(
+  usersurvey = here("config/sardinesurvey.R"),
+  userfishery = here("config/sardinefishery.R"),
+  omlist_ss = CCom_sard,
+  n_reps = 1,
+  save = TRUE
+)
 
-CCom_sard_comp <- atlantisom::om_comps(usersurvey = here("config/sardinesurvey.R"), 
-                           userfishery = here("config/sardinefishery.R"),
-                           omlist_ss = CCom_sard, 
-                           n_reps = 1, 
-                           save = TRUE)
-
+CCom_sard_comp <- atlantisom::om_comps(
+  usersurvey = here("config/sardinesurvey.R"),
+  userfishery = here("config/sardinefishery.R"),
+  omlist_ss = CCom_sard,
+  n_reps = 1,
+  save = TRUE
+)
 ```
 
 Diagnose why survey functions resulting in NA outputs. Found it: change `sapply` to `lapply` in omdimensions to make the survey selectivity dataframe. The `sapply` function behaves inconsistently when the age classes are all 10, it orients the list incorrectly; `lapply` keeps the structure correct. This only worked for NOBA because I selected a species with fewer than 10 age classes. 
 
 ```{r testomindex, eval=FALSE}
-  
-usersurvey = here("config/sardinesurvey.R")
+
+usersurvey <- here("config/sardinesurvey.R")
 
 omlist_ss <- CCom_sard
 
-#this is om_index
+# this is om_index
 
-#one script for dimension parameters to be used in multiple functions
-  source("config/omdimensions.R", local = TRUE)
+# one script for dimension parameters to be used in multiple functions
+source("config/omdimensions.R", local = TRUE)
 
-  # user options for survey--default is a census with mid-year sample
-  # allows muliple surveys
-  survObsBiomBs <- list()
+###############################################
+n_reps <- 1 # not sure about it, used the value from line 31
+save <- FALSE # Sarah already provided output data
+###############################################
 
-  for (s in usersurvey)
-  {
-    source(s, local = TRUE)
+# user options for survey--default is a census with mid-year sample
+# allows muliple surveys
+survObsBiomBs <- list()
 
-    #biomass based fishery independent survey index
-    # this uses result$biomass_ages to sample biomass directly, no need for wt@age est
-    survey_B <- atlantisom::create_survey(dat = omlist_ss$truebio_ss,
-                                          time = survtime,
-                                          species = survspp,
-                                          boxes = survboxes,
-                                          effic = surveffic,
-                                          selex = survselex)
+for (s in usersurvey)
+{
+  source(s, local = TRUE)
 
-    # call sample_survey_biomass with a bunch of 1000s for weight at age
-    # in the code it multiplies atoutput by wtatage/1000 so this allows us to use
-    # biomass directly
-    wtage <- data.frame(species=rep(names(age_classes), n_age_classes),
-                        agecl=unlist(sapply(n_age_classes,seq)),
-                        wtAtAge=rep(1000.0,sum(n_age_classes)))
+  # biomass based fishery independent survey index
+  # this uses result$biomass_ages to sample biomass directly, no need for wt@age est
+  survey_B <- atlantisom::create_survey(
+    dat = omlist_ss$truebio_ss,
+    time = survtime,
+    species = survspp,
+    boxes = survboxes,
+    effic = surveffic,
+    selex = survselex
+  )
 
-    # this is the step to repeat n_reps time if we want different realizations
-    # of the same survey design specified above; only observation error differs
-    # using the census cv of 0 will produce identical reps!
-    survObsBiomB <- list()
-    for(i in 1:n_reps){
-      survObsBiomB[[i]] <- atlantisom::sample_survey_biomass(survey_B, surv_cv, wtage)
-    }
+  # call sample_survey_biomass with a bunch of 1000s for weight at age
+  # in the code it multiplies atoutput by wtatage/1000 so this allows us to use
+  # biomass directly
+  wtage <- data.frame(
+    species = rep(names(age_classes), n_age_classes),
+    agecl = unlist(sapply(n_age_classes, seq)),
+    wtAtAge = rep(1000.0, sum(n_age_classes))
+  )
 
-    #save survey indices, takes a long time to generate with lots of reps/species
-    if(save){
-      saveRDS(survObsBiomB, file.path(d.name, paste0(scenario.name, "_",
-                                                     survey.name, "surveyB.rds")))
-    }
-
-    survObsBiomBs[[survey.name]] <- survObsBiomB
+  # this is the step to repeat n_reps time if we want different realizations
+  # of the same survey design specified above; only observation error differs
+  # using the census cv of 0 will produce identical reps!
+  survObsBiomB <- list()
+  for (i in 1:n_reps) {
+    survObsBiomB[[i]] <- atlantisom::sample_survey_biomass(survey_B, surv_cv, wtage)
   }
 
-  #configure the fishery, a default is in config/fisherycensus.R
-  #fishery configuration can specify only area and time of observation
-  #fishery species inherited from omlist_ss
-  #this is total catch not by fleet, so only one "fishery"
-  source(userfishery, local = TRUE)
-
-  #we are not currently subsetting fishery catch because we cannot correct catch.nc
-  #  instead the catch in biomass from catch.txt is read in for the index
-  #  we do not apply any cv to this, but we could this way (default cv=0)
-
-  fishObsCatchB <- list()
-  for(i in 1:n_reps){
-    fishObsCatchB[[i]] <- atlantisom::sample_fishery_totcatch(omlist_ss$truecatchbio_ss, fish_cv)
+  # save survey indices, takes a long time to generate with lots of reps/species
+  if (save) {
+    saveRDS(survObsBiomB, file.path(d.name, paste0(
+      scenario.name, "_",
+      survey.name, "surveyB.rds"
+    )))
   }
 
-  if(save){
-    saveRDS(fishObsCatchB, file.path(d.name, paste0(scenario.name, "_",
-                                                    fishery.name, "fishCatch.rds")))
-  }
-
-  indices <- list("survObsBiomB" = survObsBiomBs,
-                  "fishObsCatchB" = fishObsCatchB)
-
-  return(indices)
+  survObsBiomBs[[survey.name]] <- survObsBiomB
 }
 
+# configure the fishery, a default is in config/fisherycensus.R
+# fishery configuration can specify only area and time of observation
+# fishery species inherited from omlist_ss
+# this is total catch not by fleet, so only one "fishery"
+
+##################################################
+# Use information from lines 29 and 35
+userfishery <- here("config/sardinefishery.R")
+##################################################
+source(userfishery, local = TRUE)
+
+# we are not currently subsetting fishery catch because we cannot correct catch.nc
+#  instead the catch in biomass from catch.txt is read in for the index
+#  we do not apply any cv to this, but we could this way (default cv=0)
+
+fishObsCatchB <- list()
+for (i in 1:n_reps) {
+  fishObsCatchB[[i]] <- atlantisom::sample_fishery_totcatch(omlist_ss$truecatchbio_ss, fish_cv)
+}
+
+if (save) {
+  saveRDS(fishObsCatchB, file.path(d.name, paste0(
+    scenario.name, "_",
+    fishery.name, "fishCatch.rds"
+  )))
+}
+
+indices <- list(
+  "survObsBiomB" = survObsBiomBs,
+  "fishObsCatchB" = fishObsCatchB
+)
+
+#  return(indices)
+# }
 ```
 
 Diagnose why comps aren't working. Survey worked, fishery didn't because the burnin period was longer than this run. Changed to 0 in the sardinefishery.R config file and runs. 
 
 ```{r testomcomps, eval=FALSE}
 
-usersurvey  <-  here("config/sardinesurvey.R")
+usersurvey <- here("config/sardinesurvey.R")
 userfishery <- here("config/sardinefishery.R")
 
 omlist_ss <- CCom_sard
 
 n_reps <- 1
 
-#this is om_comps
+# this is om_comps
 
- #one script for dimension parameters to be used in multiple functions
-  source("config/omdimensions.R", local = TRUE)
+# one script for dimension parameters to be used in multiple functions
+source("config/omdimensions.R", local = TRUE)
 
-  # user options for survey--default is a census with mid-year sample
-  # allows muliple surveys
-  age_comp_datas <- list()
-  survObsLenComps <- list()
-  survObsWtAtAges <- list()
+# user options for survey--default is a census with mid-year sample
+# allows muliple surveys
+age_comp_datas <- list()
+survObsLenComps <- list()
+survObsWtAtAges <- list()
+
+for (s in usersurvey)
+{
+  source(s, local = TRUE)
+
+  # numbers based fishery independent survey for age and length comps
+  # same user specifications as indices
+  survey_N <- atlantisom::create_survey(
+    dat = omlist_ss$truenums_ss,
+    time = survtime,
+    species = survspp,
+    boxes = survboxes,
+    effic = surveffic,
+    selex = survselex.agecl
+  )
+
+  # Sample fish for age composition
+  # if we want replicates for obs error this sample function will generate them
+  age_comp_data <- list()
+  for (i in 1:n_reps) {
+    age_comp_data[[i]] <- atlantisom::sample_fish(survey_N, surveffN)
+  }
+
+  # save age comps
+  if (save) {
+    saveRDS(age_comp_data, file.path(d.name, paste0(
+      scenario.name, "_",
+      survey.name, "survObsAgeComp.rds"
+    )))
+  }
+
+  # weights needed for weight at age and length comp calcs
+  # aggregate true resn per survey design
+  survey_aggresn <- atlantisom::aggregateDensityData(
+    dat = omlist_ss$trueresn_ss,
+    time = survtime,
+    species = survspp,
+    boxes = survboxes
+  )
+
+  # aggregate true structn per survey design
+  survey_aggstructn <- atlantisom::aggregateDensityData(
+    dat = omlist_ss$truestructn_ss,
+    time = survtime,
+    species = survspp,
+    boxes = survboxes
+  )
+
+  # dont sample these, just aggregate them using median
+  structnss <- atlantisom::sample_fish(survey_aggstructn, surveffN, sample = FALSE)
+
+  resnss <- atlantisom::sample_fish(survey_aggresn, surveffN, sample = FALSE)
+
+  # this is all input into the length function, replicates follow age comp reps
+  #  separating the length comps from the weight at age here
+  survey_lenwt <- list()
+  survObsLenComp <- list()
+  survObsWtAtAge <- list()
+
+  for (i in 1:n_reps) {
+    survey_lenwt[[i]] <- atlantisom::calc_age2length(
+      structn = structnss,
+      resn = resnss,
+      nums = age_comp_data[[i]],
+      biolprm = omlist_ss$biol,
+      fgs = omlist_ss$funct.group_ss,
+      maxbin = maxbin,
+      CVlenage = lenage_cv,
+      remove.zeroes = TRUE
+    )
+
+    survObsLenComp[[i]] <- survey_lenwt[[i]]$natlength
+    survObsWtAtAge[[i]] <- survey_lenwt[[i]]$muweight
+  }
+
+  if (save) {
+    saveRDS(survObsLenComp, file.path(d.name, paste0(
+      scenario.name, "_",
+      survey.name, "survObsLenComp.rds"
+    )))
+    saveRDS(survObsWtAtAge, file.path(d.name, paste0(
+      scenario.name, "_",
+      survey.name, "survObsWtAtAge.rds"
+    )))
+  }
+  # add each survey to master list objects for survey data
+  age_comp_datas[[survey.name]] <- age_comp_data
+  survObsLenComps[[survey.name]] <- survObsLenComp
+  survObsWtAtAges[[survey.name]] <- survObsWtAtAge
+}
+
+# now do fishery comps
+# user options for fishery--default is a census with mid-year sample
+# only one fishery, but multiple fleets possible within it
+source(userfishery, local = TRUE)
+
+# fishery catch at age each observed timestep summed over observed polygons
+# catch at age by area and timestep
+catch_numbers <- atlantisom::create_fishery_subset(
+  dat = omlist_ss$truecatchnum_ss,
+  time = fishtime,
+  species = survspp,
+  boxes = fishboxes
+)
+
+# if we want replicates for obs error this sample function will generate them
+catch_age_comp <- list()
+for (i in 1:n_reps) {
+  catch_age_comp[[i]] <- atlantisom::sample_fish(catch_numbers, fisheffN)
+}
+
+# save fishery age comps
+if (save) {
+  saveRDS(catch_age_comp, file.path(d.name, paste0(
+    scenario.name, "_",
+    fishery.name, "fishObsAgeComp.rds"
+  )))
+}
+
+# Get catch weights for length comp calc
+# aggregate true resn per fishery subset design
+catch_aggresnss <- atlantisom::aggregateDensityData(
+  dat = omlist_ss$trueresn_ss,
+  time = fishtime,
+  species = survspp,
+  boxes = fishboxes
+)
+
+# aggregate true structn fishery subsetdesign
+catch_aggstructnss <- atlantisom::aggregateDensityData(
+  dat = omlist_ss$truestructn_ss,
+  time = fishtime,
+  species = survspp,
+  boxes = fishboxes
+)
+
+# dont sample these, just aggregate them using median
+catch_structnss <- atlantisom::sample_fish(catch_aggstructnss, fisheffN, sample = FALSE)
+
+catch_resnss <- atlantisom::sample_fish(catch_aggresnss, fisheffN, sample = FALSE)
+
+# these fishery lengths and weight at age are each output timestep
+# same structure as above for surveys, replicates follow age comp reps
+#  separating the length comps from the weight at age here
+fishery_lenwt <- list()
+fishObsLenComp <- list()
+fishObsWtAtAge <- list()
+
+for (i in 1:n_reps) {
+  fishery_lenwt[[i]] <- atlantisom::calc_age2length(
+    structn = catch_structnss,
+    resn = catch_resnss,
+    nums = catch_age_comp[[i]],
+    biolprm = omlist_ss$biol,
+    fgs = omlist_ss$funct.group_ss,
+    maxbin = maxbin,
+    CVlenage = lenage_cv,
+    remove.zeroes = TRUE
+  )
+
+  fishObsLenComp[[i]] <- fishery_lenwt[[i]]$natlength
+  fishObsWtAtAge[[i]] <- fishery_lenwt[[i]]$muweight
+}
+
+if (save) {
+  saveRDS(fishObsLenComp, file.path(d.name, paste0(
+    scenario.name, "_",
+    fishery.name, "fishObsLenComp.rds"
+  )))
+  saveRDS(fishObsWtAtAge, file.path(d.name, paste0(
+    scenario.name, "_",
+    fishery.name, "fishObsWtAtAge.rds"
+  )))
+}
+
+if (!is.null(omlist_ss$truenumsage_ss)) {
+  # numbers based fishery independent survey for age and length comps
+  # allows for mulitple surveys
+  annage_comp_datas <- list()
 
   for (s in usersurvey)
   {
     source(s, local = TRUE)
 
-    #numbers based fishery independent survey for age and length comps
     # same user specifications as indices
-    survey_N <- atlantisom::create_survey(dat = omlist_ss$truenums_ss,
-                                          time = survtime,
-                                          species = survspp,
-                                          boxes = survboxes,
-                                          effic = surveffic,
-                                          selex = survselex.agecl)
-
-    #Sample fish for age composition
+    survey_annageN <- atlantisom::create_survey(
+      dat = omlist_ss$truenumsage_ss,
+      time = survtime,
+      species = survspp,
+      boxes = survboxes,
+      effic = surveffic,
+      selex = survselex
+    )
+    # Sample fish for age composition
     # if we want replicates for obs error this sample function will generate them
-    age_comp_data <- list()
-    for(i in 1:n_reps){
-      age_comp_data[[i]] <- atlantisom::sample_fish(survey_N, surveffN)
+    annage_comp_data <- list()
+    for (i in 1:n_reps) {
+      annage_comp_data[[i]] <- atlantisom::sample_fish(survey_annageN, surveffN)
     }
 
-    # save age comps
-    if(save){
-      saveRDS(age_comp_data, file.path(d.name, paste0(scenario.name, "_",
-                                                      survey.name, "survObsAgeComp.rds")))
+    # save survey annual age comps
+    if (save) {
+      saveRDS(annage_comp_data, file.path(d.name, paste0(
+        scenario.name, "_",
+        survey.name, "survObsFullAgeComp.rds"
+      )))
     }
-
-    #weights needed for weight at age and length comp calcs
-    # aggregate true resn per survey design
-    survey_aggresn <- atlantisom::aggregateDensityData(dat = omlist_ss$trueresn_ss,
-                                                       time = survtime,
-                                                       species = survspp,
-                                                       boxes = survboxes)
-
-    # aggregate true structn per survey design
-    survey_aggstructn <- atlantisom::aggregateDensityData(dat = omlist_ss$truestructn_ss,
-                                                          time = survtime,
-                                                          species = survspp,
-                                                          boxes = survboxes)
-
-    #dont sample these, just aggregate them using median
-    structnss <- atlantisom::sample_fish(survey_aggstructn, surveffN, sample = FALSE)
-
-    resnss <- atlantisom::sample_fish(survey_aggresn, surveffN, sample = FALSE)
-
-    #this is all input into the length function, replicates follow age comp reps
-    #  separating the length comps from the weight at age here
-    survey_lenwt <- list()
-    survObsLenComp <- list()
-    survObsWtAtAge <- list()
-
-    for(i in 1:n_reps){
-      survey_lenwt[[i]] <- atlantisom::calc_age2length(structn = structnss,
-                                                       resn = resnss,
-                                                       nums = age_comp_data[[i]],
-                                                       biolprm = omlist_ss$biol,
-                                                       fgs = omlist_ss$funct.group_ss,
-                                                       maxbin = maxbin,
-                                                       CVlenage = lenage_cv,
-                                                       remove.zeroes=TRUE)
-
-      survObsLenComp[[i]] <- survey_lenwt[[i]]$natlength
-      survObsWtAtAge[[i]] <- survey_lenwt[[i]]$muweight
-    }
-
-    if(save){
-      saveRDS(survObsLenComp, file.path(d.name, paste0(scenario.name, "_",
-                                                       survey.name, "survObsLenComp.rds")))
-      saveRDS(survObsWtAtAge, file.path(d.name, paste0(scenario.name, "_",
-                                                       survey.name, "survObsWtAtAge.rds")))
-    }
-    # add each survey to master list objects for survey data
-    age_comp_datas[[survey.name]] <- age_comp_data
-    survObsLenComps[[survey.name]] <- survObsLenComp
-    survObsWtAtAges[[survey.name]] <- survObsWtAtAge
-
+    annage_comp_datas[[survey.name]] <- annage_comp_data
   }
-
-  #now do fishery comps
-  # user options for fishery--default is a census with mid-year sample
-  # only one fishery, but multiple fleets possible within it
-  source(userfishery, local = TRUE)
-
-  #fishery catch at age each observed timestep summed over observed polygons
-  # catch at age by area and timestep
-  catch_numbers <-  atlantisom::create_fishery_subset(dat = omlist_ss$truecatchnum_ss,
-                                                      time = fishtime,
-                                                      species = survspp,
-                                                      boxes = fishboxes)
-
-  # if we want replicates for obs error this sample function will generate them
-  catch_age_comp <- list()
-  for(i in 1:n_reps){
-    catch_age_comp[[i]] <- atlantisom::sample_fish(catch_numbers, fisheffN)
-  }
-
-  # save fishery age comps
-  if(save){
-    saveRDS(catch_age_comp, file.path(d.name, paste0(scenario.name, "_",
-                                                     fishery.name, "fishObsAgeComp.rds")))
-  }
-
-  #Get catch weights for length comp calc
-  # aggregate true resn per fishery subset design
-  catch_aggresnss <- atlantisom::aggregateDensityData(dat = omlist_ss$trueresn_ss,
-                                                      time = fishtime,
-                                                      species = survspp,
-                                                      boxes = fishboxes)
-
-  # aggregate true structn fishery subsetdesign
-  catch_aggstructnss <- atlantisom::aggregateDensityData(dat = omlist_ss$truestructn_ss,
-                                                         time = fishtime,
-                                                         species = survspp,
-                                                         boxes = fishboxes)
-
-  #dont sample these, just aggregate them using median
-  catch_structnss <- atlantisom::sample_fish(catch_aggstructnss, fisheffN, sample = FALSE)
-
-  catch_resnss <- atlantisom::sample_fish(catch_aggresnss, fisheffN, sample = FALSE)
-
-  # these fishery lengths and weight at age are each output timestep
-  #same structure as above for surveys, replicates follow age comp reps
-  #  separating the length comps from the weight at age here
-  fishery_lenwt <- list()
-  fishObsLenComp <- list()
-  fishObsWtAtAge <- list()
-
-  for(i in 1:n_reps){
-    fishery_lenwt[[i]] <- atlantisom::calc_age2length(structn = catch_structnss,
-                                                      resn = catch_resnss,
-                                                      nums = catch_age_comp[[i]],
-                                                      biolprm = omlist_ss$biol,
-                                                      fgs = omlist_ss$funct.group_ss,
-                                                      maxbin = maxbin,
-                                                      CVlenage = lenage_cv,
-                                                      remove.zeroes=TRUE)
-
-    fishObsLenComp[[i]] <- fishery_lenwt[[i]]$natlength
-    fishObsWtAtAge[[i]] <- fishery_lenwt[[i]]$muweight
-  }
-
-  if(save){
-    saveRDS(fishObsLenComp, file.path(d.name, paste0(scenario.name, "_",
-                                                     fishery.name, "fishObsLenComp.rds")))
-    saveRDS(fishObsWtAtAge, file.path(d.name, paste0(scenario.name, "_",
-                                                     fishery.name, "fishObsWtAtAge.rds")))
-  }
-
-  if(!is.null(omlist_ss$truenumsage_ss)){
-    #numbers based fishery independent survey for age and length comps
-    #allows for mulitple surveys
-    annage_comp_datas <- list()
-
-    for (s in usersurvey)
-    {
-      source(s, local = TRUE)
-
-      # same user specifications as indices
-      survey_annageN <- atlantisom::create_survey(dat = omlist_ss$truenumsage_ss,
-                                                  time = survtime,
-                                                  species = survspp,
-                                                  boxes = survboxes,
-                                                  effic = surveffic,
-                                                  selex = survselex)
-      #Sample fish for age composition
-      # if we want replicates for obs error this sample function will generate them
-      annage_comp_data <- list()
-      for(i in 1:n_reps){
-        annage_comp_data[[i]] <- atlantisom::sample_fish(survey_annageN, surveffN)
-      }
-
-      # save survey annual age comps
-      if(save){
-        saveRDS(annage_comp_data, file.path(d.name, paste0(scenario.name, "_",
-                                                           survey.name, "survObsFullAgeComp.rds")))
-      }
-      annage_comp_datas[[survey.name]] <- annage_comp_data
-    }
-
-  }else{annage_comp_datas <- NULL}
-
-  if(!is.null(omlist_ss$truecatchage_ss)){
-    #fishery catch at age each observed timestep summed over observed polygons
-    # catch at age by area and timestep
-    catch_annagenumbers <-  atlantisom::create_fishery_subset(dat = omlist_ss$truecatchage_ss,
-                                                        time = fishtime,
-                                                        species = survspp,
-                                                        boxes = fishboxes)
-
-    # if we want replicates for obs error this sample function will generate them
-    # WARNING THIS AGGREGATES ACROSS FLEETS
-    # TODO: need to change sample_fish to fix
-    catch_annage_comp <- list()
-    for(i in 1:n_reps){
-      catch_annage_comp[[i]] <- atlantisom::sample_fish(catch_annagenumbers, fisheffN)
-    }
-
-    # save fishery annual age comps
-    if(save){
-    saveRDS(catch_annage_comp, file.path(d.name, paste0(scenario.name,"_",
-                                                        fishery.name, "fishObsFullAgeComp.rds")))
-    }
-  }else{catch_annage_comp <- NULL}
-
-  # call interpolate weight at age function to get survObsFullWtAtAge
-  if(!is.null(omlist_ss$truenumsage_ss)){
-    interp_survWtAtAges <- list()
-    for (s in usersurvey)
-    {
-      source(s, local = TRUE)
-
-      interp_survWtAtAge <- list()
-      for(i in 1:n_reps){
-        interp_survWtAtAge[[i]] <- calc_avgwtstage2age(wtagecl = survObsWtAtAges[[survey.name]][[i]],
-                                                       annages = omlist_ss$truenumsage_ss,
-                                                       fgs = omlist_ss$funct.group_ss)
-      }
-      if(save){
-        saveRDS(interp_survWtAtAge, file.path(d.name, paste0(scenario.name, "_",
-                                                             survey.name, "survObsFullWtAtAge.rds")))
-      }
-      interp_survWtAtAges[[survey.name]] <- interp_survWtAtAge
-    }
-  }else{interp_survWtAtAges <- NULL}
-
-  # do we want fishery average weight at true age too? why not
-  # call interpolate weight at age function to get fishObsFullWtAtAge
-  # WARNING currently aggregates out fleet info, but no fleets in aggregate wtage
-  if(!is.null(omlist_ss$truecatchage_ss)){
-    interp_fishWtAtAge <- list()
-    for(i in 1:n_reps){
-      interp_fishWtAtAge[[i]] <- calc_avgwtstage2age(wtagecl = fishObsWtAtAge[[i]],
-                                                     annages = omlist_ss$truecatchage_ss,
-                                                     fgs = omlist_ss$funct.group_ss)
-    }
-    if(save){
-      saveRDS(interp_fishWtAtAge, file.path(d.name, paste0(scenario.name,"_",
-                                                           fishery.name, "fishObsFullWtAtAge.rds")))
-    }
-  }else{interp_fishWtAtAge <- NULL}
-
-
-
-  comps <- list("survObsAgeComp" = age_comp_datas,
-                "survObsLenComp" = survObsLenComps,
-                "survObsWtAtAge" = survObsWtAtAges,
-                "fishObsAgeComp" = catch_age_comp,
-                "fishObsLenComp" = fishObsLenComp,
-                "fishObsWtAtAge" = fishObsWtAtAge,
-                "survObsFullAgeComp" = annage_comp_datas,
-                "fishObsFullAgeComp" = catch_annage_comp,
-                "survObsFullWtAtAge" = interp_survWtAtAges,
-                "fishObsFullWtAtAge" = interp_fishWtAtAge
-                )
-
-  return(comps)
+} else {
+  annage_comp_datas <- NULL
 }
 
+if (!is.null(omlist_ss$truecatchage_ss)) {
+  # fishery catch at age each observed timestep summed over observed polygons
+  # catch at age by area and timestep
+  catch_annagenumbers <- atlantisom::create_fishery_subset(
+    dat = omlist_ss$truecatchage_ss,
+    time = fishtime,
+    species = survspp,
+    boxes = fishboxes
+  )
+
+  # if we want replicates for obs error this sample function will generate them
+  # WARNING THIS AGGREGATES ACROSS FLEETS
+  # TODO: need to change sample_fish to fix
+  catch_annage_comp <- list()
+  for (i in 1:n_reps) {
+    catch_annage_comp[[i]] <- atlantisom::sample_fish(catch_annagenumbers, fisheffN)
+  }
+
+  # save fishery annual age comps
+  if (save) {
+    saveRDS(catch_annage_comp, file.path(d.name, paste0(
+      scenario.name, "_",
+      fishery.name, "fishObsFullAgeComp.rds"
+    )))
+  }
+} else {
+  catch_annage_comp <- NULL
+}
+
+# call interpolate weight at age function to get survObsFullWtAtAge
+if (!is.null(omlist_ss$truenumsage_ss)) {
+  interp_survWtAtAges <- list()
+  for (s in usersurvey)
+  {
+    source(s, local = TRUE)
+
+    interp_survWtAtAge <- list()
+    for (i in 1:n_reps) {
+      interp_survWtAtAge[[i]] <- calc_avgwtstage2age(
+        wtagecl = survObsWtAtAges[[survey.name]][[i]],
+        annages = omlist_ss$truenumsage_ss,
+        fgs = omlist_ss$funct.group_ss
+      )
+    }
+    if (save) {
+      saveRDS(interp_survWtAtAge, file.path(d.name, paste0(
+        scenario.name, "_",
+        survey.name, "survObsFullWtAtAge.rds"
+      )))
+    }
+    interp_survWtAtAges[[survey.name]] <- interp_survWtAtAge
+  }
+} else {
+  interp_survWtAtAges <- NULL
+}
+
+# do we want fishery average weight at true age too? why not
+# call interpolate weight at age function to get fishObsFullWtAtAge
+# WARNING currently aggregates out fleet info, but no fleets in aggregate wtage
+if (!is.null(omlist_ss$truecatchage_ss)) {
+  interp_fishWtAtAge <- list()
+  for (i in 1:n_reps) {
+    interp_fishWtAtAge[[i]] <- calc_avgwtstage2age(
+      wtagecl = fishObsWtAtAge[[i]],
+      annages = omlist_ss$truecatchage_ss,
+      fgs = omlist_ss$funct.group_ss
+    )
+  }
+  if (save) {
+    saveRDS(interp_fishWtAtAge, file.path(d.name, paste0(
+      scenario.name, "_",
+      fishery.name, "fishObsFullWtAtAge.rds"
+    )))
+  }
+} else {
+  interp_fishWtAtAge <- NULL
+}
+
+
+
+comps <- list(
+  "survObsAgeComp" = age_comp_datas,
+  "survObsLenComp" = survObsLenComps,
+  "survObsWtAtAge" = survObsWtAtAges,
+  "fishObsAgeComp" = catch_age_comp,
+  "fishObsLenComp" = fishObsLenComp,
+  "fishObsWtAtAge" = fishObsWtAtAge,
+  "survObsFullAgeComp" = annage_comp_datas,
+  "fishObsFullAgeComp" = catch_annage_comp,
+  "survObsFullWtAtAge" = interp_survWtAtAges,
+  "fishObsFullWtAtAge" = interp_fishWtAtAge
+)
+
+#  return(comps)
+# }
 ```
 
 
@@ -416,112 +486,127 @@ source(here("config/omdimensions.R"))
 source(here("config/sardinesurvey.R"))
 source(here("config/sardinefishery.R"))
 
-#read time series data
-survObsBiom <- readRDS(file.path(d.name, paste0(scenario.name,
-                                                "_",
-                                                survey.name,
-                                                "surveyB.rds")))
+# read time series data
+survObsBiom <- readRDS(file.path(d.name, paste0(
+  scenario.name,
+  "_",
+  survey.name,
+  "surveyB.rds"
+)))
 
 survObsBiom <- survObsBiom[[1]]
 
-plotB <-ggplot() +
-  geom_line(data=survObsBiom, aes(x=time/stepperyr,y=atoutput, color="survey Biomass"), 
-            alpha = 10/10) +
+plotB <- ggplot() +
+  geom_line(
+    data = survObsBiom, aes(x = time / stepperyr, y = atoutput, color = "survey Biomass"),
+    alpha = 10 / 10
+  ) +
   theme_tufte() +
   theme(legend.position = "top") +
-  labs(colour=scenario.name)
+  labs(colour = scenario.name)
 
 plotB +
-  facet_wrap(~species, scales="free") 
-
+  facet_wrap(~species, scales = "free")
 ```
 
 
 #### Catch time series
 ```{r catchind-1}
-#read time series data
-catchbio_ss <- readRDS(file.path(d.name, paste0(scenario.name,
-                                                "_",
-                                                fishery.name, "fishCatch.rds")))
+# read time series data
+catchbio_ss <- readRDS(file.path(d.name, paste0(
+  scenario.name,
+  "_",
+  fishery.name, "fishCatch.rds"
+)))
 
 catchbio_ss <- catchbio_ss[[1]]
 
-plotC <-ggplot() +
-  geom_line(data=catchbio_ss, aes(x=time/365,y=atoutput, color="observed Catch"), 
-            alpha = 10/10) +
+plotC <- ggplot() +
+  geom_line(
+    data = catchbio_ss, aes(x = time / 365, y = atoutput, color = "observed Catch"),
+    alpha = 10 / 10
+  ) +
   theme_tufte() +
   theme(legend.position = "top") +
-  labs(colour=scenario.name)
+  labs(colour = scenario.name)
 
 plotC +
-  facet_wrap(~species, scales="free") 
-
-
+  facet_wrap(~species, scales = "free")
 ```
 
 
 #### Survey length composition
 ```{r lencomp-1}
 
-#length comps
-len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name,
-                                                "_",
-                                                survey.name, "survObsLenComp.rds")))
-fish_len_comp_data <- readRDS(file.path(d.name, paste0(scenario.name,
-                                                "_",
-                                                fishery.name,"fishObsLenComp.rds")))
+# length comps
+len_comp_data <- readRDS(file.path(d.name, paste0(
+  scenario.name,
+  "_",
+  survey.name, "survObsLenComp.rds"
+)))
+fish_len_comp_data <- readRDS(file.path(d.name, paste0(
+  scenario.name,
+  "_",
+  fishery.name, "fishObsLenComp.rds"
+)))
 
 len_comp_data <- len_comp_data[[1]]
 fish_len_comp_data <- fish_len_comp_data[[1]]
 
-#add this to om_indices function so that this has years when read in
-fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time/fstepperyr))
+# add this to om_indices function so that this has years when read in
+fish_len_comp_data$time <- as.integer(floor(fish_len_comp_data$time / fstepperyr))
 
 len <- len_comp_data
 
 len <- filter(len_comp_data, time %in% c(55:175))
 
-  lfplot <- ggplot(len, aes(upper.bins)) +
-    geom_bar(aes(weight = atoutput)) +
-    theme_tufte() +
-    labs(subtitle = paste(scenario.name,
-                          len$species))
-  
-  lfplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+lfplot <- ggplot(len, aes(upper.bins)) +
+  geom_bar(aes(weight = atoutput)) +
+  theme_tufte() +
+  labs(subtitle = paste(
+    scenario.name,
+    len$species
+  ))
 
-
+lfplot + facet_wrap(~ time / stepperyr, ncol = 6, scales = "free_y")
 ```
 
 
 #### Survey age composition (age classes)
 ```{r agecomp-1}
 
-#read in comp data
-age_comp_data <- readRDS(file.path(d.name, paste0(scenario.name,
-                                                "_",
-                                                survey.name, "survObsAgeComp.rds")))
+# read in comp data
+age_comp_data <- readRDS(file.path(d.name, paste0(
+  scenario.name,
+  "_",
+  survey.name, "survObsAgeComp.rds"
+)))
 age_comp_data <- age_comp_data[[1]]
 
 Natage <- age_comp_data
 
 Natage <- filter(age_comp_data, time %in% c(150:270))
 
-Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
-    geom_point() +
-    theme_tufte() +
-    labs(subtitle = paste(scenario.name,
-                          Natage$species))
-  
-  Natageplot + facet_wrap(~time/stepperyr, ncol=6, scales="free_y")
+Natageplot <- ggplot(Natage, aes(x = agecl, y = atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(
+    scenario.name,
+    Natage$species
+  ))
+
+Natageplot + facet_wrap(~ time / stepperyr, ncol = 6, scales = "free_y")
 ```
 
 
 #### Survey weight at age (age classes)
 ```{r wtageclass-1}
 
-wtage <- readRDS(file.path(d.name, paste0(scenario.name,
-                                                "_",
-                                                survey.name, "survObsWtAtAge.rds")))
+wtage <- readRDS(file.path(d.name, paste0(
+  scenario.name,
+  "_",
+  survey.name, "survObsWtAtAge.rds"
+)))
 wtage <- wtage[[1]]
 
 wageplot <- ggplot(wtage, aes(time, atoutput)) +
@@ -532,33 +617,37 @@ wageplot <- ggplot(wtage, aes(time, atoutput)) +
   ylab("average individual weight (g)") +
   labs(subtitle = paste0(scenario.name, " annual mid year sample"))
 
-wageplot + facet_wrap(c("species"), scales="free_y")
+wageplot + facet_wrap(c("species"), scales = "free_y")
 ```
 
 
 #### Fishery age composition (age classes)
 ```{r fishagecomp-1}
 
-#read in comp data
-fish_age_comp <- readRDS(file.path(d.name, paste0(scenario.name,
-                                                "_",
-                                                fishery.name, "fishObsAgeComp.rds")))
+# read in comp data
+fish_age_comp <- readRDS(file.path(d.name, paste0(
+  scenario.name,
+  "_",
+  fishery.name, "fishObsAgeComp.rds"
+)))
 fish_age_comp <- fish_age_comp[[1]]
 
-#add this to om_indices function so that this has years when read in
-fish_age_comp$time <- fish_age_comp$time/fstepperyr
+# add this to om_indices function so that this has years when read in
+fish_age_comp$time <- fish_age_comp$time / fstepperyr
 
 Natage <- fish_age_comp
 
 Natage <- filter(fish_age_comp, time %in% c(30:53))
 
-Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
-    geom_point() +
-    theme_tufte() +
-    labs(subtitle = paste(scenario.name,
-                          Natage$species))
-  
-  Natageplot + facet_wrap(~time, ncol=6, scales="free_y")
+Natageplot <- ggplot(Natage, aes(x = agecl, y = atoutput)) +
+  geom_point() +
+  theme_tufte() +
+  labs(subtitle = paste(
+    scenario.name,
+    Natage$species
+  ))
+
+Natageplot + facet_wrap(~time, ncol = 6, scales = "free_y")
 ```
 
 ### {-}
@@ -568,20 +657,35 @@ Natageplot <- ggplot(Natage, aes(x=agecl, y=atoutput)) +
 To read in the Stock Synthesis files, first ensure you have the latest version of `r4ss`. You will need to ensure the relevant Stock Synthesis files are stored in the inst/extdata/ folder, with each species example in its own folder. 
 
 ```{r readdata}
-#devtools::install_github("r4ss/r4ss", dependencies = FALSE)
+# devtools::install_github("r4ss/r4ss", dependencies = FALSE)
 require(r4ss)
-#source("./config/sardine_config.R") this is above for illustration
+# source("./config/sardine_config.R") this is above for illustration
 
-#Directory with SS files
-model_dir <- "Sardine_SS_files/"
+# Set species name
+species <- "Pacific_sardine" # change to species_ss if we want both
 
-#Name of SS data file
+# Directory with SS files
+model_dir <- "Sardine_SS_files_Sep2022/"
+
+# Name of SS data file
 datfile_name <- "sardEM_3_3.dat"
 
 
-stocksynthesis.data <- r4ss::SS_readdat_3.30(paste0("./inst/extdata/",
-model_dir,
-datfile_name))
+stocksynthesis.data <- r4ss::SS_readdat_3.30(paste0(
+  "./inst/extdata/",
+  model_dir,
+  datfile_name
+))
+```
+
+```{r sardine-survey-spec}
+# Years to survey, assuming survey is once per year
+# survey_years <- survey_sample_full[(burnin+1):(burnin+nyears)] # my original
+survey_years <- survey_sample_full[burnin:(burnin + nyears - 1)] # from Christine's new sardine_config.R
+
+# Month of survey/fishing
+survey_month <- 7
+fishing_month <- 1
 ```
 
 *Now changing catch units to tons!*
@@ -590,23 +694,27 @@ Write time series biomass (tons) and catch (tons--taken directly from truth with
 
 ```{r SS-write-ts}
 
-#Month of survey/fishing
-survey_month <- 7
-fishing_month <- 1
+# Test writing CPUE in biomass
 
-
-#Test writing CPUE in biomass
-  stocksynthesis.data <- SS_write_ts(ss_data_list = stocksynthesis.data,
-                ts_data = list(survObsBiom$atoutput[fish_years],
-                  omlist_ss$truecatchbio_ss$atoutput[omlist_ss$truecatchbio_ss$time %in% fish_years]),
-                CVs = c(CVs$survey,
-                        CVs$fishery),
-                data_years = list((survObsBiom$time[fish_years]-survey_sample_time)/timestep+1,             fish_years),
-            sampling_month = list(rep(survey_month,nyears),
-                                rep(fishing_month,nyears)),
-                units = c("biomass","biomass"),
-                data_type=c("CPUE","catch"),
-                fleets = c(2,1))
+stocksynthesis.data <- SS_write_ts(
+  ss_data_list = stocksynthesis.data,
+  ts_data = list(
+    survObsBiom$atoutput[fish_years],
+    omlist_ss$truecatchbio_ss$atoutput[(omlist_ss$truecatchbio_ss$time / 365) %in% fish_years]
+  ),
+  CVs = c(
+    surv_cv$cv,
+    fish_cv$cv
+  ),
+  data_years = list((survObsBiom$time[fish_years] - survey_sample_time) / timestep + 1, fish_years),
+  sampling_month = list(
+    rep(survey_month, nyears),
+    rep(fishing_month, nyears)
+  ),
+  units = c("biomass", "biomass"),
+  data_type = c("CPUE", "catch"),
+  fleets = c(2, 1)
+)
 
 stocksynthesis.data$CPUE
 
@@ -616,68 +724,79 @@ stocksynthesis.data$catch
 Writing age composition data 
 
 ```{r SS-write-comps}
-#age_comp_data
+# age_comp_data
 
-#Get the age bins
+# Get the age bins
 age_bin_names <- names(stocksynthesis.data$agecomp)[10:length(names(stocksynthesis.data$agecomp))]
-age_bins <- sub("a","",age_bin_names)
+age_bins <- sub("a", "", age_bin_names)
 
 age_comp_flat <- reformat_compositions(age_comp_data,
-                     round.places = 4,
-                     comp_type = "agecomp")
+  round.places = 4,
+  comp_type = "agecomp"
+)
 
 ## Write age composition data for survey
-stocksynthesis.data <- SS_write_comps(ss_data_list = stocksynthesis.data,
-               comp_matrix = list(age_comp_flat[burnin:(burnin+nyears-1),]),
-               data_rows = list(stocksynthesis.data$styr:(stocksynthesis.data$styr+nyears-1)),
-               sampling_month = list(rep(survey_month,nyears)),
-               data_type = c("agecomp"),
-               fleet_number = c(1),
-               bins = list(age_bins),
-               caal_bool = c(FALSE))
-stocksynthesis.data$agecomp
+stocksynthesis.data <- SS_write_comps(
+  ss_data_list = stocksynthesis.data,
+  comp_matrix = list(age_comp_flat[burnin:(burnin + nyears - 1), ]),
+  data_rows = list(stocksynthesis.data$styr:(stocksynthesis.data$styr + nyears - 1)),
+  sampling_month = list(rep(survey_month, nyears)),
+  data_type = c("agecomp"),
+  fleet_number = c(2),
+  bins = list(age_bins),
+  caal_bool = c(FALSE)
+)
 
-
+stocksynthesis.data$agecomp[, age_bin_names] <- as.data.frame(age_comp_flat)[burnin:(burnin + nyears - 1), age_bins]
 ```
 
 Once we have the natlength matrix, we can munge the data into the proper CAAL and length bin format for SS
 
 ```{r SS-comps-formatting}
 
-#Check length compositions match age compositions
-#ss_length_stdsurv$natlength %>%
+# Check length compositions match age compositions
+# ss_length_stdsurv$natlength %>%
 #  group_by(time,agecl) %>%
 #  summarise(sum(atoutput))
 
-len_comp_data <- ss_length_stdsurv$natlength
-fish_len_comp_data <- catch_lengthwt_samp$natlength
+len_comp_data <- survey_lenwt[[1]]$natlength
+fish_len_comp_data <- fishery_lenwt[[1]]$natlength
 
-if(fstepperyr>1){
+if (fstepperyr > 1) {
   fish_len_comp_anndata <- fish_len_comp_data %>%
-    mutate(yr = floor(time/fstepperyr)) %>%
-    group_by(species, agecl, lower.bins, upper.bins, time=as.integer(yr)) %>%
-    summarise(annnatlength=sum(atoutput)) %>%
+    mutate(yr = floor(time / fstepperyr)) %>%
+    group_by(species, agecl, lower.bins, upper.bins, time = as.integer(yr)) %>%
+    summarise(annnatlength = sum(atoutput)) %>%
     rename(atoutput = annnatlength)
 } else {
   fish_len_comp_anndata <- fish_len_comp_data
 }
 
-caal_comp_flat <- reformat_compositions(len_comp_data,                                round.places=4,
-                comp_type="caalcomp")
+caal_comp_flat <- reformat_compositions(len_comp_data,
+  round.places = 4,
+  comp_type = "caalcomp"
+)
 
 
-#remove burnin
-caal_comp_final <- filter(caal_comp_flat,
-                         time %in% survey_years)
+# remove burnin
+caal_comp_final <- filter(
+  caal_comp_flat,
+  time %in% survey_years
+)
+caal_comp_final <- as.data.frame(caal_comp_final)
 
 
-#Add over age classes to get sample size
+# Add over age classes to get sample size
 len_comp_flat <- reformat_compositions(len_comp_data,
-                                  round.places = 0,
-                           comp_type="lencomp")
-#remove burnin
-len_comp_final <- filter(len_comp_flat,
-                         time %in% survey_years)
+  round.places = 0,
+  comp_type = "lencomp"
+)
+# remove burnin
+len_comp_final <- filter(
+  len_comp_flat,
+  time %in% survey_years
+)
+len_comp_final <- as.data.frame(len_comp_final)
 
 length_bins <- as.integer(names(len_comp_final))
 length_bins <- length_bins[!is.na(length_bins)]
@@ -686,12 +805,16 @@ length_bins <- length_bins[!is.na(length_bins)]
 # need to aggregate to annual (done above)
 # also,  make effN annual goal/fstepsperyr (done above)
 fish_len_comp_flat <- reformat_compositions(fish_len_comp_anndata,
-                                  round.places = 0,
-                           comp_type="lencomp")
+  round.places = 0,
+  comp_type = "lencomp"
+)
 
-#remove burnin works after adjustment above
-fish_len_comp_final <- filter(fish_len_comp_flat,
-                         time %in% fish_years)
+# remove burnin works after adjustment above
+fish_len_comp_final <- filter(
+  fish_len_comp_flat,
+  time %in% fish_years
+)
+fish_len_comp_final <- as.data.frame(fish_len_comp_final)
 
 notbins <- c("time", "nsamp")
 
@@ -700,82 +823,97 @@ notbins <- c("time", "nsamp")
 
 # need to fill empty length bins with 0s to have same bins as survey for SS_write_comps
 missing.lengths <- setdiff(length_bins, names(fish_len_comp_final)[!names(fish_len_comp_final) %in% notbins])
-fish_len_comp_final[as.character(missing.lengths)] <- 0                    # Add them, filled with '0's
+fish_len_comp_final[as.character(missing.lengths)] <- 0 # Add them, filled with '0's
 fish_len_comp_final <- fish_len_comp_final[c("time", length_bins, "nsamp")]
 
 
 # fishery age comps also 5 timesteps per year
-if(fstepperyr>1){
-  fish_age_comp_anndata <- catch_numsss_samp %>%
-    mutate(yr = floor(time/fstepperyr)) %>%
-    group_by(species, agecl, time=as.integer(yr)) %>%
-    summarise(annnatage=sum(atoutput)) %>%
+if (fstepperyr > 1) {
+  fish_age_comp_anndata <- catch_age_comp[[1]] %>%
+    mutate(yr = floor(time / fstepperyr)) %>%
+    group_by(species, agecl, time = as.integer(yr)) %>%
+    summarise(annnatage = sum(atoutput)) %>%
     rename(atoutput = annnatage)
 } else {
-  fish_age_comp_anndata <- catch_numsss_samp
+  fish_age_comp_anndata <- catch_age_comp[[1]]
 }
 
 fish_age_comp_flat <- reformat_compositions(fish_age_comp_anndata,
-                           comp_type="agecomp")
+  comp_type = "agecomp"
+)
 
-#remove burnin (not necessary?fish comps made with fish_years only) 
-fish_age_comp_final <- filter(fish_age_comp_flat,
-                         time %in% fish_years)
+# remove burnin (not necessary?fish comps made with fish_years only)
+fish_age_comp_final <- filter(
+  fish_age_comp_flat,
+  time %in% fish_years
+)
+fish_age_comp_final <- as.data.frame(fish_age_comp_final)
 
 # #SS_write_comps breaking because fishery age bins start with 2 not 1; extracting bins from fish file may help?
 # fish_age_bins <- names(fish_age_comp_flat)[!names(fish_age_comp_flat) %in% notbins]
 
 # that leaves an empty column in data file, so instead fill with 0s
 missing.ages <- setdiff(age_bins, names(fish_age_comp_final)[!names(fish_age_comp_final) %in% notbins])
-fish_age_comp_final[missing.ages] <- 0                    # Add them, filled with '0's
+fish_age_comp_final[missing.ages] <- 0 # Add them, filled with '0's
 fish_age_comp_final <- fish_age_comp_final[c("time", age_bins, "nsamp")]
 
-comp_list <- list(caal_comp_final,len_comp_final, fish_age_comp_final, fish_len_comp_final)
+comp_list <- list(caal_comp_final, len_comp_final, fish_age_comp_final, fish_len_comp_final)
 
-apply_month <- list(rep(survey_month, nrow(comp_list[[1]])), 
-                    rep(survey_month, nrow(comp_list[[2]])),
-                    rep(fishing_month,nrow(comp_list[[3]])),
-                    rep(fishing_month,nrow(comp_list[[4]])))
+apply_month <- list(
+  rep(survey_month, nrow(comp_list[[1]])),
+  rep(survey_month, nrow(comp_list[[2]])),
+  rep(fishing_month, nrow(comp_list[[3]])),
+  rep(fishing_month, nrow(comp_list[[4]]))
+)
 
 
-# This now runs by ensuring that survey and fishery compositions have the same bins 
+# This now runs by ensuring that survey and fishery compositions have the same bins
 # (filled with 0s for missing bins in fishery relative to survey)
 
 # Write CAAL and length composition data
-stocksynthesis.data <- SS_write_comps(ss_data_list = stocksynthesis.data, 
-                                      comp_matrix = comp_list, 
-                                      data_rows = list((comp_list[[1]]$time-survey_sample_time)/timestep + 1 , (survey_years-survey_sample_time)/timestep + 1,fish_years,fish_years),
-                                      sampling_month = apply_month, 
-                                      data_type = rep(c("agecomp", "lencomp"),2), 
-                                      fleet_number = c(2,2,1,1),  
-                                      bins = list(age_bins, 
-                                                  length_bins, 
-                                                  age_bins, 
-                                                  length_bins), 
-                                      caal_bool = c(TRUE, rep(FALSE,3)))
+stocksynthesis.data <- SS_write_comps(
+  ss_data_list = stocksynthesis.data,
+  comp_matrix = comp_list,
+  data_rows = list((comp_list[[1]]$time - survey_sample_time) / timestep + 1, (survey_years - survey_sample_time) / timestep + 1, fish_years, fish_years),
+  sampling_month = apply_month,
+  data_type = rep(c("agecomp", "lencomp"), 2),
+  fleet_number = c(2, 2, 1, 1),
+  bins = list(
+    age_bins,
+    length_bins,
+    age_bins,
+    length_bins
+  ),
+  caal_bool = c(TRUE, rep(FALSE, 3))
+)
 
 head(stocksynthesis.data$lencomp)
 head(stocksynthesis.data$agecomp)
 
-#Change length bin structure to match atlantis data
+# Change length bin structure to match atlantis data
 stocksynthesis.data$lbin_vector <- length_bins
 
-#Get correct number of length bins
+# Get correct number of length bins
 stocksynthesis.data$N_lbins <- length(length_bins)
 
-#Set lbin_method to 1 - this makes the population length bins match the data bins 
-#When lbin_method==1, we just comment out the binwidth, minimum, and maximum size arguments since they aren't used
+# Set lbin_method to 1 - this makes the population length bins match the data bins
+# When lbin_method==1, we just comment out the binwidth, minimum, and maximum size arguments since they aren't used
 stocksynthesis.data$lbin_method <- 1
 stocksynthesis.data$binwidth <- "#"
 stocksynthesis.data$minimum_size <- "#"
 stocksynthesis.data$maximum_size <- "#"
 
-#Change minimum sample size to 0.001 for CAAL data (SS won't let it go lower than this)
-stocksynthesis.data$age_info$minsamplesize <- rep(0.001,2)
+# Change minimum sample size to 0.001 for CAAL data (SS won't let it go lower than this)
+stocksynthesis.data$age_info$minsamplesize <- rep(0.001, 2)
 
-SS_writedat_3.30(stocksynthesis.data, outfile = paste0("./inst/extdata/",model_dir,
-datfile_name),
-                 overwrite=TRUE)
+SS_writedat_3.30(
+  datlist = stocksynthesis.data,
+  outfile = paste0(
+    "./inst/extdata/", model_dir,
+    datfile_name
+  ),
+  overwrite = TRUE
+)
 ```
 
 ## Coming up with dynamic life history parameters (partial from Christine)
@@ -785,70 +923,96 @@ Below we get the weight-length relationship parameters from atlantis, calculate 
 The following is under construction from CreateStockSynthesis.Rmd and not evaluated. Existing control file was modified by hand to make the number of recruitment settlement assignments 1 instead of two, with GPattern month area age vector 1 1 1 1. 
 
 ```{r, eval=FALSE}
-#Get biological parameters
 
-#Load needed inputs for biological parameters
-source(here("config/CC3Config.R"))
-#biological parameters
-biolprm <- load_biolprm(dir = d.name, file_biolprm = biol.prm.file)#"C:/Users/chris/Documents/GitHub/atlantisom", 
-#d.name <- "C:/Users/chris/Documents/GitHub/atlantisom"
-#functional groups
-fgs <- truth$fgs
-runprm <- load_runprm(dir = d.name, file_runprm = run.prm.file)
-YOY <- load_yoy(d.name, paste0("output", scenario.name, "YOY.txt"))
-truenums_ss <- truth$nums[results$nums$species==species,]
-
-YOY_ss <- YOY %>%
-  select(Time, "SAR.0")
-
-fullresZ <- calc_Z(yoy = YOY_ss,
-                   nums = truenums_ss,
-                   fgs = fgs,
-                   biolprm = biolprm,
-                   toutinc = runprm$toutinc)
-
-
-meanwt_spp <- ss_length_stdsurv$muweight %>% 
-  filter(time>burnin) %>%
-  group_by(agecl) %>%
-  summarize(meanwt = mean(atoutput))
-
-ctlfile_name <-  "sardEM_3_3.ctl"
-sardine.ctl <-r4ss::SS_readctl_3.30(paste0("./inst/extdata/",
-model_dir,
-ctlfile_name))
-sardine.ctl <- SS_write_biol(sardine.ctl, biolprm, "SAR", Z = mean(fullresZ$atoutput), wtsage=meanwt_spp)
-
-li_a_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 2]/1000
-li_b_use <- biolprm$wl[match(fgs$Code[match(species,fgs$Name)],biolprm$wl[, 1]), 3]
-
-#maturity ogive
-#check what R0 is
-
-
-
-len_nonburn <- ss_length_stdsurv$mulen %>%
-  filter(time > burnin*timestep)
-plot(len_nonburn$atoutput~len_nonburn$agecl, col=len_nonburn$time)
-
-length.data <- data.frame("Year"=(len_nonburn$time-survey_sample_time)/timestep+1, length=len_nonburn$atoutput, Weight=NA, Sex="Female", age=as.integer(len_nonburn$agecl))
-
-#require(bbmle)
-#vb_estimates <-sample_fit_vbgf(length.data, 25, 45, 0.4,
-#  0.1, 0.1, 20, 40, 0.05, 0.01, 0.01,
-#  30, 50, 0.6, 0.3, 0.3, 0.5, 10)
-
+# # Need to clone atlantisom and load the package locally because the
+# # installed package from remote repository does not include SS_write_biol()
+# devtools::load_all("C:/Users/bai.li/Documents/sardine/atlantisom")
+# 
+# # Get biological parameters
+# 
+# # Load needed inputs for biological parameters
+# 
+# # biological parameters
+# biolprm <- load_biolprm(dir = d.name, file_biolprm = biol.prm.file) # "C:/Users/chris/Documents/GitHub/atlantisom"
+# # functional groups
+# 
+# fgs <- CCom$truth$fgs
+# runprm <- load_runprm(dir = d.name, file_runprm = run.prm.file)
+# YOY <- load_yoy(d.name, paste0(scenario.name, "YOY.txt"))
+# truenums_ss <- CCom$truth$nums[CCom$truth$nums$species == species, ]
+# 
+# YOY_ss <- YOY %>%
+#   select(Time, "SAR.0")
+# 
+# fullresZ <- calc_Z(
+#   yoy = YOY_ss,
+#   nums = truenums_ss,
+#   fgs = fgs,
+#   biolprm = biolprm,
+#   toutinc = runprm$toutinc
+# )
+# Z <- mean(fullresZ$atoutput)
+# 
+# meanwt_spp <- survey_lenwt[[1]]$muweight %>%
+#   filter(time > burnin) %>%
+#   group_by(agecl) %>%
+#   summarize(meanwt = mean(atoutput))
+# 
+# ctlfile_name <- "sardEM_3_3.ctl"
+# sardine.ctl <- r4ss::SS_readctl_3.30(paste0(
+#   "./inst/extdata/",
+#   model_dir,
+#   ctlfile_name
+# ),
+# datlist = paste0(
+#   "./inst/extdata/", model_dir,
+#   datfile_name
+# )
+# )
+# 
+# lensage <- data.frame(
+#   agecl = age_classes[[species]],
+#   meanln = seq(15.188, 48.39, length = length(age_classes[[species]])),
+#   cvln = seq(15.188 * 0.25, 0.9, length = length(age_classes[[species]]))
+# )
+# cvo_guess <- 48.39
+# 
+# sardine.ctl <- atlantisom::SS_write_biol(sardine.ctl,
+#   biolprm,
+#   "SAR",
+#   wtsage = meanwt_spp,
+#   M_est = rep(0.4, length(age_classes[[species]])),
+#   lensage = lensage
+# )
+# 
+# li_a_use <- biolprm$wl[match(fgs$Code[match(species, fgs$Name)], biolprm$wl[, 1]), 2] / 1000
+# li_b_use <- biolprm$wl[match(fgs$Code[match(species, fgs$Name)], biolprm$wl[, 1]), 3]
+# 
+# # maturity ogive
+# # check what R0 is
+# 
+# 
+# 
+# len_nonburn <- survey_lenwt[[1]]$mulen %>%
+#   filter(time > burnin * timestep)
+# plot(len_nonburn$atoutput ~ len_nonburn$agecl, col = len_nonburn$time)
+# 
+# length.data <- data.frame("Year" = (len_nonburn$time - survey_sample_time) / timestep + 1, length = len_nonburn$atoutput, Weight = NA, Sex = "Female", age = as.integer(len_nonburn$agecl))
+# 
+# # require(bbmle)
+# # vb_estimates <-sample_fit_vbgf(length.data, 25, 45, 0.4,
+# #  0.1, 0.1, 20, 40, 0.05, 0.01, 0.01,
+# #  30, 50, 0.6, 0.3, 0.3, 0.5, 10)
 ```
 
 ## Run Stock Synthesis
 After the data and control file modifications, ensure you copy the local SS 3.3 executable into the folder containing the model files. Then run the following chunk.
 
 ```{r runSS}
-#Run stock synthesis model 
+# Run stock synthesis model
 # default runs with admb_options = "-noest"
-#run_stocksynthesis(species = species, model_dir = model_dir, show_output = TRUE)
+# run_stocksynthesis(species = species, model_dir = model_dir, show_output = TRUE)
 
 # for estimation
 run_stocksynthesis(species = species, model_dir = model_dir, admb_options = "", show_output = TRUE)
-
 ```
