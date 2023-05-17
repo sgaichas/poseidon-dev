@@ -1,0 +1,49 @@
+---
+title: "New catch functions from CATCH.nc file"
+author: "Sarah Gaichas"
+date: "`r format(Sys.time(), ''%d %B %Y'')`"
+output: html_document
+---
+
+## Intro
+
+Total catch in tons has been pulled from the Atlantis `CATCH.txt` output file from 2019-2023 due to difficulties scaling catch in numbers from the `CATCH.nc` file to total weight. See comparisons [here](https://sgaichas.github.io/poseidon-dev/TestCatchNOBA.html). 
+
+For testing multispecies models, there is a need for subannual catch information, which is not provided in the annual `CATCH.txt` output. In addition, there is no polygon information in the `CATCH.txt` output, so spatial subsetting is not possible.
+
+In order to get catch in tons subannually and by area, we can use the fleet-specific catch information in the `CATCH.nc` file. These outputs are reported in tons by species in aggregate over all age classes for each defined fleet.
+
+## Methods
+
+Workflow
+
+1.  Modify `atlantisom::load_nc` to get catch in tons from different `CATCH.nc` outputs. New function because current function already gets catch in numbers, would be complicated to use the same "Catch" variable to get tons. Name new function `atlantisom::load_nc_catchtons`
+
+2.  Test new `atlantisom::load_nc_catchtons` with NOBA, NEUS, CC by summing output over polygons and fleets to each year and comparing with annual output of current `atlantisom::load_catch` based on `CATCH.txt`
+
+3.  Incorporate `atlantisom::load_nc_catchtons` into `atlantisom::run_truth`. Add a new catchtons object keeping polygon, timestep, and fleet information to the output list. Consider removing the `CATCH.txt` output in this function, currently called `catch_all` but not used? Or keep it, since catchtons can be summed to catch_all this could be used as an internal test as was started in the run_truth function. 
+
+4.  Adjust `atlantisom::om_init` for the new catchtons output. Should we keep reading in the `CATCH.txt` here? It may be ok to keep it just to keep existing functions for aggregate annual catch working.
+
+5.  Adjust `atlantisom::om_species` for the new catchtons output. 
+
+6.  Adjust `atlantisom::om_index` for the new catchtons output. Create a new index that will be consistent across the subannual and annual datasets: this means applying the cv at the level of reporting? So possibly by fleet and timestep, then summing to annual? This involves including and updating two functions: `atlantisom::create_fishery_subset` parallel to the `atlantisom::create_survey` function to subset areas, currently used only on fishery comps but can now be applied to the index as well, and updating another `atlantisom::sample_fishery_totalcatch` for the cv application. This will save perhaps one new output and update one existing output, or just one output? Will we have the same current `censusfishCatch.rds` output that is annually aggregated plus a disaggregated version? Or have a single output with the same name `censusfishCatch.rds` that is disaggregated, to be summed separately in mskeyrun?
+
+7. Adjust `mskeyrun` functions creating aggregated and subannual catch datasets. Do we need a fleet specific index?
+
+
+### 1. New `atlantisom::load_nc_catchtons` function
+
+Here is the new script, tested with snippets in mskeyrun sarah_wgsamsim branch and implemented in atlantisom dev branch
+
+```{r}
+
+```
+
+
+### Test `load_nc_catchtons` with the NOBA, NEUS, CC model outputs
+
+```{r}
+
+```
+
