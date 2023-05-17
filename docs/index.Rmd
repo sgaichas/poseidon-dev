@@ -9,6 +9,10 @@ These pages document initial testing of the atlantisom package in development at
 
 <a href="https://sgaichas.github.io/poseidon-dev/atlantisom_landingpage.html" target="_blank">Draft atlantisom landing page for review, June 9, 2020</a>
 
+### New workflow testing for WGSAM simulated datasets
+
+<a href="https://sgaichas.github.io/poseidon-dev/NewCatchWorkflow.html" target="_blank"> Total catch in tons now by polygon, fleet, and subannual timestep, in honor of Norwegian Constitution Day, May 17, 2023</a>
+
 ### New CCA run
 
 <a href="https://sgaichas.github.io/poseidon-dev/NewCCASardines.html" target="_blank"> Test run from Isaac, June 30, 2022</a>
