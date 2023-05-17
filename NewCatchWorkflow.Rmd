@@ -58,9 +58,11 @@ Here is the new function, tested with snippets in mskeyrun sarah_wgsamsim branch
 
 ### 2. Test `load_nc_catchtons` with the NOBA, NEUS, CC model outputs
 
-Only NOBA first, this one sacc30 with climate, different from sacc38 in mskeyrun without
+For all plots, the total catch derived from CATCH.txt is considered correct, and is represented by the black line. The total catch summed across polygon, subannual timestep and fleet is in blue. 
 
-```{r}
+Only NOBA first, this one is model sacc30 with climate, different from sacc38 in `mskeyrun` without climate: 
+
+```{r, message=FALSE, warning=FALSE}
 
 # define for each model
 
@@ -82,7 +84,7 @@ select_groups <- c("Long_rough_dab",
 
 stepperyr <- 5
 
-## CC
+
 
 ## NEUS
 
@@ -91,62 +93,131 @@ stepperyr <- 5
 ##### aggregate over polygons to fleets #######
 # make this a function
 
-source(atlmod)
-
-dir <- d.name
-nc_catch <- paste0(scenario.name, 'CATCH.nc')
-file_fgs <- functional.groups.file
-file_init <- initial.conditions.file
-file_fish <- fisheries.file
-
-# Get the boundary boxes
-allboxes <- atlantisom::load_box(dir = d.name, file_bgm = box.file)
-boxes <- atlantisom::get_boundary(allboxes)
-
-
+comparecatch <- function(atlmod, select_groups, stepperyr) {
+  source(atlmod, local = TRUE)
+  
+  dir <- d.name
+  nc_catch <- paste0(scenario.name, 'CATCH.nc')
+  file_fgs <- functional.groups.file
+  file_init <- initial.conditions.file
+  file_fish <- fisheries.file
+  
+  # Get the boundary boxes
+  allboxes <- atlantisom::load_box(dir = d.name, file_bgm = box.file)
+  boxes <- atlantisom::get_boundary(allboxes)
+  
+  
   # Read in information
   # Read in the functional groups csv since that is used by many functions
   fgs <- load_fgs(dir = dir, file_fgs = file_fgs)
   # Read in the biomass pools
-  bps <- load_bps(dir = dir, fgs = file_fgs, file_init = file_init)
-
-  catchtons <- load_nc_catchtons(dir = dir,
-                                 file_nc = nc_catch,
-                                 file_fish = file_fish,
-                                 bps = bps,
-                                 fgs = fgs,
-                                 select_groups = select_groups,
-                                 select_variable = "Catch",
-                                 check_acronyms = TRUE,
-                                 bboxes = boxes)
+  bps <- load_bps(dir = dir,
+                  fgs = file_fgs,
+                  file_init = file_init)
+  
+  catchtons <- load_nc_catchtons(
+    dir = dir,
+    file_nc = nc_catch,
+    file_fish = file_fish,
+    bps = bps,
+    fgs = fgs,
+    select_groups = select_groups,
+    select_variable = "Catch",
+    check_acronyms = TRUE,
+    bboxes = boxes
+  )
   #if(verbose) message("Catch tons read in.")
+  
+  # result is output of load_nc_catchtons
+  
+  aggcatchtons <- catchtons %>%
+    dplyr::select(-agecl) %>%
+    dplyr::group_by(species, fleet, time) %>%
+    dplyr::summarise(totcatch = sum(atoutput)) %>%
+    dplyr::mutate(year = ceiling(time / stepperyr))
+  
+  # compare annual catch in tons to CATCH.txt output
+  yearcatchtons <- aggcatchtons %>%
+    dplyr::group_by(species, year) %>%
+    dplyr::summarise(yeartot = sum(totcatch))
+  
+  txtCatchtons <- atlantisom::load_catch(d.name, catch.file, fgs) %>%
+    dplyr::filter(species %in% select_groups) %>%
+    dplyr::mutate(year = time / 365) %>%
+    dplyr::left_join(dplyr::select(fgs, Code, Name), by = c("species" = "Name"))
+  
+  comparetons <- txtCatchtons %>%
+    dplyr::left_join(yearcatchtons, by = c("Code" = "species", "year" = "year")) %>%
+    ggplot2::ggplot() +
+    geom_line(aes(year, atoutput)) +
+    geom_point(aes(year, yeartot), color = "blue", alpha = 0.2) +
+    facet_wrap( ~ species, scales = "free_y")
+  
+  # looks like a match!
+  comparetons
+  
+}
 
-# result is output of load_nc_catchtons
+comparecatch(atlmod = atlmod, 
+             select_groups = select_groups,
+             stepperyr = stepperyr)
 
-aggcatchtons <- catchtons %>%
-  dplyr::select(-agecl) %>%
-  dplyr::group_by(species, fleet, time) %>%
-  dplyr::summarise(totcatch = sum(atoutput)) %>%
-  dplyr::mutate(year = ceiling(time/stepperyr)) 
-
-# compare annual catch in tons to CATCH.txt output
-yearcatchtons <- aggcatchtons %>%
-  dplyr::group_by(species, year) %>%
-  dplyr::summarise(yeartot = sum(totcatch))
-
-txtCatchtons <- atlantisom::load_catch(d.name, catch.file, fgs) %>%
-  dplyr::filter(species %in% select_groups) %>%
-  dplyr::mutate(year = time/365) %>%
-  dplyr::left_join(dplyr::select(fgs, Code, Name), by = c("species" = "Name"))
-
-comparetons <- txtCatchtons %>%
-  dplyr::left_join(yearcatchtons, by = c("Code" = "species", "year" = "year")) %>%
-  ggplot2::ggplot() +
-  geom_line(aes(year, atoutput)) +
-  geom_point(aes(year, yeartot), color = "blue", alpha = 0.2) +
-  facet_wrap(~species, scales="free_y")
- 
-# looks like a match!               
-comparetons
 ```
+
+Now try the Isaac's recent CC model:
+
+```{r, message=FALSE, warning=FALSE}
+## CC
+
+atlmod <- here("config/CCConfigSep22.R")
+
+select_groups <- c("Arrowtooth_flounder",
+                   "Petrale_sole",
+                   "Pacific_sardine",
+                   "Anchovy",
+                   "Herring",
+                   "Pacific_Ocean_Perch",
+                   "Bocaccio_rockfish",
+                   "Yelloweye_rockfish",
+                   "Mesopel_M_Fish", #Pacific hake
+                   "Mesopel_N_Fish", #Sablefish
+                   "Demersal_P_Fish") #Dover sole
+
+stepperyr <- 5
+
+comparecatch(atlmod = atlmod, 
+             select_groups = select_groups,
+             stepperyr = stepperyr)
+```
+
+And finally the NEUS model, thanks to Joe for output files: 
+
+```{r, message=FALSE, warning=FALSE}
+## NEUS
+atlmod <- here("config/NEUStestConfigMay23.R")
+
+select_groups <- c("Summerflounder",
+                   "Winterflounder",
+                   "Mackerel",
+                   "Herring",
+                   "Cod",
+                   "Monkfish",
+                   "Haddock",
+                   "Spiny_Dogfish",
+                   "Winter_Skate",
+                   "Yellowtail_Flounder",
+                   "Silver_Hake")
+
+stepperyr <- 5
+
+comparecatch(atlmod = atlmod, 
+             select_groups = select_groups,
+             stepperyr = stepperyr)
+
+```
+
+Looks like we have a match to CATCH.txt output for all systems using the same function and inputs from the CATCH.nc file. However, it looks like there is a final value in CATCH.txt that is not present, or not being summed correctly in the CATCH.nc output in the CC and NEUS models. Worth investigating...
+
+### 3. Incorporate new `load_nc_catchtons` function into `run_truth`
+
 
