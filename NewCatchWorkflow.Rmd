@@ -23,9 +23,9 @@ library(atlantisom)
 
 ## Intro
 
-Total catch in tons has been pulled from the Atlantis `CATCH.txt` output file from 2019-2023 due to difficulties scaling catch in numbers from the `CATCH.nc` file to total weight. See comparisons [here](https://sgaichas.github.io/poseidon-dev/TestCatchNOBA.html). 
+Total catch in tons has been pulled from the Atlantis `Catch.txt` output file from 2019-2023 due to difficulties scaling catch in numbers from the `CATCH.nc` file to total weight. See comparisons [here](https://sgaichas.github.io/poseidon-dev/TestCatchNOBA.html). 
 
-For testing multispecies models, there is a need for subannual catch information, which is not provided in the annual `CATCH.txt` output. In addition, there is no polygon information in the `CATCH.txt` output, so spatial subsetting is not possible.
+For testing multispecies models, there is a need for subannual catch information, which is not provided in the annual `Catch.txt` output. In addition, there is no polygon information in the `Catch.txt` output, so spatial subsetting is not possible.
 
 In order to get catch in tons subannually and by area, we can use the fleet-specific catch information in the `CATCH.nc` file. These outputs are reported in tons by species in aggregate over all age classes for each defined fleet.
 
@@ -35,11 +35,11 @@ Workflow
 
 1.  Modify `atlantisom::load_nc` to get catch in tons from different `CATCH.nc` outputs. New function because current function already gets catch in numbers, would be complicated to use the same "Catch" variable to get tons. Name new function `atlantisom::load_nc_catchtons`
 
-2.  Test new `atlantisom::load_nc_catchtons` with NOBA, NEUS, CC by summing output over polygons and fleets to each year and comparing with annual output of current `atlantisom::load_catch` based on `CATCH.txt`
+2.  Test new `atlantisom::load_nc_catchtons` with NOBA, NEUS, CC by summing output over polygons and fleets to each year and comparing with annual output of current `atlantisom::load_catch` based on `Catch.txt`
 
-3.  Incorporate `atlantisom::load_nc_catchtons` into `atlantisom::run_truth`. Add a new catchtons object keeping polygon, timestep, and fleet information to the output list. Consider removing the `CATCH.txt` output in this function, currently called `catch_all` but not used? Or keep it, since catchtons can be summed to catch_all this could be used as an internal test as was started in the run_truth function. 
+3.  Incorporate `atlantisom::load_nc_catchtons` into `atlantisom::run_truth`. Add a new catchtons object keeping polygon, timestep, and fleet information to the output list. Consider removing the `Catch.txt` output in this function, currently called `catch_all` but not used? Or keep it, since catchtons can be summed to catch_all this could be used as an internal test as was started in the run_truth function. 
 
-4.  Adjust `atlantisom::om_init` for the new catchtons output. Should we keep reading in the `CATCH.txt` here? It may be ok to keep it just to keep existing functions for aggregate annual catch working.
+4.  Adjust `atlantisom::om_init` for the new catchtons output. Should we keep reading in the `Catch.txt` here? It may be ok to keep it just to keep existing functions for aggregate annual catch working.
 
 5.  Adjust `atlantisom::om_species` for the new catchtons output. 
 
@@ -58,7 +58,7 @@ Here is the new function, tested with snippets in mskeyrun sarah_wgsamsim branch
 
 ### 2. Test `load_nc_catchtons` with the NOBA, NEUS, CC model outputs
 
-For all plots, the total catch derived from CATCH.txt is considered correct, and is represented by the black line. The total catch summed across polygon, subannual timestep and fleet is in blue. 
+For all plots, the total catch derived from Catch.txt is considered correct, and is represented by the black line. The total catch summed across polygon, subannual timestep and fleet is in blue. 
 
 Only NOBA first, this one is model sacc30 with climate, different from sacc38 in `mskeyrun` without climate: 
 
@@ -136,7 +136,7 @@ comparecatch <- function(atlmod, select_groups, stepperyr) {
     dplyr::summarise(totcatch = sum(atoutput)) %>%
     dplyr::mutate(year = ceiling(time / stepperyr))
   
-  # compare annual catch in tons to CATCH.txt output
+  # compare annual catch in tons to Catch.txt output
   yearcatchtons <- aggcatchtons %>%
     dplyr::group_by(species, year) %>%
     dplyr::summarise(yeartot = sum(totcatch))
@@ -216,8 +216,17 @@ comparecatch(atlmod = atlmod,
 
 ```
 
-Looks like we have a match to CATCH.txt output for all systems using the same function and inputs from the CATCH.nc file. However, it looks like there is a final value in CATCH.txt that is not present, or not being summed correctly in the CATCH.nc output in the CC and NEUS models. Worth investigating...
+Looks like we have a match to Catch.txt output for all systems using the same function and inputs from the CATCH.nc file. However, it looks like there is a final value in Catch.txt that is not present, or not being summed correctly in the CATCH.nc output in the CC and NEUS models. Worth investigating...
 
-### 3. Incorporate new `load_nc_catchtons` function into `run_truth`
+### 3. Incorporate new `load_nc_catchtons` function into `atlantisom::run_truth`
+
+Added catchtons and disctons (same function with `select_variable = "Discards"`) to `run_truth` in the atlantisom dev branch. At present, catchtons and disctons are in the run_truth output and catch_all which was originally from the `Catch.txt` file have been removed from the output. Sections of the function that read in both the `Catch.txt` and the `CatchPerFishery.txt` files have been commented out. They could be reinstated if needed, but `om_init` reads in `Catch.txt` already and seems like a good place to read in text files. 
+
+Here is the new function, tested by re-running the code in `SimData.Rmd` in the mskeyrun repo using the NOBA sacc38 outputs. The new runtruth object includes the new catchtons and disctons (0) objects. 
+
+```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/run_truth.R"), eval=F}
+```
+
+### 4.  Adjust `atlantisom::om_init` for the new catchtons output
 
 
