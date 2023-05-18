@@ -27,7 +27,7 @@ Total catch in tons has been pulled from the Atlantis `Catch.txt` output file fr
 
 For testing multispecies models, there is a need for subannual catch information, which is not provided in the annual `Catch.txt` output. In addition, there is no polygon information in the `Catch.txt` output, so spatial subsetting is not possible.
 
-In order to get catch in tons subannually and by area, we can use the fleet-specific catch information in the `CATCH.nc` file. These outputs are reported in tons by species in aggregate over all age classes for each defined fleet.
+In order to get catch in tons subannually and by area, we can use the fleet-specific catch information in the `CATCH.nc` file. These outputs are reported in tons by species aggregated over all age classes for each defined fleet. Variable names in the `CATCH.nc` file for these outputs follow the format "XXX_Catch_FCN" and "XXX_Discard_FCN" where XXX is the 3 letter group Code defined in the Atlantis `groups.csv` file and N is the integer Index for the fishery defined in the Atlantis `fisheries.csv` file. 
 
 ## Methods
 
@@ -235,11 +235,41 @@ Actually, no adjustment needed for `om_init`. This was run as is to produce the 
 
 Added the catchtons and disctons truth outputs here, subset by code rather than species name, update documentation. Note that code will need to be changed to species prior to applying the fishery sampling functions. 
 
-New function, tested by re-running code in `SimData.Rmd` in mskeyrun as above. The most recent omlist_ss.rds file in the mskeyrun simulated data atlantisoutput NOBAsacc38 directory reflects the updated catch in tons at full resolution.
+New function, tested by re-running code in `SimData.Rmd` in mskeyrun as above. The most recent `omlist_ss.rds` file in the mskeyrun simulated data atlantisoutput NOBAsacc38 directory reflects the updated catch in tons at full resolution.
 
 ```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/om_species.R"), eval=F}
 ```
 
 ### 6. Adjust `atlantisom::om_index` for the new catchtons output
 
-The complex part.
+The complex part. This requires adjusting the `atlantisom::create_fishery_subset` to take catchtons as an input, then feeding this into the index using `atlantisom::sample_fishery_totalcatch` and applying cv at a more disaggregated point, then summing to the annual index so that subannual and annual indices are consistent. Then `om_index` will output the subannual index only, or both? It should probably just make one and users can decide how to aggregate to annual (ie. mskeyrun will provide both a subannual and annual index based on the same `om_index` output).
+
+#### 6a. Update `om_index`
+
+The fishery portion of this wrapper can now have parallel structure to the survey portion. It allows multiple fishery.R config files so the user can get a differet index for each fleet if that is desired. Specifications for which polygons are kept for which fleet number would be in the fishery.R config file. If only one file we can have it default to aggregating across fleets for a species first. 
+
+
+```{r}
+
+```
+
+
+#### 6b. Update `create_fishery_subset`
+
+This needs modification to use the fleet column found in catchtons. 
+
+```{r}
+
+```
+
+
+#### 6c. Update `sample_fishery_totalcatch`
+
+Applies cv at the subannual level for the specified fishery. 
+
+```{r}
+
+```
+
+
+
