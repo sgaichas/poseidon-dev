@@ -1491,6 +1491,171 @@ run_truth &lt;- function(scenario, dir = getwd(),
 <div id="adjust-atlantisomom_init-for-the-new-catchtons-output" class="section level3">
 <h3>4. Adjust <code>atlantisom::om_init</code> for the new catchtons
 output</h3>
+<p>Actually, no adjustment needed for <code>om_init</code>. This was run
+as is to produce the new truth output. I think we keep reading in
+<code>Catch.txt</code> here.</p>
+</div>
+<div id="adjust-atlantisomom_species-for-the-new-catchtons-output" class="section level3">
+<h3>5. Adjust <code>atlantisom::om_species</code> for the new catchtons
+output</h3>
+<p>Added the catchtons and disctons truth outputs here, subset by code
+rather than species name, update documentation. Note that code will need
+to be changed to species prior to applying the fishery sampling
+functions.</p>
+<p>New function, tested by re-running code in <code>SimData.Rmd</code>
+in mskeyrun as above. The most recent omlist_ss.rds file in the mskeyrun
+simulated data atlantisoutput NOBAsacc38 directory reflects the updated
+catch in tons at full resolution.</p>
+<pre class="r"><code>#&#39;Species-specific atlantisom outputs
+#&#39;@description A wrapper function to reduce a set of \code{atlantisom} objects from atlantis
+#&#39;output to a single species or subset of species for creating assessment input datasets.
+#&#39;Optionally includes diet data (set diet=TRUE in function call, default is FALSE)
+#&#39;@param species The species to sample in the survey and fishery (a vector)
+#&#39;@param omlist output of \code{om_init}
+#&#39;@return Returns an omlist_ss list object containing dataframes and lists:
+#&#39; \itemize{
+#&#39;  \item{species_ss, species name(s)}
+#&#39;  \item{code_ss, species code from funct.groups}
+#&#39;  \item{truetotbio_ss, dataframe output of \code{load_bioind}, species_ss only}
+#&#39;  \item{truecatchbio_ss, dataframe output of \code{load_catch}, species_ss only}
+#&#39;  \item{YOY_ss, dataframe young of year output, code_ss only}
+#&#39;  \item{truenums_ss, numbers at age output of \code{run_truth}, species_ss only}
+#&#39;  \item{truebio_ss, biomass at age output of \code{run_truth}, species_ss only}
+#&#39;  \item{trueresn_ss, reserve nitrogen output of \code{run_truth}, species_ss only}
+#&#39;  \item{truestructn_ss, structural nitrogen output of \code{run_truth}, species_ss only}
+#&#39;  \item{truecatchnum_ss, fishery catch at age output of \code{run_truth}, species_ss only}
+#&#39;  \item{truecons_ss, total consumption output of \code{run_truth}, species_ss only}
+#&#39;  \item{truecatchtons_ss, fishery catch by fleet output of \code{run_truth}, code_ss only}
+#&#39;  \item{truedisctons_ss, fishery discard by fleet output of \code{run_truth}, code_ss only}
+#&#39;  \item{truenumsage_ss, true numbers at annual age output of \code{run_truth}, species_ss only}
+#&#39;  \item{truecatchage_ss, fishery catch at annual age output of \code{run_truth}, species_ss only}
+#&#39;  \item{truediscage_ss, fishery discard at annual age output of \code{run_truth}, species_ss only}
+#&#39;  \item{funct.groups_ss, dataframe of species characteristics, species_ss only}
+#&#39;  \item{biol, list of biological parameters passed from input omlist}
+#&#39;  \item{boxpars, dataframe of spatial parameters}
+#&#39;  \item{runpar, list of run parameters passed from input omlist}
+#&#39; },
+#&#39;
+#&#39;@export
+#&#39;
+#&#39;@family wrapper functions
+#&#39;@author Sarah Gaichas
+#&#39;
+#&#39;@examples
+#&#39;\dontrun{
+#&#39; # assuming CC3om is output of om_init(here(&quot;config/CC3config.r&quot;))
+#&#39;CC3om_sardine &lt;- om_species(c(&quot;Pacific_sardine&quot;), CC3om)
+#&#39;
+#&#39;CC3om_2spp &lt;- om_species(c(&quot;Pacific_sardine&quot;, &quot;Mesopel_M_Fish&quot;), CC3om)
+#&#39;}
+#&#39;
+om_species &lt;- function(species = spp, omlist, save = TRUE,
+                       removefullom = TRUE){
+  # spp format c(&quot;speciesname1&quot;, &quot;speciesname2&quot;)
+  if(!all(species %in% omlist$funct.group.names)) stop(&quot;species name not found&quot;)
+  species_ss &lt;- species
+
+  #subset species true bio
+  truetotbio_ss &lt;- omlist$truetotbio[omlist$truetotbio$species %in% species_ss,]
+
+  #subset species true catch
+  truecatchbio_ss &lt;- omlist$truecatchbio[omlist$truecatchbio$species %in% species_ss,]
+
+  #subset species YOY
+  # get code matching species name to split YOY file
+  code_ss &lt;- omlist$funct.groups$Code[which(omlist$funct.groups$Name %in% species_ss)]
+  # cut to a single species in YOY file
+  YOY_ss &lt;- omlist$YOY %&gt;%
+    select(Time, paste0(code_ss, &quot;.0&quot;))
+  # reformat to be like all the other objects
+
+  # numbers at agecl at full resolution (all polygons and layers)
+  truenums_ss &lt;- omlist$truth$nums[omlist$truth$nums$species %in% species_ss,]
+
+  # biomass at agecl at full resolution (all polygons and layers)
+  truebio_ss &lt;- omlist$truth$biomass_ages[omlist$truth$biomass_ages$species %in% species_ss,]
+
+  # reserve nitrogen at agecl at full resolution
+  trueresn_ss &lt;- omlist$truth$resn[omlist$truth$resn$species %in% species_ss,]
+
+  # structural nitrogen at agecl at full resolution
+  truestructn_ss &lt;- omlist$truth$structn[omlist$truth$structn$species %in% species_ss,]
+
+  # catch in numbers at agecl at full resoluation (all polygons, no layer in output)
+  truecatchnum_ss &lt;- omlist$truth$catch[omlist$truth$catch$species %in% species_ss,]
+
+  # catch in tons at full resolution by fleet (all polygons, no layer or agecl)
+  truecatchtons_ss &lt;- omlist$truth$catchtons[omlist$truth$catchtons$species %in% code_ss,]
+
+  # discard in tons at full resolution by fleet (all polygons, no layer or agecl)
+  truedisctons_ss &lt;- omlist$truth$disctons[omlist$truth$disctons$species %in% code_ss,]
+
+  # consumption (biomass_eaten) at agecl at full resolution (all polygons, no layer in output)
+  # based on atlantisom::calc_pred_cons()
+  truecons_ss &lt;- omlist$truth$biomass_eaten[omlist$truth$biomass_eaten$species %in% species_ss,]
+
+  # if annage output exists, add in, otherwise fill with NULL
+  if(&quot;numsage&quot; %in% names(omlist$truth)){
+    truenumsage_ss &lt;- omlist$truth$numsage[omlist$truth$numsage$species %in% species_ss,]
+  } else {truenumsage_ss &lt;- NULL}
+
+  if(&quot;catchage&quot; %in% names(omlist$truth)){
+    truecatchage_ss &lt;- omlist$truth$catchage[omlist$truth$catchage$species %in% species_ss,]
+  } else {truecatchage_ss &lt;- NULL}
+
+  if(&quot;discage&quot; %in% names(omlist$truth)){
+    truediscage_ss &lt;- omlist$truth$discage[omlist$truth$discage$species %in% species_ss,]
+  } else {truediscage_ss &lt;- NULL}
+
+  # original biomass_eaten was not correct by polygon, and also appeared inflated
+  # a separate set of functions will get true diet by polygon from the
+  # DetailedDietCheck.txt file
+  # now biomass_eaten is based on atlantisom::calc_pred_cons() and included above by default
+
+  # if(diet){
+  #   truebioeaten_ss &lt;- omlist$truth$biomass_eaten[omlist$truth$biomass_eaten$species %in% species_ss,]
+  # } else {truebioeaten_ss &lt;- NULL}
+
+  #subset species biol parameters? no, may miss some globals that aren&#39;t by species
+
+  #subset species functional group info
+  funct.groups_ss &lt;- omlist$funct.groups[omlist$funct.groups$Code %in% code_ss,]
+
+  #keep the runpar and also need boxes for survey selection
+
+  omlist_ss &lt;- list(&quot;species_ss&quot; = species_ss,
+                    &quot;code_ss&quot; = code_ss,
+                    &quot;truetotbio_ss&quot; = truetotbio_ss,
+                    &quot;truecatchbio_ss&quot; = truecatchbio_ss,
+                    &quot;YOY_ss&quot; = YOY_ss,
+                    &quot;truenums_ss&quot; = truenums_ss,
+                    &quot;truebio_ss&quot; = truebio_ss,
+                    &quot;trueresn_ss&quot; = trueresn_ss,
+                    &quot;truestructn_ss&quot; = truestructn_ss,
+                    &quot;truecatchnum_ss&quot; = truecatchnum_ss,
+                    &quot;truecons_ss&quot; = truecons_ss,
+                    &quot;truecatchtons_ss&quot; = truecatchtons_ss,
+                    &quot;truedisctons_ss&quot; = truedisctons_ss,
+                    &quot;truenumsage_ss&quot; = truenumsage_ss,
+                    &quot;truecatchage_ss&quot; = truecatchage_ss,
+                    &quot;truediscage_ss&quot; = truediscage_ss,
+                    &quot;funct.group_ss&quot; = funct.groups_ss,
+                    &quot;biol&quot; = omlist$biol,
+                    &quot;boxpars&quot; = omlist$boxpars,
+                    &quot;runpar&quot; = omlist$runpar)
+
+  if(save){
+    saveRDS(omlist_ss, file.path(d.name, paste0(scenario.name, &quot;omlist_ss.rds&quot;)))
+  }
+  if(removefullom) rm(omlist) #not removing passed data object
+
+  return(omlist_ss)
+}</code></pre>
+</div>
+<div id="adjust-atlantisomom_index-for-the-new-catchtons-output" class="section level3">
+<h3>6. Adjust <code>atlantisom::om_index</code> for the new catchtons
+output</h3>
+<p>The complex part.</p>
 </div>
 </div>
 

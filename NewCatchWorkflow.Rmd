@@ -229,4 +229,17 @@ Here is the new function, tested by re-running the code in `SimData.Rmd` in the 
 
 ### 4.  Adjust `atlantisom::om_init` for the new catchtons output
 
+Actually, no adjustment needed for `om_init`. This was run as is to produce the new truth output. I think we keep reading in `Catch.txt` here.
 
+### 5.  Adjust `atlantisom::om_species` for the new catchtons output
+
+Added the catchtons and disctons truth outputs here, subset by code rather than species name, update documentation. Note that code will need to be changed to species prior to applying the fishery sampling functions. 
+
+New function, tested by re-running code in `SimData.Rmd` in mskeyrun as above. The most recent omlist_ss.rds file in the mskeyrun simulated data atlantisoutput NOBAsacc38 directory reflects the updated catch in tons at full resolution.
+
+```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/om_species.R"), eval=F}
+```
+
+### 6. Adjust `atlantisom::om_index` for the new catchtons output
+
+The complex part.
