@@ -246,7 +246,11 @@ The complex part. This requires adjusting the `atlantisom::create_fishery_subset
 
 #### 6a. Update `om_index`
 
-The fishery portion of this wrapper can now have parallel structure to the survey portion. It allows multiple fishery.R config files so the user can get a differet index for each fleet if that is desired. Specifications for which polygons are kept for which fleet number would be in the fishery.R config file. If only one file we can have it default to aggregating across fleets for a species first. 
+The fishery portion of this wrapper can now have parallel structure to the survey portion. It allows multiple fishery.R config files so the user can get a differet index for each fleet if that is desired. Specifications for which polygons are kept for which fleet number would be in the fishery.R config file. 
+
+If only one file we can have it default to aggregating across fleets for a species first: for each fishery.R file the first step is to select fleets identified in fishery.R and aggregate across those fleets in the input. Or we do this by default for each fleet and have users sum at the end?
+
+Note that allowing for multiple fishery.R files for each fleet means we need to make a parallel change to `om_comps`.
 
 
 ```{r}
