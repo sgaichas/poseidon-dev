@@ -11,7 +11,7 @@
 
 <meta name="author" content="Sarah Gaichas" />
 
-<meta name="date" content="2023-05-17" />
+<meta name="date" content="2023-06-09" />
 
 <title>New catch functions from CATCH.nc file</title>
 
@@ -446,7 +446,7 @@ display: none;
 
 <h1 class="title toc-ignore">New catch functions from CATCH.nc file</h1>
 <h4 class="author">Sarah Gaichas</h4>
-<h4 class="date">17 May 2023</h4>
+<h4 class="date">09 June 2023</h4>
 
 </div>
 
@@ -471,8 +471,13 @@ output. In addition, there is no polygon information in the
 possible.</p>
 <p>In order to get catch in tons subannually and by area, we can use the
 fleet-specific catch information in the <code>CATCH.nc</code> file.
-These outputs are reported in tons by species in aggregate over all age
-classes for each defined fleet.</p>
+These outputs are reported in tons by species aggregated over all age
+classes for each defined fleet. Variable names in the
+<code>CATCH.nc</code> file for these outputs follow the format
+“XXX_Catch_FCN” and “XXX_Discard_FCN” where XXX is the 3 letter group
+Code defined in the Atlantis <code>groups.csv</code> file and N is the
+integer Index for the fishery defined in the Atlantis
+<code>fisheries.csv</code> file.</p>
 </div>
 <div id="methods" class="section level2">
 <h2>Methods</h2>
@@ -1503,9 +1508,9 @@ rather than species name, update documentation. Note that code will need
 to be changed to species prior to applying the fishery sampling
 functions.</p>
 <p>New function, tested by re-running code in <code>SimData.Rmd</code>
-in mskeyrun as above. The most recent omlist_ss.rds file in the mskeyrun
-simulated data atlantisoutput NOBAsacc38 directory reflects the updated
-catch in tons at full resolution.</p>
+in mskeyrun as above. The most recent <code>omlist_ss.rds</code> file in
+the mskeyrun simulated data atlantisoutput NOBAsacc38 directory reflects
+the updated catch in tons at full resolution.</p>
 <pre class="r"><code>#&#39;Species-specific atlantisom outputs
 #&#39;@description A wrapper function to reduce a set of \code{atlantisom} objects from atlantis
 #&#39;output to a single species or subset of species for creating assessment input datasets.
@@ -1655,7 +1660,405 @@ om_species &lt;- function(species = spp, omlist, save = TRUE,
 <div id="adjust-atlantisomom_index-for-the-new-catchtons-output" class="section level3">
 <h3>6. Adjust <code>atlantisom::om_index</code> for the new catchtons
 output</h3>
-<p>The complex part.</p>
+<p>The complex part. This requires adjusting the
+<code>atlantisom::create_fishery_subset</code> to take catchtons as an
+input, then feeding this into the index using
+<code>atlantisom::sample_fishery_totalcatch</code> and applying cv at a
+more disaggregated point, then summing to the annual index so that
+subannual and annual indices are consistent. Then <code>om_index</code>
+will output the subannual index only, or both? It should probably just
+make one and users can decide how to aggregate to annual (ie. mskeyrun
+will provide both a subannual and annual index based on the same
+<code>om_index</code> output).</p>
+<div id="a.-update-om_index" class="section level4">
+<h4>6a. Update <code>om_index</code></h4>
+<p>The fishery portion of this wrapper can now have parallel structure
+to the survey portion. It allows multiple fishery.R config files so the
+user can get a different index for each fleet if that is desired.
+Specifications for which polygons are kept for which fleet number would
+be in the <code>fishery.R</code> config file, with an appropriate
+fleet.name.</p>
+<p>I think we want to aggregate across all fleets for a species for the
+given set of polygons: for each <code>fishery.R</code> file the first
+step is to select fleets identified in <code>fishery.R</code> and
+aggregate across those fleets for the polygons specified in
+<code>fishery.R</code>, keeping species separated out–this is done in
+<code>create_fishery_subset</code> below.</p>
+<p>Note that allowing for multiple <code>fishery.R</code> files for each
+fleet means we need to make a parallel change to
+<code>om_comps</code>.</p>
+<p>Note that species in here are the codes not the names, so conversion
+back to names needs to happen somewhere. The fishery.R file now
+specifies the species codes in fishspp instead of species names (survspp
+still does that).</p>
+<p>Here is the new <code>om_index</code></p>
+<pre class="r"><code>#&#39;Generate index data from atlantisom
+#&#39;
+#&#39;#&#39;@description A wrapper function to create survey and fishery index data for assessment input.
+#&#39;Takes the output of \code{om_species}. Wrapper can generate replicates. Saves output as .rds
+#&#39;Results for more than one survey are generated with multiple survey config files and
+#&#39;saved as separate .rds files.
+#&#39;@param usersurvey survey config file in format of /config/usersurvey.R
+#&#39;@param userfishery fishery config file in format of /config/fisherycensus.R
+#&#39;@param omlist_ss output of \code{om_species}
+#&#39;@param n_reps number of replicate indices to be generated
+#&#39;@template save
+#&#39;@return Returns list objects containing dataframes of survey biomass index and total catch:
+#&#39; \itemize{
+#&#39;  \item{survObsBiomB, list of replicate dataframes of observed survey biomass (tons)}
+#&#39;  \item{fishObsCatchB, list of replicate dataframes of observed fishery catch (tons)}
+#&#39; },
+#&#39;
+#&#39;@export
+#&#39;
+#&#39;@family wrapper functions
+#&#39;@author Sarah Gaichas
+#&#39;
+#&#39;@examples
+#&#39;\dontrun{
+#&#39; # assuming CC3om is output of om_init(here(&quot;config/CC3config.r&quot;))
+#&#39; # and CC3om_sardine &lt;- om_species(c(&quot;Pacific_sardine&quot;), CC3om)
+#&#39;
+#&#39;CC3om_sard_ind &lt;- om_index(usersurvey = here(&quot;config/usersurvey.R&quot;),
+#&#39;     userfishery = here(&quot;config/fisherycensus.R&quot;),
+#&#39;     omlist_ss = CC3om_sardine,
+#&#39;     n_reps = 5,
+#&#39;     save = TRUE)
+#&#39;}
+#&#39;
+om_index &lt;- function(usersurvey = usersurvey_file,
+                     userfishery = userfishery_file,
+                     omlist_ss,
+                     n_reps = n_reps,
+                     save = TRUE){
+
+  #one script for dimension parameters to be used in multiple functions
+  source(&quot;config/omdimensions.R&quot;, local = TRUE)
+
+  # user options for survey--default is a census with mid-year sample
+  # allows muliple surveys
+  survObsBiomBs &lt;- list()
+
+  for (s in usersurvey)
+  {
+    source(s, local = TRUE)
+
+    #biomass based fishery independent survey index
+    # this uses result$biomass_ages to sample biomass directly, no need for wt@age est
+    survey_B &lt;- atlantisom::create_survey(dat = omlist_ss$truebio_ss,
+                                          time = survtime,
+                                          species = survspp,
+                                          boxes = survboxes,
+                                          effic = surveffic,
+                                          selex = survselex)
+
+    # call sample_survey_biomass with a bunch of 1000s for weight at age
+    # in the code it multiplies atoutput by wtatage/1000 so this allows us to use
+    # biomass directly
+    wtage &lt;- data.frame(species=rep(names(age_classes), n_age_classes),
+                        agecl=unlist(sapply(n_age_classes,seq)),
+                        wtAtAge=rep(1000.0,sum(n_age_classes)))
+
+    # this is the step to repeat n_reps time if we want different realizations
+    # of the same survey design specified above; only observation error differs
+    # using the census cv of 0 will produce identical reps!
+    survObsBiomB &lt;- list()
+    for(i in 1:n_reps){
+      survObsBiomB[[i]] &lt;- atlantisom::sample_survey_biomass(survey_B, surv_cv, wtage)
+    }
+
+    #save survey indices, takes a long time to generate with lots of reps/species
+    if(save){
+      saveRDS(survObsBiomB, file.path(d.name, paste0(scenario.name, &quot;_&quot;,
+                                                     survey.name, &quot;surveyB.rds&quot;)))
+    }
+
+    survObsBiomBs[[survey.name]] &lt;- survObsBiomB
+  }
+
+  #configure the fishery, a default is in config/fisherycensus.R
+  #fishery configuration can specify only area and time of observation
+  #fishery species inherited from omlist_ss
+  #this is total catch not by fleet, so only one &quot;fishery&quot;
+
+  # 2023 update, can now get fleet specific catch by polygon
+  # user options for fishery--default is a census in all areas for all fleets
+  # allows multiple fisheries
+  fishObsCatchBs &lt;- list()
+
+  for(f in userfishery){
+
+    source(f, local = TRUE)
+
+    # 2023 update: we can now subset fishery catch from CATCH.nc using fleet output
+    # create_fishery_subset as currently written aggregates across fleets and polygons
+    # change so that fleets to be aggregated together are specified in the userfishery file
+
+    fishery_C &lt;- atlantisom::create_fishery_subset(dat = omlist_ss$truecatchtons_ss,
+                                                   time = fishtime,
+                                                   fleets = fishfleets,
+                                                   species = fishspp,
+                                                   boxes = fishboxes)
+
+    fishObsCatchB &lt;- list()
+    for(i in 1:n_reps){
+      fishObsCatchB[[i]] &lt;- atlantisom::sample_fishery_totcatch(fishery_C, fish_cv)
+    }
+
+    if(save){
+      saveRDS(fishObsCatchB, file.path(d.name, paste0(scenario.name, &quot;_&quot;,
+                                                      fishery.name, &quot;fishCatch.rds&quot;)))
+    }
+
+    fishObsCatchBs[[fishery.name]] &lt;- fishObsCatchB
+
+  }
+
+  indices &lt;- list(&quot;survObsBiomB&quot; = survObsBiomBs,
+                  &quot;fishObsCatchB&quot; = fishObsCatchBs)
+
+  return(indices)
+}</code></pre>
+<p>And an example <code>fishery.R</code> file (modified
+<code>msfishery.R</code> file used in ms-keyrun project):</p>
+<pre class="r"><code># Default fishery configuration here is a census
+# June 2023 now aggregating over fleets in input
+# change name to identify fleet specific config files
+# output will be stored with this name
+
+fishery.name=&quot;allfleet&quot;
+
+# select fleets by number from fisheries.csv Index column
+# NULL is all fleets
+fishfleets &lt;- NULL
+
+# Inherits species from input omlist_ss
+fishspp &lt;- omlist_ss$code_ss 
+
+# fishery output: learned the hard way this can be different from ecosystem outputs
+fstepperyr &lt;- if(omlist_ss$runpar$outputstepunit==&quot;days&quot;) 365/omlist_ss$runpar$toutfinc
+
+#The last timestep to sample
+total_sample &lt;- noutsteps-1 #495
+
+# leave out model burn in period? define how long
+burnin &lt;- 0
+
+# take only some years? for mskeyrun we do this later, here take all
+nyears &lt;- NULL
+
+# same time dimensioning parameters as in surveycensus.R
+#Vector of indices of catch in numbers to pull (by timestep to sum)
+fish_sample_full &lt;- c(0:total_sample)  #total_sample
+#fish_burnin &lt;- burnin*fstepperyr+1
+#fish_nyears &lt;- nyears*fstepperyr
+#fish_times &lt;- fish_sample_full[fish_burnin:(fish_burnin+fish_nyears-1)]
+#fish_timesteps &lt;- seq(fish_times[fstepperyr], max(fish_times), by=fstepperyr) #last timestep
+#fish_years &lt;- unique(floor(fish_times/fstepperyr)+1) # my original
+#fish_years &lt;- unique(floor(fish_times/fstepperyr)) #from Christine&#39;s new sardine_config.R
+
+#fishtime &lt;- fish_times
+
+fishtime &lt;- fish_sample_full
+
+# fishery sampling area
+# should return all model areas, this assumes you see everything that it caught
+fishboxes &lt;- c(0:(omlist_ss$boxpars$nbox - 1))
+
+# effective sample size needed for sample_fish
+# this effective N is divided by the number of annual timesteps below, so 200 per time
+# use as input to the length samples, ages can be a subset
+fisheffN &lt;- data.frame(species=survspp, effN=rep(1000, length(survspp)))
+
+#this adjusts for subannual fishery output so original effN is for whole year
+fisheffN$effN &lt;- fisheffN$effN/fstepperyr 
+
+# fishery catch cv can be used in sample_survey_biomass
+# perfect observation
+fish_cv &lt;- data.frame(species=fishspp, cv=rep(0.01,length(fishspp)))</code></pre>
+</div>
+<div id="b.-update-create_fishery_subset" class="section level4">
+<h4>6b. Update <code>create_fishery_subset</code></h4>
+<p>Left alone, this function will aggregate across all fleets and
+polygons given in the input data (since it is not expecting a fleet
+column). This needs modification to use the fleet column found in
+catchtons. That way the user can control which fleets are included in
+the aggregated output. Specifying fleets=NULL means all fleets are
+aggreagated.</p>
+<pre class="r"><code>#&#39; @title Create fishery subset from Atlantis output
+
+#&#39; @description Create a subset of the fishery observations for an Atlantis scenario.
+
+#&#39; @details The function takes fishery catch data from an Atlantis scenario
+#&#39;   where the data was read in from Atlantis output using \code{\link{load_nc}}
+#&#39;   within \code{\link{run_truth}}. One does not need to use these functions
+#&#39;   to create \code{dat}, rather you must only ensure that the structure of
+#&#39;   \code{dat} is the same.
+#&#39;   Currently, the function subsets the data by fleet, polygon and time (there
+#&#39;   are not layers in fishery outputs).  The input is fishery observations (either
+#&#39;   catch nums or catch bio outputs of run_truth), so nothing else needs to be done.
+#&#39;   Atlantis already applies a fishery efficiency and selectivity internally.
+#&#39;   This function works for specific defined species, specific defined polygons,
+#&#39;   and specific defined time.
+
+#&#39; @author Poseidon
+#&#39; @export
+
+#&#39; @template      dat
+#&#39; @param time    The timing of the survey (a vector indicating specific time steps, which are typically associated with years)
+#&#39;                    i.e., seq(365,10*3650,365) would be an annual survey for 10 years
+#&#39; @param fleets  which fleet indices to aggregate in the output (NULL aggregates all fleets)
+#&#39; @param species The species to sample in the survey (a vector)
+#&#39; @param boxes   A vector of box numbers
+
+#&#39; @return The function returns a subsetted matrix aggregated over fleets with the columns
+#&#39;   as the input data, i.e.,:
+#&#39;   \itemize{
+#&#39;     \item{species}
+#&#39;     \item{agecl}
+#&#39;     \item{polygon}
+#&#39;     \item{layer}
+#&#39;     \item{time}
+#&#39;     \item{atoutput}
+#&#39;   }
+#&#39; This function is for a vector of defined species
+#&#39; Returns only boxes where fishery was sampled
+
+create_fishery_subset &lt;- function(dat, time, fleets, species, boxes) {
+
+    #Do some vector length tests (species=effic, column names, )
+
+    #first select the appropriate rows (fleets) if non-NULL fleets specified
+  if(!is.null(fleets)){
+    dat &lt;- dat[dat$fleet %in% fleets,]
+  }
+
+    #first select the appropriate rows and
+    aggData &lt;- aggregateData(dat, time, species, boxes, keepColumns=c(&quot;species&quot;,&quot;agecl&quot;,&quot;polygon&quot;,&quot;time&quot;))
+
+    #Should I be checking for NA&#39;s along the way to identify problems?
+
+    #Create final dataframe in same format as input
+    #put time (mean) and layers (NA) back in the dataframe for completeness
+    out &lt;- data.frame(species = aggData$species,
+                      agecl = aggData$agecl,
+                      polygon = aggData$polygon,
+                      layer = NA,
+                      time = aggData$time,
+                      atoutput = aggData$numAtAge)
+
+    return(out)
+}</code></pre>
+</div>
+<div id="c.-update-sample_fishery_totcatch" class="section level4">
+<h4>6c. Update <code>sample_fishery_totcatch</code></h4>
+<p>Now this function determines if there are polygons in the input, and
+aggregates over polygon if there are. It then applies cv at the
+subannual level for the specified fishery.</p>
+<pre class="r"><code>#&#39; @title Sample a fishery catch index from an atlantis scenario
+#&#39;
+#&#39; @description The function takes total catch data from an Atlantis scenario
+#&#39;   where the data was read in from Atlantis output using \code{\link{load_catch}}
+#&#39;   function. One does not need to use these functions
+#&#39;   to create \code{dat}, rather you must only ensure that the structure of
+#&#39;   \code{dat} is the same.
+#&#39; @details
+#&#39;   This function simply creates an observed total catch time series from
+#&#39;   total catch input using by applying a user-specified cv.
+#&#39;   The result is a coastwide catch (tons) estimate in tons from the fishery.
+#&#39; @author Poseidon
+#&#39; @export
+#&#39;
+#&#39; @template dat
+#&#39; @param cv      Coefficient of variation for the entire species specific catch
+#&#39;                    a matrix with columns: species, cv
+#&#39;
+#&#39; @return The standard dataframe as specified used in \code{dat}.
+#&#39;
+#&#39; @examples
+#&#39; d &lt;- system.file(&quot;extdata&quot;, &quot;SETAS_Example&quot;, package = &quot;atlantisom&quot;)
+#&#39; groups &lt;- c(&quot;Pisciv_T_Fish&quot;,&quot;Pisciv_S_Fish&quot;)
+#&#39; file &lt;- &quot;outputsCatch.txt&quot;
+#&#39; fgs &lt;- load_fgs(dir = d, &quot;Functional_groups.csv&quot;)
+#&#39; truetotcatch &lt;- load_catch(dir = d, fgs = fgs, file_catch = file)
+#&#39; groupcatch &lt;- truetotcatch[truetotcatch$species %in% groups, ]
+#&#39; cv &lt;- data.frame(species=groups, cv=c(0.2,0.3))
+#&#39; fishObsCatch &lt;- sample_fishery_totcatch(dat=groupcatch,cv=cv)
+
+
+sample_fishery_totcatch &lt;- function(dat,cv) {
+
+  #dat is the output of load_catch
+
+  # if dat is output of load_nc_catchtons
+  # it needs to be aggregated over fleet and polygon
+  if(!is.na(sum(dat$polygon))){
+    #sum over boxes and ages (the sampled boxes and fleets were already subset
+    #in create functions)
+    dat &lt;- aggregate(dat$atoutput,list(dat$species,dat$time),sum)
+    names(dat) &lt;- c(&quot;species&quot;,&quot;time&quot;,&quot;catchtons&quot;)
+  }
+
+    #add observation error
+  totCobs &lt;- merge(dat,cv,by=&quot;species&quot;,all.x=T)
+  totCobs$var &lt;- log(totCobs$cv^2+1)
+  totCobs$obsCatch &lt;- rlnorm(nrow(totCobs), log(totCobs$catchtons)-totCobs$var/2, sqrt(totCobs$var))
+
+    out &lt;- data.frame(species=totCobs$species,
+                      agecl = NA,
+                      polygon=NA,
+                      layer=NA, time=totCobs$time,
+                      atoutput=totCobs$obsCatch)
+
+    return(out)
+}
+
+
+if(F) {
+    #to check how multiple sampling can work
+    a &lt;- seq(10,100,10)
+    b &lt;- seq(0.1,1,0.1)
+
+    x &lt;- matrix(rlnorm(length(a)*1000,log(a)-(b^2)/2,b),ncol=10,byrow=T)
+    apply(x,2,mean)
+
+
+    directory &lt;- system.file(&quot;extdata&quot;, &quot;INIT_VMPA_Jan2015&quot;, package = &quot;atlantisom&quot;)
+    scenario &lt;- &quot;SETAS&quot;
+    groups &lt;- load_fgs(dir = directory, &quot;functionalGroups.csv&quot;)
+    groups &lt;- groups[groups$IsTurnedOn &gt; 0, &quot;Name&quot;]
+    results &lt;- run_truth(scenario = scenario,
+    dir = directory,
+    file_fgs = &quot;functionalGroups.csv&quot;,
+    file_bgm = &quot;VMPA_setas.bgm&quot;,
+    select_groups = groups,
+    file_init = &quot;INIT_VMPA_Jan2015.nc&quot;,
+    file_biolprm = &quot;VMPA_setas_biol_fishing_Trunk.prm&quot;)
+
+    species=c(&quot;Pisciv_T_Fish&quot;,&quot;Pisciv_S_Fish&quot;)
+    boxes &lt;- 1:3
+    effic &lt;- data.frame(species=c(&quot;Pisciv_T_Fish&quot;,&quot;Pisciv_S_Fish&quot;), efficiency=c(0.3,0.1))
+    selex &lt;- data.frame(species=c(rep(&quot;Pisciv_T_Fish&quot;,10),rep(&quot;Pisciv_S_Fish&quot;,10)),
+                    agecl=c(1:10,1:10),
+                    selex=c(0,0,0.1,0.5,0.8,1,1,1,1,1,0,0,0.1,0.3,0.5,0.7,0.9,1,1,1))
+
+    tmp &lt;- create_survey(dat=results$nums, time=seq(70,82,3), species=species, boxes=boxes, effic=effic, selex=selex)
+
+    wtAtAge &lt;- data.frame(species=c(rep(&quot;Pisciv_T_Fish&quot;,10),rep(&quot;Pisciv_S_Fish&quot;,10)),
+                    agecl=c(1:10,1:10),
+                    wtAtAge=c(0.1,0.5,0.9,1.5,1.8,2.0,2.1,2.2,2.3,2.35,0.05,0.2,0.3,0.35,0.45,0.5,0.55,0.6,0.63,0.65))
+    cv &lt;- data.frame(species=species, cv=c(0.2,0.3))
+
+    survObsBiom &lt;- sample_survey_biomass(dat=tmp,cv=cv,wtAtAge)
+
+}</code></pre>
+</div>
+<div id="testing" class="section level4">
+<h4>Testing</h4>
+<p>Compare the previous total catch time series (annual) with the new
+one summed to annual and hope the mostly match (both have a cv applied
+but it is 0.01 for all species so shouldn’t matter.)</p>
+</div>
 </div>
 </div>
 

@@ -246,34 +246,47 @@ The complex part. This requires adjusting the `atlantisom::create_fishery_subset
 
 #### 6a. Update `om_index`
 
-The fishery portion of this wrapper can now have parallel structure to the survey portion. It allows multiple fishery.R config files so the user can get a differet index for each fleet if that is desired. Specifications for which polygons are kept for which fleet number would be in the fishery.R config file. 
+The fishery portion of this wrapper can now have parallel structure to the survey portion. It allows multiple fishery.R config files so the user can get a different index for each fleet if that is desired. Specifications for which polygons are kept for which fleet number would be in the `fishery.R` config file, with an appropriate fleet.name. 
 
-If only one file we can have it default to aggregating across fleets for a species first: for each fishery.R file the first step is to select fleets identified in fishery.R and aggregate across those fleets in the input. Or we do this by default for each fleet and have users sum at the end?
+I think we want to aggregate across all fleets for a species for the given set of polygons: for each `fishery.R` file the first step is to select fleets identified in `fishery.R` and aggregate across those fleets for the polygons specified in `fishery.R`, keeping species separated out--this is done in `create_fishery_subset` below.
 
-Note that allowing for multiple fishery.R files for each fleet means we need to make a parallel change to `om_comps`.
+Note that allowing for multiple `fishery.R` files for each fleet means we need to make a parallel change to `om_comps`.
 
+Note that species in here are the codes not the names, so conversion back to names needs to happen somewhere. The fishery.R file now specifies the species codes in fishspp instead of species names (survspp still does that).
 
-```{r}
+Here is the new `om_index`
+
+```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/om_index.R"), eval=F}
+
+```
+
+And an example `fishery.R` file (modified `msfishery.R` file used in ms-keyrun project):
+
+```{r, code = readLines("https://raw.githubusercontent.com/NOAA-EDAB/ms-keyrun/sarah_wgsamsim/data-raw/simulated-data/config/msfishery.R"), eval=F}
 
 ```
 
 
 #### 6b. Update `create_fishery_subset`
 
-This needs modification to use the fleet column found in catchtons. 
+Left alone, this function will aggregate across all fleets and polygons given in the input data (since it is not expecting a fleet column). This needs modification to use the fleet column found in catchtons. That way the user can control which fleets are included in the aggregated output. Specifying fleets=NULL means all fleets are aggreagated.
 
-```{r}
+```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/create_fishery_subset.R"), eval=F}
+
+```
+
+
+#### 6c. Update `sample_fishery_totcatch`
+
+Now this function determines if there are polygons in the input, and aggregates over polygon if there are. It then applies cv at the subannual level for the specified fishery. 
+
+```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/sample_fishery_totcatch.R"), eval=F}
 
 ```
 
+#### Testing
 
-#### 6c. Update `sample_fishery_totalcatch`
-
-Applies cv at the subannual level for the specified fishery. 
-
-```{r}
-
-```
+Compare the previous total catch time series (annual) with the new one summed to annual and hope the mostly match (both have a cv applied but it is 0.01 for all species so shouldn't matter.)
 
 
 
