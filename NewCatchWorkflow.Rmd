@@ -254,6 +254,8 @@ Note that allowing for multiple `fishery.R` files for each fleet means we need t
 
 Note that species in here are the codes not the names, so conversion back to names needs to happen somewhere. The fishery.R file now specifies the species codes in fishspp instead of species names (survspp still does that).
 
+Time in this output is *timestep* not days.
+
 Here is the new `om_index`
 
 ```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/om_index.R"), eval=F}
@@ -288,5 +290,46 @@ Now this function determines if there are polygons in the input, and aggregates 
 
 Compare the previous total catch time series (annual) with the new one summed to annual and hope the mostly match (both have a cv applied but it is 0.01 for all species so shouldn't matter.)
 
+Read in saved files created previously in ms-keyrun and the one just created with the new functions. This is now comparing the "sampled" fishery data. 
+
+```{r}
+
+mskeyrundir <- "/Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38"
+
+scenario.name <- "nordic_runresults_01"
+
+stepperyr <- 5
+
+fisherycomp <- atlantisom::read_savedfisheries(mskeyrundir, "Catch")
+
+from_nc <- fisherycomp$allfleet[[1]]
+
+from_txt <- fisherycomp$census[[1]]
+
+fgs <- atlantisom::load_fgs(mskeyrundir, "nordic_groups_v04.csv")
+
+  aggcatchtons <- from_nc %>%
+    dplyr::select(species, time, atoutput) %>%
+    dplyr::mutate(year = ceiling(time / stepperyr)) %>%
+    dplyr::group_by(species, year) %>%
+    dplyr::summarise(yeartot = sum(atoutput))
+  
+  txtCatchtons <- from_txt %>%
+    dplyr::select(species, time, atoutput) %>%
+    dplyr::mutate(year = time / 365) %>%
+    dplyr::left_join(dplyr::select(fgs, Code, Name), by = c("species" = "Name"))
+  
+  comparetons <- txtCatchtons %>%
+    dplyr::left_join(aggcatchtons, by = c("Code" = "species", "year" = "year")) %>%
+    ggplot2::ggplot() +
+    geom_line(aes(year, atoutput)) +
+    geom_point(aes(year, yeartot), color = "blue", alpha = 0.2) +
+    facet_wrap( ~ species, scales = "free_y")
+  
+  # looks like a match!
+  comparetons
+
+
+```
 
 
