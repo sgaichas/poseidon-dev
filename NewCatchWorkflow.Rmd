@@ -332,4 +332,21 @@ fgs <- atlantisom::load_fgs(mskeyrundir, "nordic_groups_v04.csv")
 
 ```
 
+We have a match so it seems the workflow gives the same results in aggregate. Lets call the fleet specific and subannual catch good then. It can go into `mskeyrun`.
+
+### 7. Adjust `mskeyrun` functions creating aggregated and subannual catch datasets
+
+See mskeyrun repo. I would like to keep life simple and not have fleet specific subannual catch indices, but since we just did fleet specific indices with the real Georges Bank data I suppose I will have to test this with simulated data.
+
+But maybe not for the WGSAM skill assessment. See below for why I don't quite have a full set of fleet specific outputs.
+
+### 8. Adjust `atlantisom::om_comps` for the new catchtons output
+
+Well this sounded easier than it is. We can have multiple fleets in `om_comps` using a similar structure to surveys. Sadly, the length comps from fisheries cannot be by fleet because they come from the CATCH.nc numbers output, which is by age class and not by fleet. Lengths are estimated using the age class information by numbers, structn, and resn. I don't think we can apply the `calcage2length` function to the true age data because we don't have the growth information from structn and resn at that level.
+
+I can rewrite `om_comps` to use fleet information on all but the lengths. Placeholder code below.
+
+```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/om_comps.R"), eval=F}
+
+```
 
