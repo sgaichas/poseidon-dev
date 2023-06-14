@@ -1,0 +1,129 @@
+---
+title: "New Biomass Pools Workflow"
+author: "Sarah Gaichas"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_fold: hide
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(here)
+library(stringr)
+library(magrittr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(atlantisom)
+```
+
+
+## Intro
+
+Current `atlantisom` functions are designed primarily for age structured modeled groups, because the package was originally scoped to generate simulated data to test fishery stock assessments. It is now clear that simulated data testing can also benefit other model types, including multispecies models and food web models. Therefore, there is a need to develop functions to develop simulated data for lower trophic level biomass pools modeled in Atlantis and also included in food web models such as Rpath.
+
+Where is biomass information for non-age structured groups output? To be parallel to survey sampling for fish, it would be good to have it by model output timestep toutinc and polygon, but depth layer is not necessary at this time.
+
+First check content of the `.nc` output file:
+
+```{r}
+
+dir <- here("atlantisoutput/NOBA_sacc_30")
+file_nc <- "nordic_runresults_01.nc"
+
+file.nc <- file.path(dir, file_nc)
+
+ # Load ATLANTIS output!
+  at_out <- RNetCDF::open.nc(con = file.nc)
+  on.exit(RNetCDF::close.nc(at_out))
+
+    # Get info from netcdf file! (Filestructure and all variable names)
+  var_names_ncdf <- sapply(seq_len(RNetCDF::file.inq.nc(at_out)$nvars - 1),
+    function(x) RNetCDF::var.inq.nc(at_out, x)$name)
+  n_timesteps <- RNetCDF::dim.inq.nc(at_out, 0)$length
+  n_boxes     <- RNetCDF::dim.inq.nc(at_out, 1)$length
+  n_layers    <- RNetCDF::dim.inq.nc(at_out, 2)$length
+
+```
+
+Which species are biomass pools, are they identified in the groups.csv?
+
+No, biomass pools are defined as the combination of NumCohorts == 1 and GroupType not FISH, FISH_INVERT, SHARK, BIRD, MAMMAL, REPTILE. Biomass pools groups are among those below according to the Atlantis manual, ch 6. p 106: 
+
+>BIOMASS POOL GROUPS
+Phytoplankton
+7) Small Phytoplankton SM_PHY
+8) Large Phytoplankton LG_PHY (used in combination with IsSiliconDep
+to define diatoms)
+9) Trichodesmium and Cyanobacteria TRICHO (N fixers)
+Other primary producers
+10) Microphtybenthos MICROPHTYBENTHOS
+11) Dinoflagellates DINOFLAG
+12) Phytoben PHYTOBEN (typically used to represent macroalgae) 
+13) Seagrass SEAGRASS
+14) Turf TURF
+Zooplankton
+15) Small Zooplankton SM_ZOO
+16) Medium Zooplankton MED_ZOO
+17) Large Zooplankton LG_ZOO
+18) Jellyfish JELLIES (in the past represented as LG_ZOO)
+Large pelagic invetebrates
+19)Cephalopod CEP 
+20) Prawns PWN
+Infauna
+21) Small Infauna SM_INF 
+22) Large Infauna LG_INF
+Epibenthic organisms
+23) Sediment epibenthic filter feeders SED_EP_FF (often used for bivalves, sponges)
+
+For NOBA Atlantis, these are the biomass pools:
+
+```{r}
+
+fgs <- atlantisom::load_fgs(here("atlantisoutput/NOBA_sacc_30"), "nordic_groups_v04.csv") 
+
+pools <- fgs %>%
+  dplyr::filter(NumCohorts==1) %>%
+  dplyr::select(Code, Name, Long.Name, NumCohorts, InvertType)
+
+knitr::kable(pools)
+
+```
+
+Here are the relevant outputs in the output.nc file for these groups:
+
+```{r}
+# return everything in var_names_ncdf matching Name in pools
+
+var_names_ncdf[str_detect(var_names_ncdf, str_c(pools$Name, collapse ="|"))]
+
+```
+So we want "N" nitrogen output. In theory this can be achieved with `atlantisom::load_nc`with `select_variable = "N"`. 
+
+```{r}
+
+select_groups <- pools$Name
+nc_out <- file_nc
+bps <- load_bps(dir = dir, fgs = "nordic_groups_v04.csv", file_init = "nordic_biol_v23.nc")
+  # Get the boundary boxes
+  allboxes <- load_box(dir = dir, file_bgm = "Nordic02.bgm")
+  boxes <- get_boundary(allboxes)
+
+
+
+testNpools <- load_nc(dir = dir,
+                  file_nc = nc_out,
+                  bps = bps,
+                  fgs = fgs,
+                  select_groups = select_groups,
+                  select_variable = "N",
+                  check_acronyms = TRUE,
+                  bboxes = boxes)
+```
+
+
+I don't think we have a function that converts N to biomass but there are pieces in other functions.
+
