@@ -101,7 +101,7 @@ Here are the relevant outputs in the output.nc file for these groups:
 var_names_ncdf[str_detect(var_names_ncdf, str_c(pools$Name, collapse ="|"))]
 
 ```
-So we want "N" nitrogen output. In theory this can be achieved with `atlantisom::load_nc`with `select_variable = "N"`. 
+So we want "N" nitrogen output. In theory this can be achieved with `atlantisom::load_nc`with `select_variable = "N"`. Looks like it works, output is N for our selected biomass pool species over all polygons, layers, and times.
 
 ```{r}
 
@@ -122,8 +122,10 @@ testNpools <- load_nc(dir = dir,
                   select_variable = "N",
                   check_acronyms = TRUE,
                   bboxes = boxes)
+
+unique(testNpools$species)
 ```
 
 
-I don't think we have a function that converts N to biomass but there are pieces in other functions.
+I don't think we have a function that aggregates over layets and converts N to biomass but there are pieces in other functions.
 
