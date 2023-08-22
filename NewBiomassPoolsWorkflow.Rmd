@@ -202,7 +202,7 @@ biomass_pools <- calc_biomass_pool(pooln = testNpools,
 
 Do the new biomass pools match the `BiomIndx.txt` output when aggregated over polygon? If so they can be the input to the survey function for time and spatial subsetting.
 
-```{r}
+```{r, fig.width=10}
 
 aggbiopools <- biomass_pools %>%
   dplyr::group_by(species, agecl, time) %>%
@@ -221,7 +221,35 @@ ggplot(txtbiopools, aes(x=time, y=atoutput)) +
 
 ```
 
-What is up with the phytoplankton groups? Small matches but large doesn't. 
+## Diagnose mismatches between biopools and BiomInd.txt output
+
+Who matches exactly (enough). Patterns in absolute mismatch are interesting, some species are really close and some always way off. Volume wrong, depth layers wrong? Mine are always higher than the txt output when they are off, so maybe too much expansion somewhere. 
+
+Groups that match seem more likely to be pelagic (dinoflagellates, all zooplankton, pelagic bacteria, labile and refractive detritus) although large phytoplankton is way off. 
+
+```{r, warning=FALSE, fig.width=10}
+mismatch <- txtbiopools |>
+  dplyr::left_join(aggbiopools) |>
+  dplyr::mutate(mismatch = atoutput - totpool,
+                bad = ifelse(abs(mismatch) > 0.1*(atoutput), 1, 0))
+
+ggplot(mismatch, aes(x=time, y=mismatch)) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~species, scales = 'free_y')
+```
+
+This is mismatch coded as 0 if less than 10% of txt output, 1 if more. Those exceeding are carrion, predatory benthos, detritivore benthos, king crab, benthic bacteria, large phytoplankton and sometimes small phytoplankton.
+
+```{r, warning=FALSE}
+
+ggplot(mismatch, aes(x=time, y=bad)) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~species)
+```
+
+What is up with the phytoplankton groups? Small matches well visually but large doesn't. Large phytoplankton is the largest magnitude mismatch across all groups.
 
 ```{r}
 ggplot(txtbiopools |> filter(species %in% c("Large_phytop", "Small_phytop")), 
@@ -234,7 +262,7 @@ ggplot(txtbiopools |> filter(species %in% c("Large_phytop", "Small_phytop")),
 
 ```
 
-Predatory benthos is also off, Detrivore ben to a lesser extent. 
+Predatory benthos is off by what appears to be a scalar, Detrivore ben converges as they increase.
 
 ```{r}
 ggplot(txtbiopools |> filter(species %in% c("Predatory_ben", "Detrivore_ben")), 
@@ -246,4 +274,13 @@ ggplot(txtbiopools |> filter(species %in% c("Predatory_ben", "Detrivore_ben")),
   facet_wrap(~species, scales = "free_y")
 
 ```
+
+## Remaining changes to workflow, once corrected
+
+### Add `calc_biomass_pool` to `run_truth`
+
+### Test wrapper functions with biomass pool groups
+
+
+
 
