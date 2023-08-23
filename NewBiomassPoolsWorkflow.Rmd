@@ -160,15 +160,53 @@ vol <- load_nc_physics(dir = dir,
                          aggregate_layers = FALSE,
                          bboxes = boxes)
 
+# we need area for the benthic inverts instead of volume
+# THANK YOU JOE for this tip
+area <- load_boxarea(dir = dir,
+                     file_bgm = "Nordic02.bgm")
+
+# we need a list of which group types to expand to area instead of volume
+benthos <- c("SED_EP_FF", "SED_EP_OTHER", "SED_BAC", 
+             "MOB_EP_OTHER", "LG_INF", "SM_INF", 
+             "MICROPHYTBENTHOS", "SEAGRASS")
 
 
-calc_biomass_pool <- function(pooln, vol, biolprm){
+
+calc_biomass_pool <- function(pooln, vol, area, fgs, biolprm){
   datalist <- list(pooln)
 
   # Conversion factor from mg N to t wet-weight
   # should only use conversion for non vertebrates
   # also need volume of cell info
   bio_conv <- biolprm$redfieldcn * biolprm$kgw2d / 1000000000
+  
+  # get fgs info
+    # use grouptype column to allocate
+  colnames(fgs) <- tolower(colnames(fgs))
+
+  # check for GroupType or InvertType
+  if (!("grouptype" %in% colnames(fgs) | "inverttype"%in% colnames(fgs))) {
+    stop(paste("The columns GroupType or InvertType ars not in your functional\n",
+               "groups file."))
+  }
+
+  # change inverttype to grouptype, contents should be the same
+  if("inverttype" %in% names(fgs)) names(fgs)[names(fgs) == 'inverttype'] <- 'grouptype'
+
+  fgs$grouptype <- tolower(fgs$grouptype)
+
+  
+  pooltype <- fgs |>
+    dplyr::select(species=name, grouptype) |>
+    dplyr::mutate(pooltype = dplyr::case_when((grouptype %in% c("lg_inf",
+                                                                "sm_inf",
+                                                                "sed_bact",
+                                                                "sed_ep_ff",
+                                                                "sed_ep_other",
+                                                                "mobile_ep_other",
+                                                                "coral",
+                                                                "sponge")) ~ "benthos",
+                                              TRUE ~ "nonbenth"))
 
   data_names <- c("species", "agecl", "polygon", "layer", "time", "atoutput")
 
@@ -179,7 +217,18 @@ calc_biomass_pool <- function(pooln, vol, biolprm){
     pooln <- merge(pooln, vol,
                    by = c("time", "polygon", "layer"))
     
-    pooln$atoutput <- with(pooln, vol * atoutput * bio_conv)
+    pooln <- merge(pooln, area,
+                   by = c("polygon"))
+    
+    pooln <- merge(pooln, pooltype,
+                   by = c("species"))
+    
+    #pooln$atoutput <- with(pooln, vol * atoutput * bio_conv)
+    
+    pooln <- pooln |>
+      dplyr::mutate(atoutput = dplyr::case_when(pooltype == "nonbenth" ~ vol * atoutput * bio_conv,
+                                                pooltype == "benthos" ~ 
+                                                  ifelse(layer==7, area * atoutput * bio_conv, 0)))
 
     # Sum over layers 
     biomass_pools <- aggregate(atoutput ~ species + agecl + time + polygon,
@@ -195,6 +244,8 @@ biolprm <- load_biolprm(dir = dir, file_biolprm = "nordic_biol_incl_harv_v_011_1
 
 biomass_pools <- calc_biomass_pool(pooln = testNpools,
                                    vol = vol,
+                                   area = area,
+                                   fgs = fgs,
                                    biolprm = biolprm)
 
 
@@ -215,7 +266,7 @@ txtbiopools <- atlantisom::load_bioind(dir, "nordic_runresults_01BiomIndx.txt", 
 
 ggplot(txtbiopools, aes(x=time, y=atoutput)) +
   geom_line() +
-  geom_point(data = aggbiopools, aes(x = time, y = totpool), colour = "blue") +
+  geom_point(data = aggbiopools, aes(x = time, y = totpool), colour = "blue", alpha=0.1) +
   theme_bw() +
   facet_wrap(~species, scales = "free_y")
 
@@ -225,13 +276,15 @@ ggplot(txtbiopools, aes(x=time, y=atoutput)) +
 
 Who matches exactly (enough). Patterns in absolute mismatch are interesting, some species are really close and some always way off. Volume wrong, depth layers wrong? Mine are always higher than the txt output when they are off, so maybe too much expansion somewhere. 
 
+Joe pointed out that benthic groups should be expanded to area rather than volume. That correction has now been applied, and matches are better, but still diverge over time for some groups.
+
 Groups that match seem more likely to be pelagic (dinoflagellates, all zooplankton, pelagic bacteria, labile and refractive detritus) although large phytoplankton is way off. 
 
 ```{r, warning=FALSE, fig.width=10}
 mismatch <- txtbiopools |>
   dplyr::left_join(aggbiopools) |>
   dplyr::mutate(mismatch = atoutput - totpool,
-                bad = ifelse(abs(mismatch) > 0.1*(atoutput), 1, 0))
+                bad = ifelse(abs(mismatch) > 0.01*(atoutput), 1, 0))
 
 ggplot(mismatch, aes(x=time, y=mismatch)) +
   geom_line() +
@@ -239,7 +292,7 @@ ggplot(mismatch, aes(x=time, y=mismatch)) +
   facet_wrap(~species, scales = 'free_y')
 ```
 
-This is mismatch coded as 0 if less than 10% of txt output, 1 if more. Those exceeding are carrion, predatory benthos, detritivore benthos, king crab, benthic bacteria, large phytoplankton and sometimes small phytoplankton.
+This is mismatch coded as 0 if less than 1% of txt output, 1 if more. Those exceeding are carrion, predatory benthos, detritivore benthos, king crab, benthic bacteria, large phytoplankton and sometimes small zooplankton.
 
 ```{r, warning=FALSE}
 
@@ -269,7 +322,7 @@ ggplot(txtbiopools |> filter(species %in% c("Predatory_ben", "Detrivore_ben")),
        aes(x=time, y=atoutput)) +
   geom_line() +
   geom_point(data = aggbiopools |> filter(species %in% c("Predatory_ben", "Detrivore_ben")), 
-             aes(x = time, y = totpool), colour = "blue") +
+             aes(x = time, y = totpool), colour = "blue", alpha=0.1) +
   theme_bw() +
   facet_wrap(~species, scales = "free_y")
 
