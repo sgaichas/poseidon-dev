@@ -213,6 +213,8 @@ calc_biomass_pool <- function(pooln, vol, area, fgs, biolprm){
   if (all(sapply(datalist, function(x) all(is.element(names(x), data_names))))){
     
     names(vol)[names(vol) == "atoutput"] <- "vol"
+    
+    sedlayer <- max(vol$layer)
 
     pooln <- merge(pooln, vol,
                    by = c("time", "polygon", "layer"))
@@ -228,7 +230,7 @@ calc_biomass_pool <- function(pooln, vol, area, fgs, biolprm){
     pooln <- pooln |>
       dplyr::mutate(atoutput = dplyr::case_when(pooltype == "nonbenth" ~ vol * atoutput * bio_conv,
                                                 pooltype == "benthos" ~ 
-                                                  ifelse(layer==7, area * atoutput * bio_conv, 0)))
+                                                  ifelse(layer==sedlayer, area * atoutput * bio_conv, 0)))
 
     # Sum over layers 
     biomass_pools <- aggregate(atoutput ~ species + agecl + time + polygon,
@@ -294,7 +296,7 @@ ggplot(mismatch, aes(x=time, y=mismatch)) +
 
 This is mismatch coded as 0 if less than 1% of txt output, 1 if more. Those exceeding are carrion, predatory benthos, detritivore benthos, king crab, benthic bacteria, large phytoplankton and sometimes small zooplankton.
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, fig.width=10}
 
 ggplot(mismatch, aes(x=time, y=bad)) +
   geom_line() +
@@ -328,12 +330,168 @@ ggplot(txtbiopools |> filter(species %in% c("Predatory_ben", "Detrivore_ben")),
 
 ```
 
+### Try NEUS?
+
+```{r}
+dir <- here("atlantisoutput/NEUSv2.1.0")
+file_nc <- "neus_output.nc"
+
+file.nc <- file.path(dir, file_nc)
+
+ # Load ATLANTIS output!
+  at_out <- RNetCDF::open.nc(con = file.nc)
+  #on.exit(RNetCDF::close.nc(at_out))
+
+    # Get info from netcdf file! (Filestructure and all variable names)
+  var_names_ncdf <- sapply(seq_len(RNetCDF::file.inq.nc(at_out)$nvars - 1),
+    function(x) RNetCDF::var.inq.nc(at_out, x)$name)
+  n_timesteps <- RNetCDF::dim.inq.nc(at_out, 0)$length
+  n_boxes     <- RNetCDF::dim.inq.nc(at_out, 1)$length
+  n_layers    <- RNetCDF::dim.inq.nc(at_out, 2)$length
+
+```
+
+For NEUS Atlantis, these are the biomass pools:
+
+```{r}
+
+fgs <- atlantisom::load_fgs(here("atlantisoutput/NEUSv2.1.0"), "neus_groups.csv") 
+
+pools <- fgs %>%
+  dplyr::filter(NumCohorts==1) %>%
+  dplyr::select(Code, Name, LongName, NumCohorts, GroupType)
+
+knitr::kable(pools)
+
+```
+
+Here are the relevant outputs in the output.nc file for these groups:
+
+```{r}
+# return everything in var_names_ncdf matching Name in pools
+
+var_names_ncdf[str_detect(var_names_ncdf, str_c(pools$Name, collapse ="|"))]
+
+```
+NEUS has some Cover types as well as N outputs.
+
+```{r}
+
+select_groups <- pools$Name
+nc_out <- file_nc
+bps <- load_bps(dir = dir, fgs = "neus_groups.csv", file_init = "neus_init.nc")
+  # Get the boundary boxes
+  allboxes <- load_box(dir = dir, file_bgm = "neus_tmerc_RM2.bgm")
+  boxes <- get_boundary(allboxes)
+
+
+
+testNpools <- load_nc(dir = dir,
+                  file_nc = nc_out,
+                  bps = bps,
+                  fgs = fgs,
+                  select_groups = select_groups,
+                  select_variable = "N",
+                  check_acronyms = TRUE,
+                  bboxes = boxes)
+
+unique(testNpools$species)
+```
+```{r}
+
+
+# we need the volume of each layer as input to this
+vol <- load_nc_physics(dir = dir,
+                         file_nc = nc_out,
+                         physic_variables = "volume",
+                         aggregate_layers = FALSE,
+                         bboxes = boxes)
+
+# we need area for the benthic inverts instead of volume
+# THANK YOU JOE for this tip
+area <- load_boxarea(dir = dir,
+                     file_bgm = "neus_tmerc_RM2.bgm")
+
+biolprm <- load_biolprm(dir = dir, file_biolprm = "at_biology.prm")
+
+biomass_pools <- calc_biomass_pool(pooln = testNpools,
+                                   vol = vol,
+                                   area = area,
+                                   fgs = fgs,
+                                   biolprm = biolprm)
+
+
+```
+
+Do the new biomass pools match the `BiomIndx.txt` output when aggregated over polygon? If so they can be the input to the survey function for time and spatial subsetting.
+
+```{r, fig.width=10}
+
+aggbiopools <- biomass_pools %>%
+  dplyr::group_by(species, agecl, time) %>%
+  dplyr::summarise(totpool = sum(atoutput))
+
+txtbiopools <- atlantisom::load_bioind(dir, "neus_outputBiomIndx.txt", fgs) %>%
+  dplyr::mutate(time = time/73) %>%
+  dplyr::filter(species %in% unique(aggbiopools$species)) %>%
+  dplyr::select(species, time, atoutput)
+
+ggplot(txtbiopools, aes(x=time, y=atoutput)) +
+  geom_line() +
+  geom_point(data = aggbiopools, aes(x = time, y = totpool), colour = "blue", alpha=0.1) +
+  theme_bw() +
+  facet_wrap(~species, scales = "free_y")
+
+```
+mismatch
+
+```{r, warning=FALSE, fig.width=10}
+mismatch <- txtbiopools |>
+  dplyr::left_join(aggbiopools) |>
+  dplyr::mutate(mismatch = atoutput - totpool,
+                bad = ifelse(abs(mismatch) > 0.01*(atoutput), 1, 0))
+
+ggplot(mismatch, aes(x=time, y=mismatch)) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~species, scales = 'free_y')
+```
+This is mismatch coded as 0 if less than 1% of txt output, 1 if more. 
+
+```{r, warning=FALSE, fig.width=10}
+
+ggplot(mismatch, aes(x=time, y=bad)) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~species)
+```
+
+Learned that we should not hardcode the sediment layer! Added a sedlayer variable to the function.
+
+BUT. Diatoms are still off so this calculation may not be working for that category. 
+
+What is up with the phytoplankton groups? Small matches well visually but large doesn't. Large phytoplankton is the largest magnitude mismatch across all groups.
+
+```{r}
+ggplot(txtbiopools |> filter(species %in% c("Diatom", "DinoFlag")), 
+       aes(x=time, y=atoutput)) +
+  geom_line() +
+  geom_point(data = aggbiopools |> filter(species %in% c("Diatom", "DinoFlag")), 
+             aes(x = time, y = totpool), colour = "blue") +
+  theme_bw() +
+  facet_wrap(~species, scales = "free_y")
+
+```
+
+
 ## Remaining changes to workflow, once corrected
 
 ### Add `calc_biomass_pool` to `run_truth`
 
+With an if statement?
+
 ### Test wrapper functions with biomass pool groups
 
-
+Only need species and index here, comps don't apply.
 
 
