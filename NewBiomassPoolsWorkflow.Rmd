@@ -496,10 +496,27 @@ ggplot(txtbiopools |> filter(species %in% c("Diatom", "DinoFlag")),
 
 ### Add `calc_biomass_pool` to `run_truth`
 
-With an if statement?
+With an if statement? Or let the species selection take care of that.  
+
+Decision: add it and if no biomass pools species selected it should return nothing
+
+Added to `run_truth`:
+
++  area using existing `load_boxarea`
++  pooln using existing `load_nc` with select_variable = "N"
++  biomass_pools using new `calc_biomass_pool`
+
+Returns biomass_pools as part of truth list
 
 ### Test wrapper functions with biomass pool groups
 
 Only need species and index here, comps don't apply.
 
+In `om_species` need to check for biomass pools output and append that to the `truebio_ss` object? If one object can use existing `om_index` on bio pools.
 
+```{r}
+  # biomass at agecl at full resolution (all polygons and layers)
+  #truebio_ss <- omlist$truth$biomass_ages[omlist$truth$biomass_ages$species %in% species_ss,]
+```
+
+If a single true bio object is created, may have to modify selectivty definition for biomass pools in `om_index`
