@@ -150,6 +150,12 @@ I don't think we have a function that aggregates over layers and converts N to b
 
 New `atlantisom` function: `calc_biomass_pool` based on `calc_biomass_age`, but adding the expansion to volume used in `calc_pred_cons`.
 
+With the following exceptions!
+
+Benthic groups have N expanded to area
+
+LG_PHY type has N expanded to only water column, not sediment layers.
+
 ```{r}
 
 
@@ -196,41 +202,45 @@ calc_biomass_pool <- function(pooln, vol, area, fgs, biolprm){
   fgs$grouptype <- tolower(fgs$grouptype)
 
   
-  pooltype <- fgs |>
+   pooltype <- fgs |>
     dplyr::select(species=name, grouptype) |>
     dplyr::mutate(pooltype = dplyr::case_when((grouptype %in% c("lg_inf",
                                                                 "sm_inf",
                                                                 "sed_bact",
                                                                 "sed_ep_ff",
                                                                 "sed_ep_other",
-                                                                "mobile_ep_other",
+                                                                "mob_ep_other",
                                                                 "coral",
                                                                 "sponge")) ~ "benthos",
-                                              TRUE ~ "nonbenth"))
+                                              (grouptype %in% c("lg_phy")) ~ "lg_phy",
+                                              TRUE ~ "alllayers"))
 
   data_names <- c("species", "agecl", "polygon", "layer", "time", "atoutput")
 
   if (all(sapply(datalist, function(x) all(is.element(names(x), data_names))))){
-    
+
     names(vol)[names(vol) == "atoutput"] <- "vol"
-    
+
     sedlayer <- max(vol$layer)
 
     pooln <- merge(pooln, vol,
                    by = c("time", "polygon", "layer"))
-    
+
     pooln <- merge(pooln, area,
                    by = c("polygon"))
-    
+
     pooln <- merge(pooln, pooltype,
                    by = c("species"))
-    
+
     #pooln$atoutput <- with(pooln, vol * atoutput * bio_conv)
-    
+
     pooln <- pooln |>
-      dplyr::mutate(atoutput = dplyr::case_when(pooltype == "nonbenth" ~ vol * atoutput * bio_conv,
-                                                pooltype == "benthos" ~ 
+      dplyr::mutate(atoutput = dplyr::case_when(pooltype == "alllayers" ~ vol * atoutput * bio_conv,
+                                                pooltype == "lg_phy" ~
+                                                  ifelse(layer!=sedlayer, vol * atoutput * bio_conv, 0),
+                                                pooltype == "benthos" ~
                                                   ifelse(layer==sedlayer, area * atoutput * bio_conv, 0)))
+
 
     # Sum over layers 
     biomass_pools <- aggregate(atoutput ~ species + agecl + time + polygon,
@@ -278,9 +288,9 @@ ggplot(txtbiopools, aes(x=time, y=atoutput)) +
 
 Who matches exactly (enough). Patterns in absolute mismatch are interesting, some species are really close and some always way off. Volume wrong, depth layers wrong? Mine are always higher than the txt output when they are off, so maybe too much expansion somewhere. 
 
-Joe pointed out that benthic groups should be expanded to area rather than volume. That correction has now been applied, and matches are better, but still diverge over time for some groups.
+Joe pointed out that benthic groups should be expanded to area rather than volume. That correction has now been applied, and matches are better, but still diverge over time for some groups. Not enough to worry about I think.
 
-Groups that match seem more likely to be pelagic (dinoflagellates, all zooplankton, pelagic bacteria, labile and refractive detritus) although large phytoplankton is way off. 
+Originally, large phytoplankton was way off, but Joe also pointed out that LG_PHY N can be in the sediment layer but shouldn't "count" as biomass. Therefore, this group is expanded to all layers but the sediment layer and that creates a much better match. 
 
 ```{r, warning=FALSE, fig.width=10}
 mismatch <- txtbiopools |>
@@ -294,7 +304,7 @@ ggplot(mismatch, aes(x=time, y=mismatch)) +
   facet_wrap(~species, scales = 'free_y')
 ```
 
-This is mismatch coded as 0 if less than 1% of txt output, 1 if more. Those exceeding are carrion, predatory benthos, detritivore benthos, king crab, benthic bacteria, large phytoplankton and sometimes small zooplankton.
+This is mismatch coded as 0 if less than 1% of txt output, 1 if more. 
 
 ```{r, warning=FALSE, fig.width=10}
 
@@ -304,7 +314,7 @@ ggplot(mismatch, aes(x=time, y=bad)) +
   facet_wrap(~species)
 ```
 
-What is up with the phytoplankton groups? Small matches well visually but large doesn't. Large phytoplankton is the largest magnitude mismatch across all groups.
+Large phytoplankton formerly had the largest magnitude mismatch across all groups, now fixed by not expanding N in the sediment layer for this group type.
 
 ```{r}
 ggplot(txtbiopools |> filter(species %in% c("Large_phytop", "Small_phytop")), 
@@ -317,7 +327,7 @@ ggplot(txtbiopools |> filter(species %in% c("Large_phytop", "Small_phytop")),
 
 ```
 
-Predatory benthos is off by what appears to be a scalar, Detrivore ben converges as they increase.
+These groups seem close enough to me now.
 
 ```{r}
 ggplot(txtbiopools |> filter(species %in% c("Predatory_ben", "Detrivore_ben")), 
@@ -468,9 +478,7 @@ ggplot(mismatch, aes(x=time, y=bad)) +
 
 Learned that we should not hardcode the sediment layer! Added a sedlayer variable to the function.
 
-BUT. Diatoms are still off so this calculation may not be working for that category. 
-
-What is up with the phytoplankton groups? Small matches well visually but large doesn't. Large phytoplankton is the largest magnitude mismatch across all groups.
+With corrections for LG_PHY things now line up in both models.
 
 ```{r}
 ggplot(txtbiopools |> filter(species %in% c("Diatom", "DinoFlag")), 
