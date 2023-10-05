@@ -508,15 +508,166 @@ Added to `run_truth`:
 
 Returns biomass_pools as part of truth list
 
+Testing--have to ask for N data for only biomass pool groups. If there are none we should trap this.
+
+```{r, eval=FALSE}
+
+dir <- here("atlantisoutput","NOBA_sacc_30")
+file_fgs <- "nordic_groups_v04.csv"
+biomass.pools.file <- "nordic_biol_v23.nc"
+file_biolprm <- "nordic_biol_incl_harv_v_011_1skg.prm"
+file_bgm <- "Nordic02.bgm"
+file_init <- "nordic_biol_v23.nc"
+file_runprm <- "nordic_run_v04.xml"
+scenario <- "nordic_runresults_01"
+verbose <- TRUE
+annage <- TRUE
+file_fish <- "NoBAFisheries.csv"
+  
+
+  # Read in information
+  # Read in the functional groups csv since that is used by many functions
+  fgs <- load_fgs(dir = dir, file_fgs = file_fgs)
+  
+  
+    #Get just the names of active functional groups
+  funct.group.names <- fgs %>%
+    filter(IsTurnedOn == 1) %>%
+    select(Name) %>%
+    .$Name
+  
+  
+  select_groups <- funct.group.names
+  
+  
+  # Read in the biomass pools
+  bps <- load_bps(dir = dir, fgs = file_fgs, file_init = file_init)
+  # Read in the biological parameters
+  biol <- load_biolprm(dir = dir, file_biolprm = file_biolprm)
+  # Read in the run parameters
+  runprm <- load_runprm(dir = dir, file_runprm = file_runprm)
+
+  nc_catch <- paste0(scenario, 'CATCH.nc')
+  dietcheck <- paste0(scenario, 'DietCheck.txt')
+  nc_out <- paste0(scenario, ".nc")
+  nc_prod <- paste0(scenario, "PROD.nc")
+  file_catchfish <- file.path(dir,
+    paste0(scenario, "CatchPerFishery.txt"))
+  file_catch <- paste0(scenario, "Catch.txt")
+
+  
+  if(annage){
+    if(!file.exists(paste0(file.path(dir,paste0(scenario, 'ANNAGEBIO.nc'))))){
+      stop("ANNAGEBIO.nc file not found")
+    }
+    if(!file.exists(paste0(file.path(dir,paste0(scenario, 'ANNAGECATCH.nc'))))){
+      stop("ANNAGECATCH.nc file not found")
+    }
+    nc_annagebio <- paste0(scenario, 'ANNAGEBIO.nc')
+    nc_annagecatch <- paste0(scenario, 'ANNAGECATCH.nc')
+  }
+
+  # Get the boundary boxes
+  allboxes <- load_box(dir = dir, file_bgm = file_bgm)
+  boxes <- get_boundary(allboxes)
+
+  # Get box area for benthic biomass pool calc
+  area <- load_boxarea(dir = dir,
+                       file_bgm = file_bgm)
+    
+  #Extract from NetCDF files
+  # Need: dir, file_nc, bps, fgs, select_groups, select_variable,
+  # check_acronyms, bboxes
+
+  nums <- load_nc(dir = dir,
+                  file_nc = nc_out,
+                  bps = bps,
+                  fgs = fgs,
+                  select_groups = select_groups,
+                  select_variable = "Nums",
+                  check_acronyms = TRUE,
+                  bboxes = boxes)
+  if(verbose) message("Numbers read in.")
+
+  resn <- load_nc(dir = dir,
+                  file_nc = nc_out,
+                  bps = bps,
+                  fgs = fgs,
+                  select_groups = select_groups,
+                  select_variable = "ResN",
+                  check_acronyms = TRUE,
+                  bboxes = boxes)
+  if(verbose) message("Reserve nitrogen read in.")
+
+  structn <- load_nc(dir = dir,
+                  file_nc = nc_out,
+                  bps = bps,
+                  fgs = fgs,
+                  select_groups = select_groups,
+                  select_variable = "StructN",
+                  check_acronyms = TRUE,
+                  bboxes = boxes)
+  if(verbose) message("Structural nitrogen read in.")
+
+  eat <- load_nc(dir = dir,
+                     file_nc = nc_prod,
+                     bps = bps,
+                     fgs = fgs,
+                     select_groups = select_groups,
+                     select_variable = "Eat",
+                     check_acronyms = TRUE,
+                     bboxes = boxes)
+  if(verbose) message("Eaten read in.")
+
+  grazing <- load_nc(dir = dir,
+                 file_nc = nc_prod,
+                 bps = bps,
+                 fgs = fgs,
+                 select_groups = select_groups,
+                 select_variable = "Grazing",
+                 check_acronyms = TRUE,
+                 bboxes = boxes)
+  if(verbose) message("Grazing read in.")
+
+  vol <- load_nc_physics(dir = dir,
+                         file_nc = nc_out,
+                         physic_variables = "volume",
+                         aggregate_layers = FALSE,
+                         bboxes = boxes)
+  if(verbose) message("Volume read in.")
+  
+  # biomass pools added 2023 for Rpath testing
+  pools <- fgs %>%
+    dplyr::filter(NumCohorts == 1,
+                  IsTurnedOn == 1) %>%
+    dplyr::select(Name) %>%
+    .$Name
+
+  pooln <- load_nc(dir = dir,
+                   file_nc = nc_out,
+                   bps = bps,
+                   fgs = fgs,
+                   select_groups = pools,
+                   select_variable = "N",
+                   check_acronyms = TRUE,
+                   bboxes = boxes)
+ if(verbose) message("Biomass pools N read in.")
+
+
+```
+
+
 ### Test wrapper functions with biomass pool groups
 
 Only need species and index here, comps don't apply.
 
-In `om_species` need to check for biomass pools output and append that to the `truebio_ss` object? If one object can use existing `om_index` on bio pools.
+In `om_species` need to check for biomass pools output and append that to the `truebio_ss` object? If one object can use existing `om_index` on bio pools. However, will that be a problem if trying to combine the truenums and truebio objects? They won't be the same length. Perhaps leave separate at this level and combine only if needed. 
 
 ```{r}
   # biomass at agecl at full resolution (all polygons and layers)
   #truebio_ss <- omlist$truth$biomass_ages[omlist$truth$biomass_ages$species %in% species_ss,]
 ```
 
-If a single true bio object is created, may have to modify selectivty definition for biomass pools in `om_index`
+If a single true bio object is created, may have to modify selectivty definition for biomass pools in `om_index`. If left separate can apply no selectivity to biomass pool groups, only efficiency.
+
+
