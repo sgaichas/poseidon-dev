@@ -663,11 +663,139 @@ Only need species and index here, comps don't apply.
 
 In `om_species` need to check for biomass pools output and append that to the `truebio_ss` object? If one object can use existing `om_index` on bio pools. However, will that be a problem if trying to combine the truenums and truebio objects? They won't be the same length. Perhaps leave separate at this level and combine only if needed. 
 
-```{r}
-  # biomass at agecl at full resolution (all polygons and layers)
-  #truebio_ss <- omlist$truth$biomass_ages[omlist$truth$biomass_ages$species %in% species_ss,]
-```
-
 If a single true bio object is created, may have to modify selectivty definition for biomass pools in `om_index`. If left separate can apply no selectivity to biomass pool groups, only efficiency.
 
+Decision: leave the `truebiopool_ss` object separate and process separately with a different survey config file and a separate call to `om_index`. Or just bind them together for biomass based surveys if it doesn't break anything.
+
+Running `om_init` from the `mskeyrun` repo with my local NOBA atlantis outputs produced expected output:
+
+```
+
+> NOBAom <- om_init(here("data-raw/simulated-data/config/NOBA_sacc38Config.R"))
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01PROD.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01PROD.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01CATCH.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01CATCH.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01CATCH.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01ANNAGEBIO.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01ANNAGECATCH.nc successfully"
+[1] "Read /Users/sarah.gaichas/Documents/0_Data/ms-keyrun/simulated-data/atlantisoutput/NOBA_sacc_38/nordic_runresults_01ANNAGECATCH.nc successfully"
+> NOBAom$truth$biomass_pools
+               species agecl time polygon     atoutput
+1             Ben_bact     1    0       1 1.376317e+05
+2        Detrivore_ben     1    0       1 1.088091e+05
+3             Dinoflag     1    0       1 1.312067e+04
+4      Gel_zooplankton     1    0       1 1.569070e+05
+5              Lab_det     1    0       1 2.581300e+07
+6         Large_phytop     1    0       1 3.268895e+05
+7    Large_zooplankton     1    0       1 4.772586e+05
+8   Medium_zooplankton     1    0       1 1.118751e+06
+9             Pel_bact     1    0       1 3.268895e+04
+10       Predatory_ben     1    0       1 1.088091e+05
+11             Ref_det     1    0       1 8.904920e+06
+12        Small_phytop     1    0       1 3.280167e+05
+13   Small_zooplankton     1    0       1 9.152906e+05
+14             Sponges     1    0       1 4.621541e+05
+15            Ben_bact     1    1       1 8.875378e+05
+16     Benthic_filterf     1    1       1 1.163897e-04
+17             Carrion     1    1       1 1.700432e-10
+18              Corals     1    1       1 1.148013e-04
+19       Detrivore_ben     1    1       1 1.096034e+05
+20            Dinoflag     1    1       1 4.509383e+01
+21     Gel_zooplankton     1    1       1 1.563221e+05
+22           King_crab     1    1       1 0.000000e+00
+23             Lab_det     1    1       1 8.511963e+07
+24        Large_phytop     1    1       1 8.999719e+03
+25   Large_zooplankton     1    1       1 5.237310e+05
+26  Medium_zooplankton     1    1       1 5.390765e+06
+27            Pel_bact     1    1       1 1.230456e+06
+28       Predatory_ben     1    1       1 1.089640e+05
+29             Ref_det     1    1       1 8.142682e+06
+30        Small_phytop     1    1       1 1.177500e+03
+31   Small_zooplankton     1    1       1 7.373987e+07
+32             Sponges     1    1       1 4.647222e+05
+```
+
+Added lines to `om_species` to include the truebiopool outputs:
+
+```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/om_species.R"), eval=F}
+
+```
+
+Now test modified `om_species` in `mskeyrun` repo:
+
+```
+> NOBAom_fw <- om_species(fwspp$Name, NOBAom, save = FALSE) #save by hand, don't overwrite 11 species omlist_ss
+> NOBAom_fw$truebiopool_ss
+               species agecl time polygon     atoutput
+1             Ben_bact     1    0       1 1.376317e+05
+2        Detrivore_ben     1    0       1 1.088091e+05
+3             Dinoflag     1    0       1 1.312067e+04
+4      Gel_zooplankton     1    0       1 1.569070e+05
+5              Lab_det     1    0       1 2.581300e+07
+6         Large_phytop     1    0       1 3.268895e+05
+7    Large_zooplankton     1    0       1 4.772586e+05
+8   Medium_zooplankton     1    0       1 1.118751e+06
+9             Pel_bact     1    0       1 3.268895e+04
+10       Predatory_ben     1    0       1 1.088091e+05
+11             Ref_det     1    0       1 8.904920e+06
+12        Small_phytop     1    0       1 3.280167e+05
+13   Small_zooplankton     1    0       1 9.152906e+05
+14             Sponges     1    0       1 4.621541e+05
+15            Ben_bact     1    1       1 8.875378e+05
+16     Benthic_filterf     1    1       1 1.163897e-04
+17             Carrion     1    1       1 1.700432e-10
+18              Corals     1    1       1 1.148013e-04
+19       Detrivore_ben     1    1       1 1.096034e+05
+20            Dinoflag     1    1       1 4.509383e+01
+21     Gel_zooplankton     1    1       1 1.563221e+05
+22           King_crab     1    1       1 0.000000e+00
+23             Lab_det     1    1       1 8.511963e+07
+24        Large_phytop     1    1       1 8.999719e+03
+25   Large_zooplankton     1    1       1 5.237310e+05
+26  Medium_zooplankton     1    1       1 5.390765e+06
+27            Pel_bact     1    1       1 1.230456e+06
+28       Predatory_ben     1    1       1 1.089640e+05
+29             Ref_det     1    1       1 8.142682e+06
+30        Small_phytop     1    1       1 1.177500e+03
+31   Small_zooplankton     1    1       1 7.373987e+07
+32             Sponges     1    1       1 4.647222e+05
+33            Ben_bact     1    2       1 3.080604e+06
+34     Benthic_filterf     1    2       1 1.199844e-04
+35             Carrion     1    2       1 1.698761e-10
+36              Corals     1    2       1 1.168009e-04
+```
+
+Now try a new `om_index` that rbinds the truebio and truebiopool objects together for a biomass based survey
+
+```{r, code = readLines("https://raw.githubusercontent.com/r4atlantis/atlantisom/dev/R/om_index.R"), eval=F}
+
+```
+
+It works as tested from the `mskeyrun` SimData.Rmd (both age structured and biopool groups are in the output): 
+
+```
+> NOBAom_fw_ind$survObsBiomB$BTS_fall_allbox_effic1_fw[[1]] |> dplyr::group_by(species) |> dplyr::summarise(survBtot = sum(atoutput))
+# A tibble: 40 × 2
+   species         survBtot
+   <chr>              <dbl>
+ 1 Beard_seal      8.14e+ 4
+ 2 Ben_bact        9.36e+12
+ 3 Benthic_filterf 7.86e+10
+ 4 Carrion         7.46e- 7
+ 5 Corals          3.19e+11
+ 6 Demersal_large  6.47e+ 6
+ 7 Demersals_other 1.81e+ 8
+ 8 Detrivore_ben   2.59e+10
+ 9 Dinoflag        1.31e+ 6
+10 Fin_whale       3.87e+ 7
+# … with 30 more rows
+# ℹ Use `print(n = ...)` to see more rows
+```
+
+Plots of the new `mskeyrun::simSurveyIndexFW` object are [here](https://noaa-edab.github.io/RpathSim/ParametersforRpath.html).
 
