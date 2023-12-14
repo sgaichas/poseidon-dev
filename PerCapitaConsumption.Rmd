@@ -364,7 +364,10 @@ This code is part of `atlantisom::run_truth()`. With our selected species from `
   allboxes <- load_box(dir = dir, file_bgm = file_bgm)
   boxes <- get_boundary(allboxes)
 
-
+  # look directly at file
+  prod.nc = ncdf4::nc_open(file.path(dir, nc_prod))
+  
+  names(prod.nc$var)
 
   eat <- load_nc(dir = dir,
                      file_nc = nc_prod,
@@ -397,22 +400,127 @@ This code is part of `atlantisom::run_truth()`. With our selected species from `
 
 Now try the new function `atlantisom::calc_pred_cons()` which uses the volume of all water column layers to expand the atoutput (assumed to be mg N per cubic m at that timestep) to bio_eaten in tons.
 
-This is the function code
+This is the function code. Consumption still seems low so lets not exlude sediment layer.
+
+```{r}
+calc_pred_cons <- function(eat, grazing, vol, fgs, biolprm, runprm){
+
+  # Conversion factor from mg N to tonnes wet-weight
+  bio_conv <- biolprm$redfieldcn * biolprm$kgw2d / 1000000000
+
+  # Eat and grazing are per species, agecl, polygon, and time.
+  # Therefore, we need to aggregate the vol over layers.
+  # Eat calculated in atecology/atprocess.C
+  # Eat( ) is defined here : \trunk\atlantis\atecology\atprocess.c(644)
+
+  # SKG: The main question is the UNITS of eat and grazing.
+  # manual says this is either mg/m3/day or mg/day/individ
+  # calculations here assume mg/m3/day so multiplying by box vol
+  # is this m3 assuming the entire box volume or only where groups feed?
+  # do we need to match species to layers to get appropriate volume?
+  # VERTnight_XXX and VERTday_XXX in biol.prm
+
+  # biomass pool groups may get need volume expansion while
+  # age structured are per capita by age group?
+
+  # all layers? even sediment? try filtering out layer > 7 to remove sediment volume
+  # WARNING: ensure that layer 7 (processed via atlantisom) isn't unique to NOBA
+  # layer 7 is unique to NOBA, use max of layers as sediment layer
+  # however, unclear this is necessary, try without
+
+  colnames(fgs) <- tolower(colnames(fgs))
+
+  # check for GroupType or InvertType
+  if (!("grouptype" %in% colnames(fgs) | "inverttype"%in% colnames(fgs))) {
+    stop(paste("The columns GroupType or InvertType ars not in your functional\n",
+               "groups file."))
+  }
+
+  # change inverttype to grouptype, contents should be the same
+  if("inverttype" %in% names(fgs)) names(fgs)[names(fgs) == 'inverttype'] <- 'grouptype'
+
+  fgs$grouptype <- tolower(fgs$grouptype)
+
+  # is there a different calculation for benthos? don't expand to volume?
+  # not using this yet
+  pooltype <- fgs |>
+    dplyr::select(species=name, grouptype) |>
+    dplyr::mutate(pooltype = dplyr::case_when((grouptype %in% c("lg_inf",
+                                                                "sm_inf",
+                                                                "sed_bact",
+                                                                "sed_ep_ff",
+                                                                "sed_ep_other",
+                                                                "mob_ep_other",
+                                                                "coral",
+                                                                "sponge")) ~ "benthos",
+                                              (grouptype %in% c("lg_phy")) ~ "lg_phy",
+                                              TRUE ~ "alllayers"))
+  # not using this either
+  sedlayer <- max(vol$layer)
+
+  vol <- aggregate(atoutput ~ polygon + time, data = vol, sum)
+  colnames(vol)[colnames(vol) == "atoutput"] <- "vol"
+
+  # Combine eat and grazing! Calculate eaten biomass
+  biomass_eaten <- rbind(eat, grazing)
+  biomass_eaten <- merge(biomass_eaten, vol,
+    by = c("time", "polygon"))
+
+  # todo: previously AK noted that the bio_eaten values were too high
+  # the new values need to be checked to see if they give realistic
+  # results
+  # removed layer 7 in volume which should expand mg N to only water?
+  # total consumption and per capita from this look ok
+  # snapshot so should be daily value?
+
+  biomass_eaten$bio_eaten <- with(biomass_eaten,
+    atoutput * vol * bio_conv)
+
+  biomass_eaten$atoutput <- biomass_eaten$bio_eaten
+
+  return(biomass_eaten)
+}
+
+```
+
 
 ```{r, code = readLines("https://github.com/r4atlantis/atlantisom/raw/master/R/calc_pred_cons.R"), eval=F}
 ```
 
-This is the current result
+This is the current result compared with all layers
 
 ```{r}
 
-biomass_eaten <- calc_pred_cons(eat = eat, grazing = grazing, vol = vol, biolprm = biol, runprm = runprm)
+biomass_eaten <- calc_pred_cons(eat = eat, grazing = grazing, vol = vol, fgs = fgs, biolprm = biol, runprm = runprm)
+
+biomass_eaten_current <- atlantisom::calc_pred_cons(eat = eat, grazing = grazing, vol = vol, biolprm = biol, runprm = runprm)
 
 codtotcons <- biomass_eaten %>% 
   dplyr::filter(species=="North_atl_cod") %>%
   dplyr::group_by(time, agecl) %>% 
   dplyr::summarise(totcons = sum(bio_eaten))  
 
+```
+
+Keeping the sediment layer in makes a small difference. 
+
+```
+> head(biomass_eaten_current)
+  time polygon        species agecl    atoutput          vol   bio_eaten
+1    1       1 Long_rough_dab     1   0.6127621 2.865986e+13   0.6127621
+2    1       1 Long_rough_dab     8  20.7267353 2.865986e+13  20.7267353
+3    1       1 Long_rough_dab    10   6.1992620 2.865986e+13   6.1992620
+4    1       1        Haddock     2  77.4729324 2.865986e+13  77.4729324
+5    1       1         Saithe     9   9.1759148 2.865986e+13   9.1759148
+6    1       1         Saithe     3 173.4369707 2.865986e+13 173.4369707
+> head(biomass_eaten)
+  time polygon        species agecl    atoutput          vol   bio_eaten
+1    1       1 Long_rough_dab     1   0.6148762 2.875874e+13   0.6148762
+2    1       1 Long_rough_dab     8  20.7982434 2.875874e+13  20.7982434
+3    1       1 Long_rough_dab    10   6.2206497 2.875874e+13   6.2206497
+4    1       1        Haddock     2  77.7402172 2.875874e+13  77.7402172
+5    1       1         Saithe     9   9.2075721 2.875874e+13   9.2075721
+6    1       1         Saithe     3 174.0353353 2.875874e+13 174.0353353
 ```
 
 Plotting a cod example total consumption by age class
